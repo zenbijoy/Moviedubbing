@@ -30,7 +30,6 @@ def separate_stems(
     vocal_path = out_dir / "vocals.wav"
     music_path = out_dir / "music.wav"
 
-    # Check if Demucs or audio-separator CLI is available
     try:
         cmd = [
             "demucs", "--two-stems", "vocals",
@@ -46,14 +45,12 @@ def separate_stems(
             shutil.copyfile(str(sep_dir / "vocals.wav"), str(vocal_path))
             shutil.copyfile(str(sep_dir / "no_vocals.wav"), str(music_path))
             return vocal_path, music_path
+        raise RuntimeError("Demucs completed without producing the expected stems")
     except Exception as exc:
-        logger.warning("Demucs CLI separation failed/missing (%s) — falling back to copy", exc)
-
-    # Fallback when separation models are not installed
-    import shutil
-    shutil.copyfile(str(audio_p), str(vocal_path))
-    shutil.copyfile(str(audio_p), str(music_path))
-    return vocal_path, music_path
+        logger.exception("Demucs source separation failed")
+        raise RuntimeError(
+            "Demucs source separation failed; install Demucs and its model weights"
+        ) from exc
 
 
 def needs_background_normalization(

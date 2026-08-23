@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 
+import pytest
+
 from aidub.contracts.base import Identifier
 from aidub.providers.agent_state import AgentState, SegmentState
 from aidub.providers.agent_tools import AgentTool, DubbingAgentToolRegistry
@@ -15,7 +17,7 @@ from aidub.providers.factory import build_router_from_config
 from aidub.providers.gemini_adapter import GeminiAdapter
 from aidub.providers.openai_adapter import OpenAIAdapter
 from aidub.providers.openrouter_adapter import OpenRouterAdapter
-from aidub.providers.router import LlmProviderKind, LlmRequest
+from aidub.providers.router import LlmProviderError, LlmProviderKind
 
 
 def test_provider_kinds_enum() -> None:
@@ -75,13 +77,10 @@ def test_provider_config_env_parser(monkeypatch: os.MonkeyPatch) -> None:
     assert cfg.unofficial_configs[0].base_url == "https://proxy.test/v1"
 
 
-def test_factory_fallback_to_synthetic() -> None:
+def test_factory_requires_a_configured_provider() -> None:
     cfg = ProviderConfig()  # No keys set
-    router = build_router_from_config(cfg)
-    req = LlmRequest(request_id=Identifier("test_req"), user_prompt="Hello")
-    resp = router.complete(req)
-    assert resp.content != ""
-    assert resp.model_name == "synthetic-llm-v1"
+    with pytest.raises(LlmProviderError, match="no LLM provider is configured"):
+        build_router_from_config(cfg)
 
 
 def test_agent_tool_registry() -> None:

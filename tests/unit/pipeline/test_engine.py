@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from aidub.pipeline.config import PipelineConfig
-from aidub.pipeline.engine import DubbingEngine
+from aidub.pipeline.engine import DubbingEngine, PipelineCancelled
 from aidub.pipeline.errors import ErrorKind, PipelineError, exit_code_for_error
 from aidub.pipeline.manifest import PipelineManifest, StageStatus
 from aidub.pipeline.utterance_store import UtteranceStore
@@ -74,3 +74,30 @@ def test_dubbing_engine_instantiation(tmp_path: Path) -> None:
     engine = DubbingEngine(cfg)
     assert engine.work_dir.exists()
     assert engine.manifest.task_id != ""
+
+
+def test_dubbing_engine_honors_cancellation_before_media_work(tmp_path: Path) -> None:
+    in_file = tmp_path / "sample.mp4"
+    in_file.write_bytes(b"synthetic video data")
+    cfg = PipelineConfig(
+        input=in_file,
+        output=tmp_path / "dubbed.mp4",
+        work_dir=tmp_path / "work",
+    )
+    engine = DubbingEngine(cfg, cancel_requested=lambda: True)
+
+    with pytest.raises(PipelineCancelled, match="cancelled by operator"):
+        engine.run()
+
+
+def test_dubbing_engine_rejects_missing_source_before_probe(tmp_path: Path) -> None:
+    cfg = PipelineConfig(
+        input=tmp_path / "missing.mp4",
+        output=tmp_path / "dubbed.mp4",
+        work_dir=tmp_path / "work",
+    )
+
+    with pytest.raises(PipelineError) as exc_info:
+        DubbingEngine(cfg).run()
+
+    assert exc_info.value.code == "input_not_found"

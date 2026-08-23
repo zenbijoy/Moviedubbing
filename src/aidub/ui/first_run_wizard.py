@@ -70,10 +70,12 @@ class HardwareDiagnosticWizardController:
         cpu_count = os.cpu_count() or 4
         os_str = f"{platform.system()} {platform.release()}"
 
-        # Simulated memory & GPU detection
-        ram_gb = 32.0
-        vram_gb = 16.0
-        gpu_name = "NVIDIA GeForce RTX 4090"
+        # Real memory & GPU hardware probing
+        from aidub.infrastructure.system_telemetry import probe_system_telemetry  # noqa: PLC0415
+        report = probe_system_telemetry()
+        ram_gb = report.ram_total_gb
+        vram_gb = report.vram_total_gb
+        gpu_name = report.gpu_name
         ffmpeg_ok = shutil.which("ffmpeg") is not None or True
 
         # Assign tier

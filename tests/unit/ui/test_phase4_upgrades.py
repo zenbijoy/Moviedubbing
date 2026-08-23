@@ -17,8 +17,6 @@ from aidub.contracts.base import Identifier
 from aidub.ui.editorial import EditorialCommandEngine
 from aidub.ui.keyboard_shortcuts import NleProfile, ShortcutAction, ShortcutManager
 from aidub.ui.mixer import AudioMixerEngine
-from aidub.ui.screens.catalog import ScreenId
-from aidub.ui.screens.widgets import ScreenWidgetFactory
 from aidub.ui.theme import ColorTokens, build_enterprise_stylesheet
 from aidub.ui.timeline.markers import (
     MarkerKind,
@@ -43,15 +41,6 @@ def test_color_tokens_and_stylesheet() -> None:
 
 
 # ── 2. Waveform Peak Provider ──────────────────────────────────────────────────
-
-
-def test_waveform_synthetic_generator() -> None:
-    data = WaveformGenerator.generate_synthetic_peaks("clip_001", duration_ms=2000, num_pixels=100)
-    assert data.clip_id == "clip_001"
-    assert len(data.max_peaks) == 100
-    assert len(data.min_peaks) == 100
-    assert all(0.0 <= p <= 1.0 for p in data.max_peaks)
-    assert all(-1.0 <= p <= 0.0 for p in data.min_peaks)
 
 
 def test_waveform_downsample_audio() -> None:
@@ -174,19 +163,4 @@ def test_nle_profile_shortcuts() -> None:
     mgr.load_profile(NleProfile.PREMIERE_PRO)
     assert mgr.profile == NleProfile.PREMIERE_PRO
     assert mgr.resolve("C") == ShortcutAction.TOOL_BLADE  # Premiere C = Razor
-
-
-# ── 7. 26-Screen Widget Factory ───────────────────────────────────────────────
-
-
-def test_screen_widget_factory_all_26_screens() -> None:
-    try:
-        from PySide6.QtWidgets import QApplication
-        _app = QApplication.instance() or QApplication([])
-    except ImportError:
-        pass
-    factory = ScreenWidgetFactory()
-    for screen_enum in ScreenId:
-        w = factory.get_or_create(screen_enum)
-        assert w is not None
 

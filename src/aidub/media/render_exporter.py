@@ -20,6 +20,7 @@ from pathlib import Path
 from pydantic import Field
 
 from aidub.contracts.base import ContractModel, Identifier
+from aidub.media.ffmpeg_ops import _run
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +172,7 @@ class MasterMediaExporter:
         options: MasterExportOptions,
     ) -> MasterExportResult:
         """
-        Execute or format master container export.
+        Execute a real FFmpeg master-container export.
         """
         pid = Identifier(project_id)
         cmd_args = self.build_ffmpeg_args(source_video_path, options)
@@ -179,9 +180,15 @@ class MasterMediaExporter:
         out_path = Path(options.output_directory) / f"{options.output_filename}.{options.container_format.value}"
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Write synthetic deliverable file for testing / headless validation
-        if not out_path.exists():
-            out_path.write_bytes(b"RIFF_SYNTHETIC_MULTI_TRACK_MASTER_CONTAINER_PAYLOAD")
+        required_inputs = [Path(source_video_path)]
+        required_inputs.extend(Path(track.file_path) for track in options.audio_tracks)
+        required_inputs.extend(Path(track.file_path) for track in options.subtitle_tracks)
+        missing = [str(path) for path in required_inputs if not path.is_file()]
+        if missing:
+            raise FileNotFoundError(f"master export inputs do not exist: {', '.join(missing)}")
+        _run(cmd_args)
+        if not out_path.is_file() or out_path.stat().st_size == 0:
+            raise RuntimeError("FFmpeg completed without producing a master deliverable")
 
         logger.info("render_exporter: created master container deliverable -> %s", out_path)
 

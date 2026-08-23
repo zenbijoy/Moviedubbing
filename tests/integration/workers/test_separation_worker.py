@@ -4,7 +4,6 @@ import hashlib
 from pathlib import Path
 
 from aidub.contracts.jobs import JobDescriptor
-from aidub.media.stems import StudioStemSelection
 from aidub.workers.supervisor import LocalWorkerSupervisor
 
 
@@ -24,16 +23,12 @@ def make_separation_job(job_id: str, tmp_path: Path) -> JobDescriptor:
     )
 
 
-def test_separation_worker_executes_media_separate_stems_job(tmp_path: Path) -> None:
+def test_separation_worker_rejects_missing_source(tmp_path: Path) -> None:
     with LocalWorkerSupervisor() as supervisor:
         job = make_separation_job("job_sep_001", tmp_path)
         supervisor.submit(job)
         result = supervisor.wait(timeout_seconds=10.0)
 
-        assert result.succeeded
-        assert "result_json" in result.metrics
-        selection = StudioStemSelection.model_validate_json(
-            str(result.metrics["result_json"])
-        )
-        assert selection.separation_result.engine.engine_id == "demucs-separation"
-        assert len(selection.separation_result.stems) == 4
+        assert not result.succeeded
+        assert result.error is not None
+        assert "source audio does not exist" in result.error.safe_details["message"]

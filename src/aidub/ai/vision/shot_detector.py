@@ -98,12 +98,10 @@ class ShotDetector:
         self,
         media_id: str,
         total_frames: int,
-        frame_diffs: Sequence[float] | None = None,
+        frame_diffs: Sequence[float],
     ) -> ShotSegmentationResult:
         """
-        Detect shot boundaries from total frame count and optional frame-to-frame diffs.
-
-        If frame_diffs is None, synthesizes shot cuts every ~72 frames (3 seconds at 24fps).
+        Detect shot boundaries from measured frame-to-frame differences.
         """
         shots: list[ShotBoundary] = []
         if total_frames <= 0:
@@ -112,16 +110,12 @@ class ShotDetector:
             )
 
         cut_points: list[tuple[int, str, float]] = [(0, "hard_cut", 1.0)]
-        if frame_diffs is not None:
-            for idx, diff in enumerate(frame_diffs, start=1):
-                if diff >= self.cut_threshold:
-                    c_type, c_conf = self.classify_cut_type(diff)
-                    cut_points.append((idx, c_type, c_conf))
-        else:
-            # Default ~3-second synthetic shot interval
-            shot_len = int(self.fps * 3)
-            for f in range(shot_len, total_frames, shot_len):
-                cut_points.append((f, "hard_cut", 0.90))
+        if len(frame_diffs) < total_frames - 1:
+            raise ValueError("frame_diffs must contain every adjacent frame measurement")
+        for idx, diff in enumerate(frame_diffs[: total_frames - 1], start=1):
+            if diff >= self.cut_threshold:
+                c_type, c_conf = self.classify_cut_type(diff)
+                cut_points.append((idx, c_type, c_conf))
 
         # Add total_frames boundary
         if not cut_points or cut_points[-1][0] != total_frames:

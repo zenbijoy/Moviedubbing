@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 from aidub import __version__
 from aidub.i18n import CatalogError, LocaleService
 
-from .models import ShellState
 from .qt_support import DesktopDependencyError, require_pyside6
 from .styles import APPLICATION_STYLE
 
@@ -24,13 +23,12 @@ class DesktopApplication:
         argv: Sequence[str] | None = None,
         *,
         locale: str | None = None,
-        shell_state: ShellState | None = None,
     ) -> None:
         require_pyside6()
         from PySide6.QtCore import QCoreApplication  # noqa: PLC0415
         from PySide6.QtWidgets import QApplication  # noqa: PLC0415
 
-        from .main_window import AIDubMainWindow  # noqa: PLC0415
+        from .studio_window import AIDubStudioWindow  # noqa: PLC0415
 
         existing = QApplication.instance()
         self.application = existing or QApplication(list(argv) if argv is not None else sys.argv)
@@ -39,20 +37,27 @@ class DesktopApplication:
         QCoreApplication.setOrganizationDomain("aidubbing.studio")
         QCoreApplication.setApplicationName("AI Movie Dubbing Studio")
         QCoreApplication.setApplicationVersion(__version__)
-        self.application.setStyleSheet(APPLICATION_STYLE)
+        if hasattr(self.application, "setStyleSheet"):
+            self.application.setStyleSheet(APPLICATION_STYLE)
         self.locale_service = LocaleService(locale)
-        self.shell_state = shell_state or ShellState()
-        self.window = AIDubMainWindow(self.locale_service, shell_state=self.shell_state)
+        self.window = AIDubStudioWindow(locale_service=self.locale_service)
 
     def show(self) -> None:
-        self.window.show()
+        if hasattr(self.window, "show"):
+            self.window.show()
 
     def run(self) -> int:
         self.show()
-        return int(self.application.exec())
+        if hasattr(self.application, "exec"):
+            return int(self.application.exec())
+        return 0
 
 
-def run_desktop(argv: Sequence[str] | None = None, *, locale: str | None = None) -> int:
+def run_desktop(
+    argv: Sequence[str] | None = None,
+    *,
+    locale: str | None = None,
+) -> int:
     """Start the desktop UI and return a process exit code.
 
     Missing Qt packages and damaged localization resources are reported as
@@ -69,4 +74,3 @@ def run_desktop(argv: Sequence[str] | None = None, *, locale: str | None = None)
 
 if __name__ == "__main__":
     sys.exit(run_desktop())
-

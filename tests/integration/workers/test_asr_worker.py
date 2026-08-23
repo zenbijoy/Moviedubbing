@@ -6,7 +6,7 @@ from aidub.contracts.jobs import JobDescriptor
 from aidub.domain.identifiers import MediaAssetId, ProjectId
 from aidub.domain.time import AudioSamplePosition, AudioSampleRange
 from aidub.domain.types import LanguageTag, Sha256
-from aidub.speech.contracts import RecognitionChunkResult, SpeechRecognitionRequest
+from aidub.speech.contracts import SpeechRecognitionRequest
 from aidub.workers.supervisor import LocalWorkerSupervisor
 
 
@@ -36,14 +36,12 @@ def make_asr_job(job_id: str) -> JobDescriptor:
     )
 
 
-def test_asr_worker_executes_speech_asr_job() -> None:
+def test_asr_worker_rejects_job_without_real_audio_source() -> None:
     with LocalWorkerSupervisor() as supervisor:
         job = make_asr_job("job_asr_001")
         supervisor.submit(job)
         result = supervisor.wait(timeout_seconds=10.0)
 
-        assert result.succeeded
-        assert "result_json" in result.metrics
-        chunk_result = RecognitionChunkResult.model_validate_json(str(result.metrics["result_json"]))
-        assert chunk_result.provenance.engine.engine_id == "faster-whisper"
-        assert len(chunk_result.segments) > 0
+        assert not result.succeeded
+        assert result.error is not None
+        assert "real source_audio_path" in result.error.safe_details["message"]

@@ -38,12 +38,8 @@ def test_pyannote_adapter_diarization() -> None:
     audio_range = make_audio_range()
     source_sha = Sha256("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
 
-    result = adapter.diarize(audio_range, source_sha)
-
-    assert result.engine.engine_id == "pyannote-diarization"
-    assert len(result.segments) == 2
-    assert result.speaker_count == 2
-    assert result.der_score is not None and result.der_score < 0.10
+    with pytest.raises(RuntimeError, match="real source_audio_path"):
+        adapter.diarize(audio_range, source_sha)
 
 
 def test_cluster_speaker_embeddings() -> None:

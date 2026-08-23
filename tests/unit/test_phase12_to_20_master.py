@@ -67,7 +67,12 @@ def test_phase12_interchange() -> None:
     assert report.target_language == "he-IL"
 
     verifier = NLEConformVerifier()
-    res = verifier.verify_nle_conform("proj_12", "DaVinci_Resolve")
+    res = verifier.verify_nle_conform(
+        "proj_12",
+        "DaVinci_Resolve",
+        timecode_drift_ms=0.4,
+        audio_sample_drift=19,
+    )
     assert res.conform_passed is True
 
 

@@ -6,7 +6,7 @@ Evaluates dubbed movie project assets across 8 distinct quality dimensions:
   2. Diarization Boundary Precision Score
   3. Translation Semantic Meaning Preservation Score
   4. Speech Timing Fit & Alignment Score
-  5. Synthetic Voice Engine Quality (MOS Proxy) Score
+  5. Voice Engine Quality (MOS) Score
   6. Visual Lip-Sync Quality Score
   7. Audio Loudness (LUFS) & Clipping Headroom Score
   8. Subtitle Reading Speed (Characters-Per-Second CPS) Score
@@ -142,14 +142,14 @@ class MultiDimensionalQCEvaluator:
     def evaluate_utterance(
         self,
         utterance_id: str,
-        transcription_acc: float = 0.95,
-        diarization_prec: float = 0.92,
-        translation_meaning: float = 0.90,
-        timing_fit: float = 0.88,
-        voice_quality: float = 0.91,
-        lipsync_score: float = 0.89,
-        integrated_lufs: float = -24.0,
-        subtitle_cps: float = 14.5,
+        transcription_acc: float,
+        diarization_prec: float,
+        translation_meaning: float,
+        timing_fit: float,
+        voice_quality: float,
+        lipsync_score: float,
+        integrated_lufs: float,
+        subtitle_cps: float,
     ) -> UtteranceQcReport:
         """
         Evaluate single utterance quality across 8 dimensions.
@@ -289,7 +289,7 @@ class MultiDimensionalQCEvaluator:
                 passed_count=0,
                 warning_count=0,
                 blocking_count=0,
-                overall_project_quality=1.0,
+                overall_project_quality=0.0,
                 preset_used=self.preset,
                 reports=[],
             )

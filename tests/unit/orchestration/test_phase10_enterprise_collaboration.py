@@ -66,20 +66,12 @@ def test_collaborative_session_sync_ot() -> None:
 def test_distribution_package_exporter() -> None:
     exporter = DistributionPackageExporter()
 
-    # DCP Manifest
-    dcp = exporter.export_dcp_manifest("proj_01", "Hero Movie", ["en-US", "bn-BD"])
-    assert dcp.format_type == "DCP"
-    assert "dcp_cpl.xml" in dcp.manifest_file_path
-
-    # Broadcast MXF
-    mxf = exporter.export_broadcast_layback("proj_01", "7.1_Surround")
-    assert mxf.format_type == "BROADCAST_MXF"
-    assert mxf.audio_channel_layout == "7.1_Surround"
-
-    # OTT HLS/DASH
-    ott = exporter.export_ott_streaming_package("proj_01", ["en-US", "bn-BD", "es-ES"])
-    assert ott.format_type == "OTT_HLS_DASH"
-    assert len(ott.target_languages) == 3
+    with pytest.raises(RuntimeError, match="AIDUB_DCP_COMMAND is not configured"):
+        exporter.export_dcp_manifest("proj_01", "Hero Movie", ["en-US", "bn-BD"])
+    with pytest.raises(RuntimeError, match="AIDUB_MXF_COMMAND is not configured"):
+        exporter.export_broadcast_layback("proj_01", "7.1_Surround")
+    with pytest.raises(RuntimeError, match="AIDUB_OTT_COMMAND is not configured"):
+        exporter.export_ott_streaming_package("proj_01", ["en-US", "bn-BD", "es-ES"])
 
 
 def test_cryptographic_audit_logger_hash_chain() -> None:
@@ -108,13 +100,11 @@ def test_collaboration_studio_controller() -> None:
     plan = ctrl.trigger_render_orchestration("job_ui")
     assert plan.overall_progress == 100.0
 
-    dcp = ctrl.export_distribution_package("proj_ui", "DCP")
-    assert dcp.format_type == "DCP"
-
-    mxf = ctrl.export_distribution_package("proj_ui", "MXF")
-    assert mxf.format_type == "BROADCAST_MXF"
-
-    ott = ctrl.export_distribution_package("proj_ui", "OTT")
-    assert ott.format_type == "OTT_HLS_DASH"
+    with pytest.raises(RuntimeError, match="AIDUB_DCP_COMMAND is not configured"):
+        ctrl.export_distribution_package("proj_ui", "DCP")
+    with pytest.raises(RuntimeError, match="AIDUB_MXF_COMMAND is not configured"):
+        ctrl.export_distribution_package("proj_ui", "MXF")
+    with pytest.raises(RuntimeError, match="AIDUB_OTT_COMMAND is not configured"):
+        ctrl.export_distribution_package("proj_ui", "OTT")
 
     assert ctrl.verify_audit_log_integrity() is True

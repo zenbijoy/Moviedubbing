@@ -12,9 +12,9 @@ from aidub.providers.openai_adapter import OpenAIAdapter
 from aidub.providers.openrouter_adapter import OpenRouterAdapter
 from aidub.providers.router import (
     LlmAdapter,
+    LlmProviderError,
     LlmProviderRouter,
     LlmRouterConfig,
-    _SyntheticLlmAdapter,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,8 +28,8 @@ def build_router_from_config(
     Constructs an LlmProviderRouter with active LLM adapters based on configuration.
     
     Adapters are instantiated and ordered according to ``config.provider_priority``.
-    If no valid API keys or endpoints are configured, a synthetic fallback adapter
-    is used so that offline test environments continue to function seamlessly.
+    A configured, real provider is mandatory.  Missing credentials are surfaced
+    as a configuration error instead of returning fabricated translations.
     """
     cfg = config or ProviderConfig.from_env()
     adapters: list[LlmAdapter] = []
@@ -82,8 +82,12 @@ def build_router_from_config(
                     logger.info("LLM Router: Registered Custom API '%s' (%s at %s)", uc.name, uc.model, uc.base_url)
 
     if not adapters:
-        logger.warning("LLM Router: No valid API keys found in environment. Using _SyntheticLlmAdapter fallback.")
-        adapters = [_SyntheticLlmAdapter()]
+        raise LlmProviderError(
+            "configuration",
+            "no LLM provider is configured; add an OpenRouter, Gemini, OpenAI, "
+            "DeepSeek, or custom endpoint credential",
+            retryable=False,
+        )
 
     return LlmProviderRouter(adapters=adapters, config=router_config)
 

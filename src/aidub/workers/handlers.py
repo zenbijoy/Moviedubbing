@@ -77,7 +77,8 @@ def _speech_asr(job: JobDescriptor, context: WorkerContext) -> dict[str, Any]:
         else FasterWhisperOptions()
     )
 
-    adapter = FasterWhisperAdapter(options)
+    source_audio_path = job.parameters.get("source_audio_path")
+    adapter = FasterWhisperAdapter(options, source_audio_path=source_audio_path)
     runtime = CallbackRecognitionRuntime(
         is_cancelled=context.is_cancelled,
         on_progress=lambda p: context.progress(
@@ -115,7 +116,11 @@ def _speech_diarize(job: JobDescriptor, context: WorkerContext) -> dict[str, Any
     )
 
     adapter = PyannoteDiarizationAdapter(options)
-    raw_result = adapter.diarize(audio_range, source_sha256)
+    raw_result = adapter.diarize(
+        audio_range,
+        source_sha256,
+        source_audio_path=job.parameters.get("source_audio_path"),
+    )
     context.checkpoint()
 
     # Apply acoustic speaker clustering

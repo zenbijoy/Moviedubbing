@@ -6,7 +6,6 @@ Generates normalized min/max peak arrays per pixel for 60 FPS multitrack timelin
 
 from __future__ import annotations
 
-import math
 from collections.abc import Sequence
 
 from pydantic import Field
@@ -28,37 +27,6 @@ class WaveformGenerator:
     """
     Computes waveform display peaks from raw audio samples.
     """
-
-    @staticmethod
-    def generate_synthetic_peaks(
-        clip_id: str,
-        duration_ms: int,
-        num_pixels: int = 400,
-        seed: int = 42,
-    ) -> WaveformPeakData:
-        """
-        Generate smooth synthetic waveform peak contours for testing / UI previews.
-        """
-        num_pixels = max(10, num_pixels)
-        min_peaks: list[float] = []
-        max_peaks: list[float] = []
-
-        for i in range(num_pixels):
-            t = (i / num_pixels) * (duration_ms / 1000.0) * 10.0
-            # Envelope envelope modulation
-            amp = 0.2 + 0.6 * math.sin(t) ** 2
-            if i % 15 == 0:  # silence gaps
-                amp *= 0.1
-
-            max_peaks.append(round(amp, 3))
-            min_peaks.append(round(-amp, 3))
-
-        return WaveformPeakData(
-            clip_id=clip_id,
-            duration_ms=duration_ms,
-            min_peaks=min_peaks,
-            max_peaks=max_peaks,
-        )
 
     @staticmethod
     def downsample_audio(

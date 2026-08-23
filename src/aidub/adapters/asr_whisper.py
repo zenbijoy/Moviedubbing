@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from pathlib import Path
 from typing import Any, Self
 
 from pydantic import Field, model_validator
 
 from aidub.contracts.base import ContractModel, Identifier
 from aidub.domain.time import AudioSamplePosition, AudioSampleRange
-from aidub.domain.types import SemanticVersion, Sha256
 from aidub.speech.contracts import (
     RecognitionChunkResult,
     RecognitionPhase,
@@ -31,8 +31,8 @@ class FasterWhisperOptions(ContractModel):
     """Configuration options for the Faster-Whisper ASR engine adapter."""
 
     model_size: str = Field(default="large-v3", min_length=1, max_length=64)
-    device: str = Field(default="cuda", min_length=1, max_length=32)
-    compute_type: str = Field(default="float16", min_length=1, max_length=32)
+    device: str = Field(default="auto", min_length=1, max_length=32)
+    compute_type: str = Field(default="default", min_length=1, max_length=32)
     beam_size: int = Field(default=5, ge=1, le=20)
     vad_filter: bool = Field(default=True)
     word_timestamps: bool = Field(default=True)
@@ -40,9 +40,9 @@ class FasterWhisperOptions(ContractModel):
 
     @model_validator(mode="after")
     def _validate_options(self) -> Self:
-        if self.compute_type not in {"float16", "int8_float16", "int8", "float32"}:
+        if self.compute_type not in {"default", "float16", "int8_float16", "int8", "float32"}:
             raise ValueError(f"unsupported compute type: {self.compute_type}")
-        if self.device not in {"cuda", "cpu"}:
+        if self.device not in {"auto", "cuda", "cpu"}:
             raise ValueError(f"unsupported device: {self.device}")
         return self
 
@@ -50,19 +50,40 @@ class FasterWhisperOptions(ContractModel):
 class FasterWhisperAdapter(SpeechRecognizer):
     """Local Faster-Whisper speech recognizer adapter with exact sample alignment."""
 
-    def __init__(self, options: FasterWhisperOptions | None = None) -> None:
+    def __init__(
+        self,
+        options: FasterWhisperOptions | None = None,
+        *,
+        source_audio_path: str | Path | None = None,
+    ) -> None:
         self.options = options or FasterWhisperOptions()
+        self.source_audio_path = Path(source_audio_path) if source_audio_path is not None else None
         model_hash = hashlib.sha256(
             f"faster-whisper-{self.options.model_size}-{self.options.compute_type}".encode()
         ).hexdigest()
         self._identity = SpeechEngineIdentity(
             engine_id=Identifier("faster-whisper"),
-            engine_version=SemanticVersion("1.1.0"),
+            engine_version="1.1.0",
             model_id=Identifier(f"whisper-{self.options.model_size}"),
-            model_version=SemanticVersion("3.0.0"),
-            model_weights_sha256=Sha256(model_hash),
+            model_version="3.0.0",
+            model_weights_sha256=model_hash,
         )
         self._model_instance: Any | None = None
+
+    def _model(self) -> Any:
+        try:
+            import faster_whisper  # type: ignore[import-not-found]
+        except ImportError as exc:
+            raise RuntimeError(
+                "Faster-Whisper is not installed; install the production ASR dependencies"
+            ) from exc
+        if self._model_instance is None:
+            self._model_instance = faster_whisper.WhisperModel(
+                self.options.model_size,
+                device=self.options.device,
+                compute_type=self.options.compute_type,
+            )
+        return self._model_instance
 
     @property
     def identity(self) -> SpeechEngineIdentity:
@@ -79,19 +100,9 @@ class FasterWhisperAdapter(SpeechRecognizer):
         runtime.checkpoint()
         provenance = RecognitionProvenance.from_request(request, self.identity)
 
-        # Check if real faster-whisper is installed
-        try:
-            import faster_whisper  # type: ignore[import-not-found]
-        except ImportError:
-            # Fallback to deterministic sample-aligned adapter for testing
-            return self._synthetic_recognize(request, provenance, runtime)
-
-        if self._model_instance is None:
-            self._model_instance = faster_whisper.WhisperModel(
-                self.options.model_size,
-                device=self.options.device,
-                compute_type=self.options.compute_type,
-            )
+        if self.source_audio_path is None or not self.source_audio_path.is_file():
+            raise RuntimeError("a real source_audio_path is required for speech recognition")
+        model = self._model()
 
         runtime.checkpoint()
         runtime.report(
@@ -106,8 +117,8 @@ class FasterWhisperAdapter(SpeechRecognizer):
         )
 
         # Execute transcription with word-level timestamps
-        segments, _info = self._model_instance.transcribe(
-            request.source_audio_sha256,  # audio source path or buffer
+        segments, _info = model.transcribe(
+            str(self.source_audio_path),
             beam_size=self.options.beam_size,
             vad_filter=self.options.vad_filter,
             word_timestamps=self.options.word_timestamps,
@@ -169,71 +180,45 @@ class FasterWhisperAdapter(SpeechRecognizer):
             segments=tuple(recognized_segments),
         )
 
-    def _synthetic_recognize(
+    def transcribe_file(
         self,
-        request: SpeechRecognitionRequest,
-        provenance: RecognitionProvenance,
-        runtime: RecognitionRuntime,
-    ) -> RecognitionChunkResult:
-        """Deterministic sample-aligned recognition pass for clean environments."""
+        audio_path: str | Path,
+        turns: list[tuple[float, float, int]] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Transcribe an actual audio file and preserve model timestamps."""
 
-        sample_rate = request.audio_range.sample_rate
-        chunk_start = request.audio_range.start.sample_index
-        chunk_length = request.audio_range.sample_count
-
-        runtime.checkpoint()
-        runtime.report(
-            RecognitionProgress(
-                request_id=request.request_id,
-                phase=RecognitionPhase.RECOGNIZING,
-                completed_samples=chunk_length,
-                total_samples=chunk_length,
-                chunk_index=request.chunk_index,
-                chunk_count=request.chunk_count,
+        source = Path(audio_path)
+        if not source.is_file():
+            raise FileNotFoundError(f"ASR source audio does not exist: {source}")
+        segments, _info = self._model().transcribe(
+            str(source),
+            beam_size=self.options.beam_size,
+            vad_filter=self.options.vad_filter,
+            word_timestamps=self.options.word_timestamps,
+            language=self.options.language,
+        )
+        results: list[dict[str, Any]] = []
+        for segment in segments:
+            start = float(segment.start)
+            end = float(segment.end)
+            text = str(segment.text).strip()
+            if not text or end <= start:
+                continue
+            speaker = 0
+            if turns:
+                speaker = max(
+                    turns,
+                    key=lambda turn: max(0.0, min(end, turn[1]) - max(start, turn[0])),
+                )[2]
+            results.append(
+                {
+                    "start": start,
+                    "end": end,
+                    "text": text,
+                    "speaker": speaker,
+                }
             )
-        )
-
-        w1_count = int(sample_rate * 0.5)
-        w2_count = int(sample_rate * 0.5)
-
-        w1 = RecognizedWord(
-            word_id=Identifier(f"word_{request.chunk_index}_0"),
-            text="Hello",
-            audio_range=AudioSampleRange(
-                start=AudioSamplePosition(sample_index=chunk_start, sample_rate=sample_rate),
-                sample_count=w1_count,
-            ),
-            confidence=0.98,
-            provenance=provenance,
-        )
-
-        w2 = RecognizedWord(
-            word_id=Identifier(f"word_{request.chunk_index}_1"),
-            text="World",
-            audio_range=AudioSampleRange(
-                start=AudioSamplePosition(sample_index=chunk_start + w1_count, sample_rate=sample_rate),
-                sample_count=w2_count,
-            ),
-            confidence=0.96,
-            provenance=provenance,
-        )
-
-        segment = RecognizedSegment(
-            segment_id=Identifier(f"seg_{request.chunk_index}_0"),
-            text="Hello World",
-            audio_range=AudioSampleRange(
-                start=AudioSamplePosition(sample_index=chunk_start, sample_rate=sample_rate),
-                sample_count=w1_count + w2_count,
-            ),
-            confidence=0.97,
-            words=(w1, w2),
-            provenance=provenance,
-        )
-
-        return RecognitionChunkResult(
-            provenance=provenance,
-            segments=(segment,),
-        )
+        return results
 
     def transcribe_turns(
         self,
@@ -247,18 +232,8 @@ class FasterWhisperAdapter(SpeechRecognizer):
         Ensures each segment contains words from ONLY ONE speaker and retains
         the correct speaker_id attribution.
         """
-        results: list[dict[str, Any]] = []
-        for i, (a, b, spk) in enumerate(turns):
-            if (b - a) < 0.2:
-                continue
-            # Segment turn transcription
-            results.append({
-                "start": float(a),
-                "end": float(b),
-                "text": f"Sample turn dialogue {i}",
-                "speaker": int(spk),
-            })
-        return results
+        del work_dir
+        return self.transcribe_file(audio_path, turns)
 
 
 def _has_speech(segs: list[dict[str, Any]], total_duration_s: float) -> bool:
@@ -292,4 +267,3 @@ def _has_speech(segs: list[dict[str, Any]], total_duration_s: float) -> bool:
 
 
 __all__ = ["FasterWhisperAdapter", "FasterWhisperOptions", "_has_speech"]
-

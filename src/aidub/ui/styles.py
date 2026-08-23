@@ -65,6 +65,10 @@ QWidget {{
     selection-color: {TEXT_PRIMARY};
 }}
 
+QLabel {{
+    background-color: transparent;
+}}
+
 /* =====================================================================
    MAIN WINDOW
    ===================================================================== */
@@ -260,6 +264,7 @@ QListWidget#NavList::item {{
     padding: 9px 10px;
     color: {TEXT_SECONDARY};
     font-size: 13px;
+    font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets', 'Segoe UI Variable', sans-serif;
 }}
 
 QListWidget#NavList::item:selected {{

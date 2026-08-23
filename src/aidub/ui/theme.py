@@ -23,7 +23,9 @@ from aidub.contracts.base import ContractModel
 class ThemeMode(StrEnum):
     STUDIO_DARK = "studio_dark"
     BROADCAST_GRAY = "broadcast_gray"
+    CYBER_DARK = "cyber_dark"
     HIGH_CONTRAST = "high_contrast"
+    LIGHT_STUDIO = "light_studio"
 
 
 class ColorTokens(ContractModel):
@@ -39,6 +41,74 @@ class ColorTokens(ContractModel):
     text_primary: str = "#F9FAFB"
     text_secondary: str = "#D1D5DB"
     text_muted: str = "#9CA3AF"
+
+
+_THEME_PRESETS: dict[ThemeMode, ColorTokens] = {
+    ThemeMode.STUDIO_DARK: ColorTokens(
+        bg_dark="#0D1118",
+        bg_surface="#161D28",
+        bg_elevated="#1C2431",
+        border="#283241",
+        accent="#4F8CFF",
+        accent_hover="#3B82F6",
+        text_primary="#F7F9FC",
+        text_secondary="#D1D5DB",
+        text_muted="#687386",
+    ),
+    ThemeMode.BROADCAST_GRAY: ColorTokens(
+        bg_dark="#18181B",
+        bg_surface="#24242A",
+        bg_elevated="#2E2E36",
+        border="#3F3F46",
+        accent="#10B981",
+        accent_hover="#059669",
+        text_primary="#FAFAFA",
+        text_secondary="#E4E4E7",
+        text_muted="#A1A1AA",
+    ),
+    ThemeMode.CYBER_DARK: ColorTokens(
+        bg_dark="#0A0E1A",
+        bg_surface="#111827",
+        bg_elevated="#1F2937",
+        border="#374151",
+        accent="#06B6D4",
+        accent_hover="#0891B2",
+        text_primary="#F9FAFB",
+        text_secondary="#E5E7EB",
+        text_muted="#9CA3AF",
+    ),
+    ThemeMode.HIGH_CONTRAST: ColorTokens(
+        bg_dark="#000000",
+        bg_surface="#111111",
+        bg_elevated="#1E1E1E",
+        border="#444444",
+        accent="#F59E0B",
+        accent_hover="#D97706",
+        text_primary="#FFFFFF",
+        text_secondary="#E0E0E0",
+        text_muted="#AAAAAA",
+    ),
+    ThemeMode.LIGHT_STUDIO: ColorTokens(
+        bg_dark="#F8FAFC",
+        bg_surface="#FFFFFF",
+        bg_elevated="#F1F5F9",
+        border="#CBD5E1",
+        accent="#2563EB",
+        accent_hover="#1D4ED8",
+        text_primary="#0F172A",
+        text_secondary="#334155",
+        text_muted="#64748B",
+    ),
+}
+
+
+def get_theme_tokens(mode: str | ThemeMode = ThemeMode.STUDIO_DARK) -> ColorTokens:
+    if isinstance(mode, str):
+        try:
+            mode = ThemeMode(mode.lower())
+        except ValueError:
+            mode = ThemeMode.STUDIO_DARK
+    return _THEME_PRESETS.get(mode, _THEME_PRESETS[ThemeMode.STUDIO_DARK])
 
 
 TRACK_COLOR_PALETTE: dict[str, str] = {
@@ -69,7 +139,11 @@ def build_enterprise_stylesheet(tokens: ColorTokens | None = None) -> str:
         width: 2px;
         height: 2px;
     }}
-    QFrame.StudioCard {{
+    QFrame#TopBar, QFrame#Sidebar, QStatusBar#StudioStatusBar {{
+        background-color: {t.bg_surface};
+        border-color: {t.border};
+    }}
+    QFrame.StudioCard, QFrame#ElevatedPanel, QFrame#Panel {{
         background-color: {t.bg_surface};
         border: 1px solid {t.border};
         border-radius: 8px;
@@ -79,30 +153,36 @@ def build_enterprise_stylesheet(tokens: ColorTokens | None = None) -> str:
         color: {t.text_primary};
         border: 1px solid {t.border};
         border-radius: 6px;
-        padding: 8px 16px;
+        padding: 6px 14px;
         font-weight: 600;
     }}
     QPushButton:hover {{
         background-color: {t.accent_hover};
         border-color: {t.accent};
-    }}
-    QPushButton.Primary {{
-        background-color: {t.accent};
         color: #FFFFFF;
     }}
-    QLineEdit, QTextEdit, QSpinBox {{
+    QPushButton.Primary, QPushButton[primary="true"] {{
+        background-color: {t.accent};
+        color: #FFFFFF;
+        border: none;
+    }}
+    QPushButton.Primary:hover, QPushButton[primary="true"]:hover {{
+        background-color: {t.accent_hover};
+    }}
+    QLineEdit, QTextEdit, QSpinBox, QComboBox {{
         background-color: {t.bg_surface};
         color: {t.text_primary};
         border: 1px solid {t.border};
         border-radius: 4px;
         padding: 6px 10px;
     }}
-    QLineEdit:focus {{
+    QLineEdit:focus, QComboBox:focus {{
         border-color: {t.accent};
     }}
     QListWidget, QTreeWidget {{
         background-color: {t.bg_surface};
         border: 1px solid {t.border};
+        color: {t.text_primary};
         border-radius: 6px;
     }}
     QListWidget::item:selected {{
@@ -118,4 +198,5 @@ __all__ = [
     "ColorTokens",
     "ThemeMode",
     "build_enterprise_stylesheet",
+    "get_theme_tokens",
 ]

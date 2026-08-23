@@ -60,7 +60,8 @@ class Command:
         object.__setattr__(self, "keywords", tuple(self.keywords))
 
     def is_enabled(self) -> bool:
-        return bool(self.enabled() if callable(self.enabled) else self.enabled)
+        res = self.enabled() if callable(self.enabled) else self.enabled
+        return res if isinstance(res, bool) else bool(res)
 
 
 class CommandRegistry:

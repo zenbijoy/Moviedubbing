@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 
-from aidub.adapters.diarization_pyannote import SpeakerDiarizationResult
 from aidub.contracts.jobs import JobDescriptor
 from aidub.domain.time import AudioSamplePosition, AudioSampleRange
 from aidub.workers.supervisor import LocalWorkerSupervisor
@@ -26,16 +25,12 @@ def make_diarize_job(job_id: str) -> JobDescriptor:
     )
 
 
-def test_diarization_worker_executes_speech_diarize_job() -> None:
+def test_diarization_worker_rejects_job_without_real_audio_source() -> None:
     with LocalWorkerSupervisor() as supervisor:
         job = make_diarize_job("job_diar_001")
         supervisor.submit(job)
         result = supervisor.wait(timeout_seconds=10.0)
 
-        assert result.succeeded
-        assert "result_json" in result.metrics
-        diar_result = SpeakerDiarizationResult.model_validate_json(
-            str(result.metrics["result_json"])
-        )
-        assert diar_result.engine.engine_id == "pyannote-diarization"
-        assert len(diar_result.segments) > 0
+        assert not result.succeeded
+        assert result.error is not None
+        assert "real source_audio_path" in result.error.safe_details["message"]

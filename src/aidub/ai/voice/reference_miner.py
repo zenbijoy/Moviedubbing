@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class DiarizationSegmentInput:
-    """Mock input representing a speaker segment from the canonical diarization pipeline."""
+    """Measured speaker segment from the canonical diarization pipeline."""
 
     def __init__(
         self,

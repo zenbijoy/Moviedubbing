@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import math
+from collections import defaultdict
+from pathlib import Path
 from typing import Any, Self
 
 from pydantic import Field, model_validator
@@ -77,6 +79,33 @@ class PyannoteDiarizationAdapter:
         )
         self._pipeline_instance: Any | None = None
 
+    def _pipeline(self) -> Any:
+        try:
+            import pyannote.audio  # type: ignore[import-not-found]
+        except ImportError as exc:
+            raise RuntimeError(
+                "Pyannote.audio is not installed; install the production diarization dependencies"
+            ) from exc
+        if self._pipeline_instance is None:
+            self._pipeline_instance = pyannote.audio.Pipeline.from_pretrained(
+                self.options.model_id
+            )
+            if self._pipeline_instance is None:
+                raise RuntimeError(
+                    "Pyannote could not load the diarization model; verify Hugging Face access"
+                )
+            try:
+                import torch  # type: ignore[import-not-found]
+
+                device = self.options.device
+                if device == "cuda" and not torch.cuda.is_available():
+                    raise RuntimeError("CUDA diarization was selected but no CUDA device is available")
+                self._pipeline_instance.to(torch.device(device))
+            except ImportError:
+                if self.options.device == "cuda":
+                    raise RuntimeError("PyTorch with CUDA support is required for CUDA diarization")
+        return self._pipeline_instance
+
     @property
     def identity(self) -> SpeechEngineIdentity:
         return self._identity
@@ -86,25 +115,19 @@ class PyannoteDiarizationAdapter:
         audio_range: AudioSampleRange,
         source_audio_sha256: Sha256,
         *,
+        source_audio_path: str | Path | None = None,
         runtime: RecognitionRuntime | None = None,
     ) -> SpeakerDiarizationResult:
         """Diarize an audio range into distinct speaker turns and embeddings."""
 
+        del source_audio_sha256
+
         if runtime is not None:
             runtime.checkpoint()
 
-        try:
-            import pyannote.audio  # type: ignore[import-not-found]
-        except ImportError:
-            return self._synthetic_diarize(audio_range, runtime)
-
-        if self._pipeline_instance is None:
-            self._pipeline_instance = pyannote.audio.Pipeline.from_pretrained(
-                self.options.model_id
-            )
-
-        # Execute pyannote pipeline ...
-        diarization_output = self._pipeline_instance(source_audio_sha256)
+        if source_audio_path is None or not Path(source_audio_path).is_file():
+            raise RuntimeError("a real source_audio_path is required for speaker diarization")
+        diarization_output = self._pipeline()(str(source_audio_path))
         segments: list[DiarizedSpeakerSegment] = []
         speaker_ids_set: set[str] = set()
 
@@ -131,8 +154,8 @@ class PyannoteDiarizationAdapter:
                     segment_id=Identifier(f"diar_seg_{idx}"),
                     speaker_id=Identifier(spk_id),
                     audio_range=seg_range,
-                    confidence=0.92,
-                    embedding=(0.1, 0.2, 0.3, 0.4),
+                    confidence=0.0,
+                    embedding=(),
                 )
             )
 
@@ -141,7 +164,7 @@ class PyannoteDiarizationAdapter:
             engine=self.identity,
             segments=tuple(segments),
             speaker_ids=sorted_spk_ids,
-            der_score=0.05,
+            der_score=None,
         )
 
     def turns(
@@ -161,22 +184,16 @@ class PyannoteDiarizationAdapter:
         Returns:
             Tuple of (turns_list [(start, end, speaker_int)], total_speakers_count, ref_windows_dict).
         """
-        # Run diarization or synthetic fallback
-        sample_rate = 16000
-        total_samples = int(30 * sample_rate)
-        ar = AudioSampleRange(
-            start=AudioSamplePosition(sample_index=0, sample_rate=sample_rate),
-            sample_count=total_samples,
-        )
-        res = self.diarize(ar, Sha256("0" * 64))
-
         raw_turns: list[tuple[float, float, int]] = []
-        for seg in res.segments:
-            start_s = seg.audio_range.start.sample_index / sample_rate
-            end_s = (seg.audio_range.start.sample_index + seg.audio_range.sample_count) / sample_rate
-            spk_str = str(seg.speaker_id)
-            spk_num = int(spk_str.split("_")[-1]) if "_" in spk_str and spk_str.split("_")[-1].isdigit() else 0
-            raw_turns.append((start_s, end_s, spk_num))
+        source = Path(audio_path)
+        if not source.is_file():
+            raise FileNotFoundError(f"diarization source audio does not exist: {source}")
+        diarization_output = self._pipeline()(str(source))
+        speaker_numbers: dict[str, int] = {}
+        for turn, _, speaker in diarization_output.itertracks(yield_label=True):
+            label = str(speaker)
+            speaker_number = speaker_numbers.setdefault(label, len(speaker_numbers))
+            raw_turns.append((float(turn.start), float(turn.end), speaker_number))
 
         raw_turns.sort(key=lambda x: x[0])
 
@@ -189,7 +206,7 @@ class PyannoteDiarizationAdapter:
                 merged.append((a, b, spk))
 
         # Check total speaker durations
-        spk_durs: dict[int, float] = collections.defaultdict(float)
+        spk_durs: dict[int, float] = defaultdict(float)
         for a, b, spk in merged:
             spk_durs[spk] += (b - a)
 
@@ -211,59 +228,6 @@ class PyannoteDiarizationAdapter:
 
         n_speakers = len(set(ref_windows.keys()))
         return final_turns, max(1, n_speakers), ref_windows
-
-    def _synthetic_diarize(
-        self,
-        audio_range: AudioSampleRange,
-        runtime: RecognitionRuntime | None = None,
-    ) -> SpeakerDiarizationResult:
-        """Deterministic sample-aligned synthetic diarization pass."""
-
-        if runtime is not None:
-            runtime.checkpoint()
-
-        sample_rate = audio_range.sample_rate
-        start_idx = audio_range.start.sample_index
-        total_samples = audio_range.sample_count
-
-        turn_length = max(1, total_samples // 2)
-
-        seg1_range = AudioSampleRange(
-            start=AudioSamplePosition(sample_index=start_idx, sample_rate=sample_rate),
-            sample_count=turn_length,
-        )
-        seg2_range = AudioSampleRange(
-            start=AudioSamplePosition(sample_index=start_idx + turn_length, sample_rate=sample_rate),
-            sample_count=total_samples - turn_length,
-        )
-
-        # Synthetic 4D speaker embeddings for spk_00 and spk_01
-        emb1 = (0.8, 0.2, -0.1, 0.0)
-        emb2 = (-0.2, 0.9, 0.1, -0.3)
-
-        seg1 = DiarizedSpeakerSegment(
-            segment_id=Identifier("diar_seg_0"),
-            speaker_id=Identifier("spk_00"),
-            audio_range=seg1_range,
-            confidence=0.95,
-            embedding=emb1,
-        )
-
-        seg2 = DiarizedSpeakerSegment(
-            segment_id=Identifier("diar_seg_1"),
-            speaker_id=Identifier("spk_01"),
-            audio_range=seg2_range,
-            confidence=0.93,
-            embedding=emb2,
-        )
-
-        return SpeakerDiarizationResult(
-            engine=self.identity,
-            segments=(seg1, seg2),
-            speaker_ids=(Identifier("spk_00"), Identifier("spk_01")),
-            der_score=0.04,
-        )
-
 
 def cluster_speaker_embeddings(
     segments: tuple[DiarizedSpeakerSegment, ...],

@@ -25,7 +25,7 @@ class PipelineConfig:
     ctx_translate: bool = False
 
     # Models & Synthesis
-    asr_model: str = "nemo-parakeet-tdt-0.6b-v3"
+    asr_model: str = "large-v3"
     tts_model: str = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
     voice_mode: str = "clone"   # "clone" | "autocast" | "auto" | "voice"
     voice_name: str | None = None

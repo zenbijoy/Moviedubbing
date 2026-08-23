@@ -9,8 +9,13 @@ Exports industry-standard delivery packages:
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import os
+import shlex
+import subprocess
 from collections.abc import Sequence
+from pathlib import Path
 
 from pydantic import Field
 
@@ -32,8 +37,55 @@ class DistributionFormat(ContractModel):
 
 class DistributionPackageExporter:
     """
-    Exports studio distribution delivery packages.
+    Exports studio distribution delivery packages through configured mastering tools.
     """
+
+    def __init__(self, output_root: str | Path = "exports") -> None:
+        self.output_root = Path(output_root)
+
+    def _run_mastering_tool(
+        self,
+        environment_variable: str,
+        *,
+        project_id: str,
+        expected_output: Path,
+        title: str = "",
+        languages: Sequence[str] = (),
+    ) -> str:
+        template = os.environ.get(environment_variable, "").strip()
+        if not template:
+            raise RuntimeError(
+                f"{environment_variable} is not configured; set an industry mastering "
+                "command containing {project}, {output}, {title}, or {languages} placeholders"
+            )
+        expected_output.parent.mkdir(parents=True, exist_ok=True)
+        command = [
+            token.format(
+                project=project_id,
+                output=str(expected_output.resolve()),
+                title=title,
+                languages=",".join(languages),
+            )
+            for token in shlex.split(template, posix=os.name != "nt")
+        ]
+        process = subprocess.run(  # noqa: S603
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        if process.returncode != 0:
+            details = (process.stderr or process.stdout)[-2_000:]
+            raise RuntimeError(
+                f"distribution mastering failed with exit code {process.returncode}: {details}"
+            )
+        if not expected_output.is_file() or expected_output.stat().st_size == 0:
+            raise RuntimeError(
+                f"mastering command did not create the expected artifact: {expected_output}"
+            )
+        with expected_output.open("rb") as stream:
+            return hashlib.file_digest(stream, "sha256").hexdigest()
 
     def export_dcp_manifest(self, project_id: str, title: str, languages: Sequence[str]) -> DistributionFormat:
         """
@@ -41,10 +93,14 @@ class DistributionPackageExporter:
         """
         pid = Identifier(project_id)
         pkg_id = Identifier(f"dcp_{project_id}")
-        manifest_path = f"exports/{project_id}/dcp_cpl.xml"
-
-        # Mock SHA-256 hash checksum
-        sha256 = "a" * 64
+        manifest_path = self.output_root / project_id / "dcp_cpl.xml"
+        sha256 = self._run_mastering_tool(
+            "AIDUB_DCP_COMMAND",
+            project_id=project_id,
+            expected_output=manifest_path,
+            title=title,
+            languages=languages,
+        )
 
         logger.info("distribution_exporter: generated DCP manifest for %s (Title: %s)", pid, title)
         return DistributionFormat(
@@ -52,7 +108,7 @@ class DistributionPackageExporter:
             format_type="DCP",
             target_languages=list(languages),
             audio_channel_layout="5.1_Surround",
-            manifest_file_path=manifest_path,
+            manifest_file_path=str(manifest_path),
             checksum_sha256=sha256,
         )
 
@@ -62,16 +118,20 @@ class DistributionPackageExporter:
         """
         pid = Identifier(project_id)
         pkg_id = Identifier(f"mxf_{project_id}")
-        manifest_path = f"exports/{project_id}/master_layback.mxf"
-        sha256 = "b" * 64
+        manifest_path = self.output_root / project_id / "master_layback.mxf"
+        sha256 = self._run_mastering_tool(
+            "AIDUB_MXF_COMMAND",
+            project_id=project_id,
+            expected_output=manifest_path,
+        )
 
         logger.info("distribution_exporter: generated Broadcast MXF layback for %s (%s)", pid, channel_layout)
         return DistributionFormat(
             package_id=pkg_id,
             format_type="BROADCAST_MXF",
-            target_languages=["en-US", "bn-BD"],
+            target_languages=[],
             audio_channel_layout=channel_layout,
-            manifest_file_path=manifest_path,
+            manifest_file_path=str(manifest_path),
             checksum_sha256=sha256,
         )
 
@@ -81,8 +141,13 @@ class DistributionPackageExporter:
         """
         pid = Identifier(project_id)
         pkg_id = Identifier(f"ott_{project_id}")
-        manifest_path = f"exports/{project_id}/master_stream.m3u8"
-        sha256 = "c" * 64
+        manifest_path = self.output_root / project_id / "master_stream.m3u8"
+        sha256 = self._run_mastering_tool(
+            "AIDUB_OTT_COMMAND",
+            project_id=project_id,
+            expected_output=manifest_path,
+            languages=languages,
+        )
 
         logger.info("distribution_exporter: generated OTT HLS/DASH manifest for %s", pid)
         return DistributionFormat(
@@ -90,7 +155,7 @@ class DistributionPackageExporter:
             format_type="OTT_HLS_DASH",
             target_languages=list(languages),
             audio_channel_layout="Stereo",
-            manifest_file_path=manifest_path,
+            manifest_file_path=str(manifest_path),
             checksum_sha256=sha256,
         )
 

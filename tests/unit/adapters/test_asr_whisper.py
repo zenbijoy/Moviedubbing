@@ -51,14 +51,5 @@ def test_faster_whisper_adapter_recognition() -> None:
     request = make_asr_request()
     runtime = NullRecognitionRuntime()
 
-    result = adapter.recognize(request, runtime=runtime)
-
-    assert result.provenance.engine.engine_id == "faster-whisper"
-    assert len(result.segments) > 0
-    segment = result.segments[0]
-    assert len(segment.words) > 0
-
-    word = segment.words[0]
-    assert word.audio_range.start.sample_index >= request.audio_range.start.sample_index
-    assert word.audio_range.end_exclusive.sample_index <= request.audio_range.end_exclusive.sample_index
-    assert word.confidence >= 0.0 and word.confidence <= 1.0
+    with pytest.raises(RuntimeError, match="real source_audio_path"):
+        adapter.recognize(request, runtime=runtime)

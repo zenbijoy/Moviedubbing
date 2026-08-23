@@ -15,6 +15,7 @@ from aidub.adapters.separation_demucs import (
     StemKind,
 )
 from aidub.contracts.base import ContractModel
+from aidub.media.ffmpeg_ops import _run
 
 logger = logging.getLogger(__name__)
 
@@ -64,26 +65,50 @@ class StemSelector:
                     break
 
         if studio_me_index is not None and policy != StemSelectionPolicy.FORCE_AI_SEPARATION:
-            # Preserved studio M&E track
+            source_path = Path(source_audio_path)
+            if not source_path.is_file():
+                raise FileNotFoundError(f"studio M&E source does not exist: {source_path}")
+            assert probe is not None
+            source_stream = next(
+                stream for stream in probe.audio_streams if stream.index == studio_me_index
+            )
+            if source_stream.sample_rate is None or source_stream.channels is None:
+                raise RuntimeError("studio M&E stream has incomplete audio metadata")
             out_dir = Path(output_directory)
             out_dir.mkdir(parents=True, exist_ok=True)
             me_path = out_dir / "stem_studio_me.wav"
-            me_path.write_bytes(b"RIFF_WAV_STUDIO_ME_PRESERVED")
+            _run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(source_path),
+                    "-map",
+                    f"0:{studio_me_index}",
+                    "-vn",
+                    "-c:a",
+                    "pcm_s24le",
+                    str(me_path),
+                ]
+            )
+            if not me_path.is_file() or me_path.stat().st_size == 0:
+                raise RuntimeError("FFmpeg did not extract the selected studio M&E stream")
+            duration_seconds = probe.duration_seconds
+            if duration_seconds is None and source_stream.time_base is not None:
+                if source_stream.duration_ticks is not None:
+                    duration_seconds = float(
+                        source_stream.duration_ticks * source_stream.time_base
+                    )
+            if duration_seconds is None:
+                raise RuntimeError("studio M&E duration is unavailable")
 
             stems = (
                 SeparatedStem(
-                    stem_kind=StemKind.MUSIC,
+                    stem_kind=StemKind.MUSIC_AND_EFFECTS,
                     stem_path=str(me_path),
-                    sample_rate=probe.audio_streams[0].sample_rate if probe else 48_000,
-                    channels=probe.audio_streams[0].channels if probe else 2,
-                    sample_count=480_000,
-                ),
-                SeparatedStem(
-                    stem_kind=StemKind.EFFECTS,
-                    stem_path=str(me_path),
-                    sample_rate=probe.audio_streams[0].sample_rate if probe else 48_000,
-                    channels=probe.audio_streams[0].channels if probe else 2,
-                    sample_count=480_000,
+                    sample_rate=source_stream.sample_rate,
+                    channels=source_stream.channels,
+                    sample_count=round(duration_seconds * source_stream.sample_rate),
                 ),
             )
 

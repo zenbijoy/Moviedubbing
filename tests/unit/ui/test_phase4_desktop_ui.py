@@ -18,12 +18,6 @@ from aidub.ui.keyboard_shortcuts import (
     ShortcutAction,
     ShortcutManager,
 )
-from aidub.ui.screens.catalog import (
-    SCREEN_CATALOG,
-    ScreenCatalogRegistry,
-    ScreenCategory,
-    ScreenId,
-)
 from aidub.ui.timeline.model import (
     TimelineClip,
     TimelineLayoutEngine,
@@ -187,31 +181,6 @@ def test_playback_controller_dual_viewer_modes() -> None:
     for mode in DualViewerMode:
         ctrl.set_viewer_mode(mode)
         assert ctrl.state.viewer_mode == mode
-
-
-# ── Task 4.4: 26-Screen Catalog Registry ──────────────────────────────────────
-
-
-def test_screen_catalog_has_26_screens() -> None:
-    assert len(SCREEN_CATALOG) == 26
-
-
-def test_screen_catalog_registry_navigation() -> None:
-    registry = ScreenCatalogRegistry()
-    assert registry.active_screen.screen_id == ScreenId.HOME_DASHBOARD
-
-    navigated = registry.navigate_to(ScreenId.TIMELINE_EDITOR)
-    assert navigated.title == "Timeline Editor"
-    assert registry.active_screen.screen_id == ScreenId.TIMELINE_EDITOR
-
-
-def test_screen_catalog_categories() -> None:
-    registry = ScreenCatalogRegistry()
-    studios = registry.by_category(ScreenCategory.STUDIO)
-    titles = [s.title for s in studios]
-    assert "Character Studio" in titles
-    assert "Voice Studio" in titles
-    assert "Translation Studio" in titles
 
 
 # ── Task 4.5: Workspace Manager ───────────────────────────────────────────────

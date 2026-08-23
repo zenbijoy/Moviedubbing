@@ -129,7 +129,14 @@ class MediaProbe:
         source_path = Path(source).expanduser().resolve(strict=True)
         if not source_path.is_file():
             raise MediaProbeError("media.not_file", f"source is not a file: {source_path}")
-        runtime = self.runtime.inspect()
+        try:
+            runtime = self.runtime.inspect()
+        except (FileNotFoundError, RuntimeError) as exc:
+            raise MediaProbeError(
+                "media.ffprobe_unavailable",
+                "FFprobe is required to inspect real media metadata",
+            ) from exc
+
         command = [
             str(runtime.ffprobe),
             "-v",

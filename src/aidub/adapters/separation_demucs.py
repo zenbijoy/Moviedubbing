@@ -24,6 +24,7 @@ class StemKind(StrEnum):
     DIALOGUE = "dialogue"
     MUSIC = "music"
     EFFECTS = "effects"
+    MUSIC_AND_EFFECTS = "music_and_effects"
     OTHER = "other"
 
 
@@ -100,10 +101,16 @@ class DemucsSeparationAdapter:
         if runtime is not None:
             runtime.checkpoint()
 
+        source_path = Path(source_audio_path)
+        if not source_path.is_file():
+            raise FileNotFoundError(f"source audio does not exist: {source_path}")
         try:
             import demucs.api  # type: ignore[import-not-found]
-        except ImportError:
-            return self._synthetic_separate(source_audio_path, output_directory, runtime)
+            from demucs.audio import save_audio  # type: ignore[import-not-found]
+        except ImportError as exc:
+            raise RuntimeError(
+                "Demucs is not installed; install the production source-separation dependencies"
+            ) from exc
 
         out_dir = Path(output_directory)
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -117,8 +124,9 @@ class DemucsSeparationAdapter:
             )
 
         # Execute demucs separation
-        _origin, separated = self._separator_instance.separate_audio_file(source_audio_path)
+        _origin, separated = self._separator_instance.separate_audio_file(str(source_path))
         stems: list[SeparatedStem] = []
+        sample_rate = int(self._separator_instance.samplerate)
 
         mapping = {
             "vocals": StemKind.DIALOGUE,
@@ -132,15 +140,16 @@ class DemucsSeparationAdapter:
                 runtime.checkpoint()
             kind = mapping.get(name, StemKind.OTHER)
             stem_file = out_dir / f"stem_{kind.value}.wav"
-            # Write tensor audio to stem_file
-            stem_file.touch(exist_ok=True)
+            save_audio(tensor, stem_file, sample_rate, clip="rescale")
+            if not stem_file.is_file() or stem_file.stat().st_size == 0:
+                raise RuntimeError(f"Demucs produced an empty {name} stem")
             stems.append(
                 SeparatedStem(
                     stem_kind=kind,
                     stem_path=str(stem_file),
-                    sample_rate=48_000,
-                    channels=2,
-                    sample_count=tensor.shape[-1] if hasattr(tensor, "shape") else 480_000,
+                    sample_rate=sample_rate,
+                    channels=int(tensor.shape[-2]),
+                    sample_count=int(tensor.shape[-1]),
                 )
             )
 
@@ -149,41 +158,6 @@ class DemucsSeparationAdapter:
             stems=tuple(stems),
             me_preserved=True,
         )
-
-    def _synthetic_separate(
-        self,
-        source_audio_path: str,
-        output_directory: str,
-        runtime: RecognitionRuntime | None = None,
-    ) -> SourceSeparationResult:
-        """Deterministic synthetic stem generation for clean test environments."""
-
-        if runtime is not None:
-            runtime.checkpoint()
-
-        out_dir = Path(output_directory)
-        out_dir.mkdir(parents=True, exist_ok=True)
-
-        stems: list[SeparatedStem] = []
-        for kind in (StemKind.DIALOGUE, StemKind.MUSIC, StemKind.EFFECTS, StemKind.OTHER):
-            file_path = out_dir / f"stem_{kind.value}.wav"
-            file_path.write_bytes(b"RIFF_WAV_SYNTHETIC_STEM_DATA")
-            stems.append(
-                SeparatedStem(
-                    stem_kind=kind,
-                    stem_path=str(file_path),
-                    sample_rate=48_000,
-                    channels=2,
-                    sample_count=480_000,
-                )
-            )
-
-        return SourceSeparationResult(
-            engine=self.identity,
-            stems=tuple(stems),
-            me_preserved=True,
-        )
-
 
 __all__ = [
     "DemucsSeparationAdapter",

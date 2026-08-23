@@ -34,7 +34,7 @@ def probe(path: Path | str) -> dict[str, Any]:
 
 
 def duration(path: Path | str) -> float:
-    """Return total duration in seconds of input media file via ffprobe or wave header fallback."""
+    """Return the measured duration of an audio or video file."""
     try:
         meta = probe(path)
         return float(meta["format"]["duration"])
@@ -46,8 +46,8 @@ def duration(path: Path | str) -> float:
                 frames = f.getnframes()
                 rate = f.getframerate()
                 return frames / float(rate)
-        except Exception:
-            return 1.0
+        except Exception as wav_exc:
+            raise RuntimeError(f"unable to measure media duration: {path}") from wav_exc
 
 
 def extract_audio(video_path: Path | str, wav_path: Path | str, sr: int = 44100, ac: int = 2) -> Path:

@@ -1,8 +1,8 @@
 """
 LatentSync high-resolution Cinema quality Lip-Sync Engine adapter (Tier 2).
 
-Delivers broadcast-grade 1080p/4K latent diffusion lip synchronization.
-Includes synthetic offline fallback for CPU / offline testing.
+Delivers broadcast-grade 1080p/4K latent diffusion lip synchronization through
+an explicitly configured local LatentSync command.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from aidub.adapters.lipsync_base import (
     LipSyncOptions,
     LipSyncQualityTier,
     LipSyncResult,
+    run_configured_lipsync,
 )
 from aidub.contracts.base import Identifier
 from aidub.speech.runtime import RecognitionRuntime
@@ -44,9 +45,12 @@ class LatentSyncLipSyncEngine(LipSyncEngine):
 
         output_path = out_dir / f"{shot_id}_latentsync_cinema.mp4"
 
-        # Synthetic placeholder generation for CPU / offline testing
-        if not output_path.exists():
-            output_path.write_bytes(b"RIFF_SYNTHETIC_LATENTSYNC_CINEMA_MP4_PAYLOAD")
+        rendered_frames, duration_ms = run_configured_lipsync(
+            "AIDUB_LATENTSYNC_COMMAND",
+            source_video_path=source_video_path,
+            target_audio_path=target_audio_path,
+            output_path=output_path,
+        )
 
         logger.info(
             "latentsync: rendered cinema lip-sync for shot %s -> %s (color_match=%s, feather=%dpx)",
@@ -61,8 +65,8 @@ class LatentSyncLipSyncEngine(LipSyncEngine):
             shot_id=Identifier(shot_id),
             output_video_path=str(output_path),
             quality_tier=LipSyncQualityTier.CINEMA_QUALITY,
-            rendered_frames=72,
-            duration_ms=3000,
+            rendered_frames=rendered_frames,
+            duration_ms=duration_ms,
             color_matched=opts.color_match_mode != "none",
             anti_flicker_applied=opts.anti_flicker_alpha > 0,
         )

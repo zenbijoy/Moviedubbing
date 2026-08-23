@@ -118,3 +118,6 @@ else:
                 else ""
             )
             raise DesktopDependencyError(desktop_dependency_message() + detail)
+
+        def exec(self) -> int:
+            return 0

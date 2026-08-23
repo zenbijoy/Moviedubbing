@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from aidub.adapters.voice_base import SynthesisRequest, SyntheticVoiceEngine, VoiceEngine
+from aidub.adapters.voice.edge_tts_adapter import EdgeTTSVoiceEngine
+from aidub.adapters.voice_base import SynthesisRequest, VoiceEngine
 from aidub.contracts.base import ContractModel
 
 logger = logging.getLogger(__name__)
@@ -23,13 +24,13 @@ def run_tts_synthesis(payload: dict, *, engine: VoiceEngine | None = None) -> di
 
     Args:
         payload: Raw dict job payload (will be parsed as TtsSynthesisJob).
-        engine: Optional VoiceEngine override (defaults to SyntheticVoiceEngine).
+        engine: Optional VoiceEngine override. Edge TTS is used by default.
 
     Returns:
         dict: SynthesisResult as a dict for persistence.
     """
     job = TtsSynthesisJob.model_validate(payload)
-    active_engine = engine or SyntheticVoiceEngine()
+    active_engine = engine or EdgeTTSVoiceEngine()
 
     result = active_engine.synthesize(job.request, job.output_directory)
     logger.info(

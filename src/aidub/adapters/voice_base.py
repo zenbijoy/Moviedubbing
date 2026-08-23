@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class VoiceEngineKind(StrEnum):
+    EDGE_TTS = "edge_tts"
     F5_TTS = "f5_tts"
     CHATTERBOX = "chatterbox"
     FISH_SPEECH = "fish_speech"

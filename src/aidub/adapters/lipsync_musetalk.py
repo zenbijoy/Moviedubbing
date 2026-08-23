@@ -1,8 +1,8 @@
 """
 MuseTalk fast interactive preview Lip-Sync Engine adapter (Tier 1).
 
-Delivers sub-second per-frame lip animation for real-time desktop UX preview.
-Includes synthetic offline fallback when GPU or native modules are absent.
+Delivers sub-second per-frame lip animation through an explicitly configured
+local MuseTalk command.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from aidub.adapters.lipsync_base import (
     LipSyncOptions,
     LipSyncQualityTier,
     LipSyncResult,
+    run_configured_lipsync,
 )
 from aidub.contracts.base import Identifier
 from aidub.speech.runtime import RecognitionRuntime
@@ -44,9 +45,12 @@ class MuseTalkLipSyncEngine(LipSyncEngine):
 
         output_path = out_dir / f"{shot_id}_musetalk_preview.mp4"
 
-        # Synthetic placeholder generation for CPU / offline testing
-        if not output_path.exists():
-            output_path.write_bytes(b"RIFF_SYNTHETIC_MUSETALK_PREVIEW_MP4_PAYLOAD")
+        rendered_frames, duration_ms = run_configured_lipsync(
+            "AIDUB_MUSETALK_COMMAND",
+            source_video_path=source_video_path,
+            target_audio_path=target_audio_path,
+            output_path=output_path,
+        )
 
         logger.info(
             "musetalk: rendered fast preview lip-sync for shot %s -> %s (color_match=%s, feather=%dpx)",
@@ -61,8 +65,8 @@ class MuseTalkLipSyncEngine(LipSyncEngine):
             shot_id=Identifier(shot_id),
             output_video_path=str(output_path),
             quality_tier=LipSyncQualityTier.PREVIEW_FAST,
-            rendered_frames=72,
-            duration_ms=3000,
+            rendered_frames=rendered_frames,
+            duration_ms=duration_ms,
             color_matched=opts.color_match_mode != "none",
             anti_flicker_applied=opts.anti_flicker_alpha > 0,
         )

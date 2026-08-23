@@ -1,19 +1,5 @@
-"""Screens catalog package."""
-from .catalog import (
-    SCREEN_CATALOG,
-    ScreenCatalogRegistry,
-    ScreenCategory,
-    ScreenDescriptor,
-    ScreenId,
-)
-from .widgets import ScreenWidgetFactory, create_screen_widget
+"""The single AI Movie Dubbing Studio workspace."""
 
-__all__ = [
-    "SCREEN_CATALOG",
-    "ScreenCatalogRegistry",
-    "ScreenCategory",
-    "ScreenDescriptor",
-    "ScreenId",
-    "ScreenWidgetFactory",
-    "create_screen_widget",
-]
+from .timeline_editor import TimelineScreen
+
+__all__ = ["TimelineScreen"]

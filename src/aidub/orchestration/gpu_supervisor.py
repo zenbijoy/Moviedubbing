@@ -58,7 +58,7 @@ class GpuWorkerSupervisor:
         self._job_queue: Any | None = None
         self._control_queue: Any | None = None
         self._result_queue: Any | None = None
-        self._process: mp.Process | None = None
+        self._process: Any | None = None
         self._active_job_id: str | None = None
         self._handshake: WorkerHandshake | None = None
         self._latest_heartbeat: WorkerHeartbeat | None = None
@@ -93,13 +93,14 @@ class GpuWorkerSupervisor:
 
         from aidub.workers.process import worker_process_main
 
-        self._process = self._ctx.Process(
+        proc = self._ctx.Process(
             target=worker_process_main,
             args=(self._job_queue, self._control_queue, self._result_queue),
             name=f"aidub-gpu-worker-{self.gpu_id}",
             daemon=True,
         )
-        self._process.start()
+        self._process = proc
+        proc.start()
 
         # Execute Handshake Protocol
         raw_msg = self._receive(self._startup_timeout_seconds)

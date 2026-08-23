@@ -105,7 +105,13 @@ class QcInspectorController:
 
         return reports
 
-    def execute_auto_repair(self, utterance_id: str, action_type: str) -> UtteranceQcReport | None:
+    def execute_auto_repair(
+        self,
+        utterance_id: str,
+        action_type: str,
+        *,
+        measured_result: UtteranceQcReport,
+    ) -> UtteranceQcReport | None:
         """
         Execute automated repair action for a specific utterance defect.
         """
@@ -116,26 +122,19 @@ class QcInspectorController:
         if not report:
             return None
 
-        # Simulate repair by updating score to pass state
-        repaired_report = self.evaluator.evaluate_utterance(
-            utterance_id=utterance_id,
-            transcription_acc=0.98,
-            diarization_prec=0.95,
-            translation_meaning=0.95,
-            timing_fit=0.95,
-            voice_quality=0.95,
-            lipsync_score=0.95,
-            integrated_lufs=-24.0,
-            subtitle_cps=14.0,
-        )
+        if str(measured_result.utterance_id) != utterance_id:
+            raise ValueError("repair result utterance does not match the requested utterance")
 
         logger.info("qc_inspector: executed auto-repair '%s' on %s", action_type, utterance_id)
 
         # Update report in heatmap
-        new_reports = [repaired_report if r.utterance_id == utterance_id else r for r in self.heatmap.reports]
+        new_reports = [
+            measured_result if r.utterance_id == utterance_id else r
+            for r in self.heatmap.reports
+        ]
         self.heatmap = self.evaluator.generate_heatmap(self.project_id, new_reports)
 
-        return repaired_report
+        return measured_result
 
 
 if PYSIDE6_AVAILABLE:
@@ -213,8 +212,6 @@ if PYSIDE6_AVAILABLE:
                 parts = text.split(" — ")
                 if parts:
                     uid = parts[0].split("]")[-1].strip()
-                    self.controller.execute_auto_repair(uid, "auto_fix")
-                    self._refresh_list()
                     self.repair_triggered.emit(uid, "auto_fix")
 
         def _refresh_list(self) -> None:

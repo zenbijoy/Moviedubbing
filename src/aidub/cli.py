@@ -478,19 +478,6 @@ def _handle_dub(
     return EXIT_OK
 
 
-def _handle_web(
-    arguments: argparse.Namespace,
-    _dependencies: CliDependencies,
-    stdout: TextIO,
-    _stderr: TextIO,
-) -> int:
-    from aidub.ui.web_ui import launch_web_ui
-
-    stdout.write(f"Starting AI Movie Dubbing Studio Web UI on http://localhost:{arguments.port}...\n")
-    launch_web_ui(port=arguments.port, share=arguments.share)
-    return EXIT_OK
-
-
 CommandHandler = Callable[
     [argparse.Namespace, CliDependencies, TextIO, TextIO],
     int,
@@ -557,11 +544,6 @@ def build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     dub.add_argument("--no-music", action="store_false", dest="keep_music", help="disable background music track retention")
     dub.add_argument("--json", action="store_true", dest="output_json")
     dub.set_defaults(handler=_handle_dub)
-
-    web = commands.add_parser("web", help="launch the interactive Studio Web UI")
-    web.add_argument("--port", type=int, default=7860, help="port number to serve Web UI (default: 7860)")
-    web.add_argument("--share", action="store_true", help="generate a public shareable URL")
-    web.set_defaults(handler=_handle_web)
 
     media = commands.add_parser("media", help="inspect local media")
     media_commands = media.add_subparsers(dest="media_command", required=True)

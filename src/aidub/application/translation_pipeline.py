@@ -225,29 +225,37 @@ class TranslationPipeline:
             glossary = ", ".join(f"{k}={v}" for k, v in ctx.glossary_terms.items())
             context_block += f"Glossary: {glossary}\n\n"
 
+        response_contract = (
+            'Return JSON only with this exact shape: {"source_text": "<current text>", '
+            '"translated_text": "<localized dialogue>", '
+            f'"target_language": "{ctx.target_language}", '
+            '"duration_estimate_ms": <integer>, "confidence": <0..1>, '
+            '"adaptation_notes": "<brief note>"}'
+        )
+
         pass_instructions = {
             TranslationPass.SEMANTIC_DRAFT: (
                 f"Translate the following dialogue from {ctx.source_language} to {ctx.target_language}. "
                 f"Prioritize semantic accuracy.\n\n{context_block}"
-                f'Return JSON: {{"translated": "<text>", "duration_estimate_ms": <int>}}'
+                f"{response_contract}"
             ),
             TranslationPass.CHARACTER_PERSONALITY: (
                 f"Adapt the following translation to match the character voice and register.\n\n{context_block}"
-                f'Return JSON: {{"translated": "<text>", "duration_estimate_ms": <int>}}'
+                f"{response_contract}"
             ),
             TranslationPass.CULTURAL_LOCALIZATION: (
                 f"Localize idioms and cultural references for {ctx.target_language} audience.\n\n{context_block}"
-                f'Return JSON: {{"translated": "<text>", "duration_estimate_ms": <int>}}'
+                f"{response_contract}"
             ),
             TranslationPass.DURATION_BUDGETING: (
                 f"The original speech duration is {line.duration_ms}ms. "
                 f"Adjust the translation to fit within {ctx.duration_tolerance_pct*100:.0f}% of this duration.\n\n"
                 f"{context_block}"
-                f'Return JSON: {{"translated": "<text>", "duration_estimate_ms": <int>}}'
+                f"{response_contract}"
             ),
             TranslationPass.TERMINOLOGY_CHECK: (
                 f"Verify glossary consistency. Enforce term substitutions.\n\n{context_block}"
-                f'Return JSON: {{"translated": "<text>", "duration_estimate_ms": <int>}}'
+                f"{response_contract}"
             ),
         }
 

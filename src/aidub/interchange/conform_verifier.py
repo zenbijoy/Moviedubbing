@@ -23,7 +23,7 @@ class ConformVerificationReport(ContractModel):
     target_nle: str = Field(min_length=1)  # "Premiere_Pro", "DaVinci_Resolve", "Avid"
     timecode_drift_ms: float = Field(ge=0.0)
     audio_sample_drift: int = Field(ge=0)
-    conform_passed: bool = True
+    conform_passed: bool
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -32,22 +32,33 @@ class NLEConformVerifier:
     Verifies sub-frame timecode precision conform.
     """
 
-    def verify_nle_conform(self, project_id: str, target_nle: str = "DaVinci_Resolve") -> ConformVerificationReport:
+    def verify_nle_conform(
+        self,
+        project_id: str,
+        target_nle: str = "DaVinci_Resolve",
+        *,
+        timecode_drift_ms: float,
+        audio_sample_drift: int,
+    ) -> ConformVerificationReport:
         """
         Run sub-frame timecode alignment audit.
         """
         pid = Identifier(project_id)
-        drift_ms = 0.4
-        sample_drift = 19  # < 1 sample frame drift at 48 kHz
-
-        passed = drift_ms < 5.0 and sample_drift < 48
-        logger.info("conform_verifier: audited NLE conform for %s against %s (Drift: %.2f ms, Passed: %s)", pid, target_nle, drift_ms, passed)
+        passed = timecode_drift_ms < 5.0 and audio_sample_drift < 48
+        logger.info(
+            "conform_verifier: audited NLE conform for %s against %s "
+            "(Drift: %.2f ms, Passed: %s)",
+            pid,
+            target_nle,
+            timecode_drift_ms,
+            passed,
+        )
 
         return ConformVerificationReport(
             project_id=pid,
             target_nle=target_nle,
-            timecode_drift_ms=drift_ms,
-            audio_sample_drift=sample_drift,
+            timecode_drift_ms=timecode_drift_ms,
+            audio_sample_drift=audio_sample_drift,
             conform_passed=passed,
             warnings=[],
         )

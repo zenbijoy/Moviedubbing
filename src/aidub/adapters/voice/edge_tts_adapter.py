@@ -6,7 +6,12 @@ import asyncio
 import logging
 from pathlib import Path
 
-import numpy as np
+from aidub.adapters.voice_base import (
+    SynthesisRequest,
+    SynthesisResult,
+    VoiceEngineKind,
+)
+from aidub.media.ffmpeg_ops import _run, duration
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +23,16 @@ BENGALI_VOICES = {
 }
 
 DEFAULT_BENGALI_VOICE = "bn-BD-NabanitaNeural"
+
+_LANGUAGE_VOICES = {
+    "bn": DEFAULT_BENGALI_VOICE,
+    "en": "en-US-JennyNeural",
+    "hi": "hi-IN-SwaraNeural",
+    "es": "es-ES-ElviraNeural",
+    "fr": "fr-FR-DeniseNeural",
+    "de": "de-DE-KatjaNeural",
+    "ja": "ja-JP-NanamiNeural",
+}
 
 
 class EdgeTTSAdapter:
@@ -53,6 +68,9 @@ class EdgeTTSAdapter:
             Path to output MP3 file.
         """
         out_p = Path(output_mp3_path)
+        if not text.strip():
+            raise ValueError("speech text cannot be empty")
+        out_p.parent.mkdir(parents=True, exist_ok=True)
         v = voice or self.voice_name
 
         try:
@@ -63,24 +81,69 @@ class EdgeTTSAdapter:
                 await communicate.save(str(out_p))
 
             asyncio.run(_run_synth())
+            if not out_p.is_file() or out_p.stat().st_size == 0:
+                raise RuntimeError("Edge TTS returned no audio")
             return out_p
         except Exception as exc:
-            logger.warning("edge-tts synthesis failed/missing (%s) — writing synthetic fallback", exc)
-            return _synthetic_audio_fallback(text, out_p)
+            out_p.unlink(missing_ok=True)
+            logger.exception("Edge TTS synthesis failed")
+            raise RuntimeError(
+                "Edge TTS synthesis failed; install edge-tts and verify network access"
+            ) from exc
 
 
-def _synthetic_audio_fallback(text: str, out_path: Path) -> Path:
-    """Fallback generator when edge-tts package is not installed in environment."""
-    import soundfile as sf  # type: ignore[import-not-found]
+class EdgeTTSVoiceEngine:
+    """VoiceEngine bridge that produces a measured PCM WAV artifact."""
 
-    dur_s = max(0.5, len(text.split()) * 0.25)
-    sr = 24000
-    t = np.linspace(0, dur_s, int(dur_s * sr), endpoint=False)
-    samples = (0.1 * np.sin(2 * np.pi * 220 * t)).astype(np.float32)
+    @property
+    def engine_kind(self) -> VoiceEngineKind:
+        return VoiceEngineKind.EDGE_TTS
 
-    wav_p = out_path.with_suffix(".wav")
-    sf.write(str(wav_p), samples, sr)
-    return wav_p
+    def synthesize(self, request: SynthesisRequest, output_dir: str) -> SynthesisResult:
+        output_root = Path(output_dir)
+        output_root.mkdir(parents=True, exist_ok=True)
+        language = str(request.language).split("-", maxsplit=1)[0].lower()
+        voice = _LANGUAGE_VOICES.get(language, "en-US-JennyNeural")
+        mp3_path = output_root / f"{request.utterance_id}_{request.seed}.mp3"
+        wav_path = output_root / f"{request.utterance_id}_{request.seed}.wav"
+        rate_percent = round((request.pace_multiplier - 1.0) * 100)
+        pitch_hz = round(request.pitch_shift_semitones * 4)
+        EdgeTTSAdapter(voice).synthesize_to_file(
+            request.text,
+            mp3_path,
+            rate=f"{rate_percent:+d}%",
+            pitch=f"{pitch_hz:+d}Hz",
+        )
+        try:
+            _run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(mp3_path),
+                    "-ac",
+                    "1",
+                    "-ar",
+                    str(request.output_sample_rate),
+                    str(wav_path),
+                ]
+            )
+        finally:
+            mp3_path.unlink(missing_ok=True)
+        return SynthesisResult(
+            request_id=request.request_id,
+            utterance_id=request.utterance_id,
+            engine_kind=self.engine_kind,
+            output_path=str(wav_path),
+            sample_rate=request.output_sample_rate,
+            duration_ms=round(duration(wav_path) * 1_000),
+            seed_used=request.seed,
+        )
 
 
-__all__ = ["BENGALI_VOICES", "DEFAULT_BENGALI_VOICE", "EdgeTTSAdapter"]
+__all__ = [
+    "BENGALI_VOICES",
+    "DEFAULT_BENGALI_VOICE",
+    "EdgeTTSAdapter",
+    "EdgeTTSVoiceEngine",
+]

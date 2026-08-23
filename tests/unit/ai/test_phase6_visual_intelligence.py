@@ -9,7 +9,8 @@ Unit tests for Phase 6 Visual Intelligence & Selective Lip-Sync Engine:
 
 from __future__ import annotations
 
-from aidub.adapters.lipsync_base import LipSyncQualityTier
+import pytest
+
 from aidub.adapters.lipsync_latentsync import LatentSyncLipSyncEngine
 from aidub.adapters.lipsync_musetalk import MuseTalkLipSyncEngine
 from aidub.ai.vision.active_speaker import ActiveSpeakerDetector
@@ -32,9 +33,12 @@ from aidub.workers.handlers import WorkerContext, get_handler
 # ── Task 6.1: Shot Detector & Face Tracker Tests ──────────────────────────────
 
 
-def test_shot_detector_synthetic_cuts() -> None:
+def test_shot_detector_uses_measured_frame_differences() -> None:
     detector = ShotDetector(fps=24.0)
-    result = detector.detect_shots("media_001", total_frames=200)
+    frame_diffs = [0.0] * 199
+    frame_diffs[71] = 0.8
+    frame_diffs[143] = 0.8
+    result = detector.detect_shots("media_001", total_frames=200, frame_diffs=frame_diffs)
     assert len(result.shots) > 1
     assert result.shots[0].shot_id == "shot_0001"
     assert result.shots[0].start_frame == 0
@@ -154,30 +158,27 @@ def test_3d_pose_and_user_override_eligibility() -> None:
 
 def test_musetalk_preview_engine(tmp_path) -> None:
     engine = MuseTalkLipSyncEngine()
-    res = engine.synthesize_lip_sync(
-        shot_id="shot_001",
-        source_video_path="source.mp4",
-        target_audio_path="audio.wav",
-        output_directory=str(tmp_path),
-    )
-    assert res.quality_tier == LipSyncQualityTier.PREVIEW_FAST
-    assert res.rendered_frames > 0
+    with pytest.raises(FileNotFoundError, match="source video does not exist"):
+        engine.synthesize_lip_sync(
+            shot_id="shot_001",
+            source_video_path="source.mp4",
+            target_audio_path="audio.wav",
+            output_directory=str(tmp_path),
+        )
 
 
 def test_latentsync_cinema_engine(tmp_path) -> None:
     engine = LatentSyncLipSyncEngine()
-    res = engine.synthesize_lip_sync(
-        shot_id="shot_002",
-        source_video_path="source.mp4",
-        target_audio_path="audio.wav",
-        output_directory=str(tmp_path),
-    )
-    assert res.quality_tier == LipSyncQualityTier.CINEMA_QUALITY
-    assert res.rendered_frames > 0
+    with pytest.raises(FileNotFoundError, match="source video does not exist"):
+        engine.synthesize_lip_sync(
+            shot_id="shot_002",
+            source_video_path="source.mp4",
+            target_audio_path="audio.wav",
+            output_directory=str(tmp_path),
+        )
 
 
 def test_lipsync_worker_registered_handler(tmp_path) -> None:
-    import json
     import queue
 
     from aidub.contracts.jobs import JobDescriptor
@@ -201,10 +202,8 @@ def test_lipsync_worker_registered_handler(tmp_path) -> None:
             "quality_tier": "preview_fast",
         },
     )
-    result = handler(job, ctx)
-    res_dict = json.loads(result["result_json"])
-    assert res_dict["shot_id"] == "shot_003"
-    assert res_dict["quality_tier"] == "preview_fast"
+    with pytest.raises(FileNotFoundError, match="source video does not exist"):
+        handler(job, ctx)
 
 
 # ── Task 6.4 & 6.5: Visual Quality Control & NLE Panel Controller Tests ─────

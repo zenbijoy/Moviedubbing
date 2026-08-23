@@ -79,7 +79,7 @@ class GlossaryService:
             return None
         return char.pronunciation_phonetic or None
 
-    def get_character(self, character_id: str) -> CharacterBibleEntry | CharacterProfile | None:
+    def get_character(self, character_id: str) -> CharacterBibleEntry | None:
         return self._bible.get_character(character_id)
 
 

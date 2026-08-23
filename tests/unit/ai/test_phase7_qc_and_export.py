@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from aidub.adapters.interchange_otio import (
     NleClipItem,
     NleInterchangeAdapter,
@@ -79,7 +81,17 @@ def test_multi_dimensional_qc_evaluator() -> None:
 
 def test_studio_presets_and_auto_repair_actions() -> None:
     evaluator = MultiDimensionalQCEvaluator(preset=StudioQcPreset.BROADCAST_STUDIO)
-    report = evaluator.evaluate_utterance("u_preset", timing_fit=0.50, integrated_lufs=-12.0)
+    report = evaluator.evaluate_utterance(
+        "u_preset",
+        transcription_acc=0.95,
+        diarization_prec=0.92,
+        translation_meaning=0.90,
+        timing_fit=0.50,
+        voice_quality=0.91,
+        lipsync_score=0.89,
+        integrated_lufs=-12.0,
+        subtitle_cps=14.5,
+    )
     assert len(report.auto_repair_actions) >= 2
 
     types = [a.action_type for a in report.auto_repair_actions]
@@ -90,13 +102,27 @@ def test_studio_presets_and_auto_repair_actions() -> None:
 def test_qc_inspector_controller() -> None:
     ctrl = QcInspectorController("project_001")
     evaluator = MultiDimensionalQCEvaluator()
-    r1 = evaluator.evaluate_utterance("u1", timing_fit=0.95)
+    r1 = evaluator.evaluate_utterance(
+        "u1",
+        transcription_acc=0.95,
+        diarization_prec=0.92,
+        translation_meaning=0.90,
+        timing_fit=0.95,
+        voice_quality=0.91,
+        lipsync_score=0.89,
+        integrated_lufs=-24.0,
+        subtitle_cps=14.5,
+    )
     r2 = evaluator.evaluate_utterance(
         "u2",
         transcription_acc=0.50,
+        diarization_prec=0.92,
         translation_meaning=0.50,
         timing_fit=0.40,
+        voice_quality=0.91,
         lipsync_score=0.40,
+        integrated_lufs=-24.0,
+        subtitle_cps=14.5,
     )
 
     heatmap = evaluator.generate_heatmap("project_001", [r1, r2])
@@ -111,7 +137,22 @@ def test_qc_inspector_controller() -> None:
     assert filtered[0].utterance_id == "u1"
 
     # Test auto repair execution
-    repaired = ctrl.execute_auto_repair("u2", "auto_fix")
+    measured_repair = evaluator.evaluate_utterance(
+        "u2",
+        transcription_acc=0.98,
+        diarization_prec=0.95,
+        translation_meaning=0.95,
+        timing_fit=0.95,
+        voice_quality=0.95,
+        lipsync_score=0.95,
+        integrated_lufs=-24.0,
+        subtitle_cps=14.0,
+    )
+    repaired = ctrl.execute_auto_repair(
+        "u2",
+        "auto_fix",
+        measured_result=measured_repair,
+    )
     assert repaired is not None
     assert repaired.severity == QcSeverityLevel.PASS_GREEN
 
@@ -205,11 +246,8 @@ def test_master_media_exporter(tmp_path) -> None:
     assert "-af" in args
     assert "loudnorm=I=-24.0" in " ".join(args)
 
-    res = exporter.export_master_container("prj_001", "source_video.mp4", options)
-    assert res.audio_track_count == 2
-    assert res.subtitle_track_count == 2
-    assert res.fast_copy_used is True
-    assert res.ebu_r128_applied is True
+    with pytest.raises(FileNotFoundError, match="master export inputs do not exist"):
+        exporter.export_master_container("prj_001", "source_video.mp4", options)
 
 
 # ── Task 7.4: Professional NLE Interchange (OTIO, EDL, FCPXML, CSV) Tests ────
