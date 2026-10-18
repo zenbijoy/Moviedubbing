@@ -9,7 +9,7 @@ pytest.importorskip("PySide6")
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QPushButton
 
 from aidub.application.agentic_studio import (
     AutomationStage,
@@ -67,6 +67,70 @@ def test_review_master_does_not_claim_unrun_lip_sync_pass(tmp_path: Path) -> Non
             StageStatus.FAILED
         )
         assert screen._automation_state.quality_report is None
+    finally:
+        screen.close()
+        app.processEvents()
+
+
+def test_reference_workspace_exposes_navigation_tools_and_ai_actions() -> None:
+    app = QApplication.instance() or QApplication([])
+    screen = TimelineScreen()
+    try:
+        assert tuple(screen.stage_bar._buttons) == (
+            "Learning",
+            "Assembly",
+            "Editing",
+            "Dubbing",
+            "Color",
+            "Audio",
+            "Graphics",
+            "Libraries",
+        )
+        assert screen.navigation_rail._buttons["Timeline"].isChecked()
+        assert screen.tool_palette._buttons["Select"].isChecked()
+        ai_actions = {
+            button.text().strip().split("  ")[-1]
+            for button in screen.ai_overlay.findChildren(QPushButton)
+        }
+        assert {
+            "Regenerate Voice",
+            "Match Original Voice",
+            "Improve Emotion",
+            "Match Timing",
+            "Rewrite Translation",
+            "Shorten Translation",
+            "Improve Lip Sync",
+            "Fix Pronunciation",
+            "Improve Audio",
+            "Reanalyze Speaker",
+            "Properties",
+        } <= ai_actions
+    finally:
+        screen.close()
+        app.processEvents()
+
+
+def test_razor_edit_is_undoable() -> None:
+    app = QApplication.instance() or QApplication([])
+    screen = TimelineScreen()
+    original: list[tuple[str, float, float, str, float | None]] = [
+        ("V1", 0.0, 10.0, "source.mp4", None)
+    ]
+    screen._current_project_data["duration"] = 10.0
+    screen._current_project_data["clips"] = list(original)
+    screen.canvas_view.set_clips(original, 10.0)
+    try:
+        was_split = screen.canvas_view._split_clip(
+            {"tid": "V1", "start": 0.0, "dur": 10.0, "label": "source.mp4"},
+            4.0,
+        )
+
+        assert was_split is True
+        assert [clip[2] for clip in screen._current_project_data["clips"]] == [4.0, 6.0]
+
+        screen.undo()
+
+        assert screen._current_project_data["clips"] == original
     finally:
         screen.close()
         app.processEvents()

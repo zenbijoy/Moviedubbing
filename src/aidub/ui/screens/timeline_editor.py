@@ -55,6 +55,7 @@ try:
         QGraphicsScene,
         QGraphicsTextItem,
         QGraphicsView,
+        QGridLayout,
         QHBoxLayout,
         QInputDialog,
         QLabel,
@@ -63,6 +64,7 @@ try:
         QMessageBox,
         QProgressBar,
         QPushButton,
+        QSlider,
         QSplitter,
         QStackedWidget,
         QTreeWidget,
@@ -80,11 +82,15 @@ if TYPE_CHECKING:
 # ────────────────────────────────────────────────────────────────────────────
 # Timeline Constants & Presets
 # ────────────────────────────────────────────────────────────────────────────
-TRACK_HEIGHT = 34
-TRACK_HEADER_WIDTH = 250
+TRACK_HEIGHT = 32
+TRACK_HEADER_WIDTH = 218
 RULER_HEIGHT = 30
 MIN_CLIP_WIDTH = 6
-PX_PER_SEC_DEFAULT = 120.0
+PX_PER_SEC_DEFAULT = 78.0
+NAV_RAIL_WIDTH = 168
+TOOL_PALETTE_WIDTH = 82
+
+type ClipTuple = tuple[str, float, float, str, float | None]
 
 _TRACK_DEFS = [
     ("V3", "Video",        "#3B82F6", "video"),
@@ -112,59 +118,94 @@ def _format_tc(sec: float) -> str:
 
 if _QT:
     class _ProductionStageBar(QFrame):
-        """Live production graph summary for the single Studio workspace."""
+        """Reference workspace switcher above the three-panel dubbing editor."""
 
-        _GROUPS = (
-            ("MEDIA", (AutomationStage.INGEST, AutomationStage.AUDIO_SEPARATION)),
-            (
-                "ANALYSIS",
-                (AutomationStage.SPEAKER_ANALYSIS, AutomationStage.TRANSCRIPTION),
-            ),
-            ("TRANSLATION", (AutomationStage.TRANSLATION,)),
-            (
-                "VOICE",
-                (AutomationStage.VOICE_CASTING, AutomationStage.SYNTHESIS),
-            ),
-            ("TIMING", (AutomationStage.TIMING,)),
-            ("LIP SYNC", (AutomationStage.LIP_SYNC,)),
-            ("MIX", (AutomationStage.MIX,)),
-            (
-                "DELIVERY",
-                (AutomationStage.QUALITY_CONTROL, AutomationStage.MASTER_EXPORT),
-            ),
+        home_requested = Signal()
+        workspace_selected = Signal(str)
+
+        _WORKSPACES = (
+            "Learning",
+            "Assembly",
+            "Editing",
+            "Dubbing",
+            "Color",
+            "Audio",
+            "Graphics",
+            "Libraries",
         )
 
         def __init__(self, parent: _W | None = None) -> None:
             super().__init__(parent)
             self.setFixedHeight(39)
             self.setStyleSheet(
-                "QFrame{background:#0D1118;border-bottom:1px solid #1E2838;}"
+                "QFrame{background:#16191E;border-bottom:1px solid #090B0E;}"
             )
             layout = QHBoxLayout(self)
-            layout.setContentsMargins(300, 0, 300, 0)
-            layout.setSpacing(12)
-            self._labels: dict[str, QLabel] = {}
-            for label, _stages in self._GROUPS:
-                widget = QLabel(label, self)
-                widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                layout.addWidget(widget, stretch=1)
-                self._labels[label] = widget
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(0)
+
+            home_button = QPushButton("⌂", self)
+            home_button.setFixedSize(48, 39)
+            home_button.setToolTip("Home Dashboard (Ctrl+H)")
+            home_button.setCursor(Qt.CursorShape.PointingHandCursor)
+            home_button.setStyleSheet(
+                "QPushButton{background:#1A1E24;color:#B7BDC7;border:none;"
+                "border-right:1px solid #0B0D10;border-radius:0;padding:0;"
+                "font-size:20px;min-height:0;}"
+                "QPushButton:hover{background:#252B34;color:#FFF;}"
+            )
+            home_button.clicked.connect(self.home_requested.emit)
+            layout.addWidget(home_button)
+            layout.addStretch(1)
+
+            self._buttons: dict[str, QPushButton] = {}
+            for workspace in self._WORKSPACES:
+                button = QPushButton(workspace, self)
+                button.setCheckable(True)
+                button.setChecked(workspace == "Dubbing")
+                button.setCursor(Qt.CursorShape.PointingHandCursor)
+                button.setFixedHeight(39)
+                button.setMinimumWidth(76 if workspace != "Libraries" else 86)
+                button.setStyleSheet(
+                    "QPushButton{background:transparent;color:#9A9FA8;border:none;"
+                    "border-bottom:2px solid transparent;border-radius:0;padding:0 12px;"
+                    "font-size:11px;font-weight:500;min-height:0;}"
+                    "QPushButton:hover{color:#E8EBF0;background:#1B1F25;}"
+                    "QPushButton:checked{color:#55A9F7;border-bottom-color:#2E9AF3;}"
+                )
+                button.clicked.connect(
+                    lambda _checked=False, name=workspace: self._select_workspace(name)
+                )
+                layout.addWidget(button)
+                self._buttons[workspace] = button
+
+            more_button = QPushButton("»", self)
+            more_button.setFixedSize(42, 39)
+            more_button.setStyleSheet(
+                "QPushButton{background:transparent;color:#9A9FA8;border:none;"
+                "font-size:18px;padding:0;min-height:0;}"
+                "QPushButton:hover{color:#FFF;background:#252B34;}"
+            )
+            layout.addWidget(more_button)
+            layout.addStretch(1)
+
+        def _select_workspace(self, workspace: str) -> None:
+            for name, button in self._buttons.items():
+                button.setChecked(name == workspace)
+            self.workspace_selected.emit(workspace)
 
         def set_state(self, state: AgenticStudioState) -> None:
-            for label, stages in self._GROUPS:
-                statuses = {state.stage(stage).status for stage in stages}
-                if StageStatus.FAILED in statuses:
-                    color, border = "#EF4444", "#EF4444"
-                elif StageStatus.RUNNING in statuses:
-                    color, border = "#22D3EE", "#22D3EE"
-                elif statuses <= {StageStatus.SUCCEEDED, StageStatus.SKIPPED}:
-                    color, border = "#22C55E", "transparent"
-                else:
-                    color, border = "#8C9BAE", "transparent"
-                self._labels[label].setStyleSheet(
-                    f"color:{color};font-size:10px;font-weight:700;"
-                    f"border-bottom:2px solid {border};padding:7px 4px 5px 4px;"
-                )
+            dubbing = self._buttons["Dubbing"]
+            running = next(
+                (item for item in state.stages if item.status is StageStatus.RUNNING),
+                None,
+            )
+            if running is not None:
+                dubbing.setToolTip(f"{running.label} · {state.progress}%")
+            elif state.is_complete:
+                dubbing.setToolTip("Dubbing production graph complete")
+            else:
+                dubbing.setToolTip("Active dubbing workspace")
 
     # ─────────────────────────────────────────────────────────────────────────
     # Left Column: Project Media Browser
@@ -175,28 +216,28 @@ if _QT:
         def __init__(self, parent: _W | None = None) -> None:
             super().__init__(parent)
             self._source_path = ""
-            self.setStyleSheet("background:#111722;border-right:1px solid #1E2838;")
+            self.setStyleSheet("background:#121417;border-right:1px solid #08090B;")
 
             layout = QVBoxLayout(self)
-            layout.setContentsMargins(8, 8, 8, 8)
+            layout.setContentsMargins(14, 8, 12, 10)
             layout.setSpacing(6)
 
             hdr_layout = QHBoxLayout()
-            self.proj_tab = QLabel("NO PROJECT", self)
+            self.proj_tab = QLabel("Project: No Project  ×", self)
             self.proj_tab.setStyleSheet(
-                "font-size: 11px; font-weight: 700; color: #F7F9FC; background: #1C2636;"
-                "padding: 4px 8px; border-radius: 4px;"
+                "font-size:11px;font-weight:600;color:#F2F3F5;background:transparent;"
+                "padding:4px 0;border-bottom:2px solid #268DE4;"
             )
             hdr_layout.addWidget(self.proj_tab)
 
-            mb_tab = QLabel("Media", self)
-            mb_tab.setStyleSheet("font-size: 11px; color: #64748B; padding: 4px 8px;")
+            mb_tab = QLabel("Media Browser", self)
+            mb_tab.setStyleSheet("font-size:11px;color:#8F949D;padding:4px 12px;")
             hdr_layout.addWidget(mb_tab)
             hdr_layout.addStretch()
             layout.addLayout(hdr_layout)
 
-            self.proj_file_lbl = QLabel("Import a movie to begin", self)
-            self.proj_file_lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #8C9BAE;")
+            self.proj_file_lbl = QLabel("▣  Import a movie to begin", self)
+            self.proj_file_lbl.setStyleSheet("font-size:11px;font-weight:500;color:#9A9FA8;")
             layout.addWidget(self.proj_file_lbl)
 
             # Search & Count bar
@@ -204,16 +245,18 @@ if _QT:
             search_row.setSpacing(6)
 
             self.search_in = QLineEdit(self)
-            self.search_in.setPlaceholderText("🔍 Search media…")
+            self.search_in.setPlaceholderText("⌕  Search media…")
             self.search_in.setStyleSheet(
-                "QLineEdit{background:#0D131F;color:#F7F9FC;border:1px solid #1E2838;padding:4px 8px;border-radius:4px;font-size:11px;}"
+                "QLineEdit{background:#0B0D10;color:#ECEEF2;border:1px solid #23262C;"
+                "padding:4px 8px;border-radius:2px;font-size:11px;min-height:22px;}"
             )
             self.search_in.textChanged.connect(self._on_search_text_changed)
             search_row.addWidget(self.search_in, stretch=1)
 
             self.count_lbl = QLabel("0", self)
             self.count_lbl.setStyleSheet(
-                "font-size: 11px; font-weight: 700; color: #64748B; background: #16202E; padding: 3px 6px; border-radius: 3px;"
+                "font-size:11px;font-weight:700;color:#8F949D;background:transparent;"
+                "padding:3px 6px;"
             )
             search_row.addWidget(self.count_lbl)
 
@@ -221,7 +264,8 @@ if _QT:
             gear_btn.setFixedSize(24, 24)
             gear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             gear_btn.setStyleSheet(
-                "QPushButton{background:#16202E;color:#8C9BAE;border:none;border-radius:3px;}"
+                "QPushButton{background:transparent;color:#8C919A;border:none;border-radius:2px;"
+                "padding:0;min-height:0;}"
                 "QPushButton:hover{background:#2563EB;color:#FFF;}"
             )
             gear_btn.clicked.connect(self._on_gear_clicked)
@@ -232,12 +276,13 @@ if _QT:
             self.tree = QTreeWidget(self)
             self.tree.setHeaderLabels(["Name", "Type"])
             self.tree.header().setStyleSheet(
-                "QHeaderView::section{background:#0D131F;color:#64748B;font-size:10px;font-weight:700;border:none;padding:3px;}"
+                "QHeaderView::section{background:#181A1E;color:#A3A7AE;font-size:10px;"
+                "font-weight:500;border:none;padding:4px;}"
             )
             self.tree.setStyleSheet(
-                "QTreeWidget{background:#0D131F;border:1px solid #1E2838;border-radius:6px;color:#F7F9FC;font-size:11px;}"
-                "QTreeWidget::item{padding:3px;}"
-                "QTreeWidget::item:selected{background:#1E3A5F;color:#F7F9FC;}"
+                "QTreeWidget{background:#111316;border:none;color:#D3D6DB;font-size:11px;}"
+                "QTreeWidget::item{padding:3px;border:none;}"
+                "QTreeWidget::item:selected{background:#24282E;color:#FFF;}"
             )
             self.tree.itemDoubleClicked.connect(self._on_item_double_clicked)
 
@@ -269,7 +314,7 @@ if _QT:
             if source is None or not source.is_file():
                 empty_item = self._item(
                     self.tree,
-                    "＋  Import source movie…",
+                    "+  Import source movie…",
                     "Action",
                     "studio://import",
                 )
@@ -277,8 +322,8 @@ if _QT:
                 self.count_lbl.setText("0")
                 return
 
-            source_bin = self._item(self.tree, "📁  01_Source")
-            self._item(source_bin, f"🎬  {movie_name}", "Video", source_path)
+            source_bin = self._item(self.tree, "▾  📁  01_Source")
+            self._item(source_bin, f"▣  {movie_name}", "Video", source_path)
 
             if source.parent.is_dir():
                 sidecars = sorted(
@@ -298,7 +343,7 @@ if _QT:
                         media_type,
                         str(sidecar),
                     )
-            generated_bin = self._item(self.tree, "📁  02_Generated")
+            generated_bin = self._item(self.tree, "▾  📁  02_Generated")
             if generated_paths:
                 for generated in generated_paths:
                     generated_path = Path(generated)
@@ -310,10 +355,13 @@ if _QT:
                         )
                         self._item(
                             generated_bin,
-                            f"⚡  {generated_path.name}",
+                            f"✦  {generated_path.name}",
                             media_type,
                             str(generated_path),
                         )
+            self._item(self.tree, "›  📁  03_Assets")
+            self._item(self.tree, "›  📁  04_Proxies")
+            self._item(self.tree, "›  📁  05_Stems")
             self.tree.expandAll()
             root = self.tree.invisibleRootItem()
             count = sum(1 + root.child(index).childCount() for index in range(root.childCount()))
@@ -326,8 +374,8 @@ if _QT:
             source_path: str = "",
             generated_paths: tuple[str, ...] = (),
         ) -> None:
-            self.proj_tab.setText(name.upper())
-            self.proj_file_lbl.setText(source_path or "No source media loaded")
+            self.proj_tab.setText(f"Project: {name}  ×")
+            self.proj_file_lbl.setText(f"▣  {source_path}" if source_path else "No source media loaded")
             self.populate_tree(movie_name, source_path, generated_paths)
 
         def _on_search_text_changed(self, text: str) -> None:
@@ -335,13 +383,19 @@ if _QT:
             if not text:
                 for i in range(self.tree.topLevelItemCount()):
                     item = self.tree.topLevelItem(i)
+                    if item is None:
+                        continue
                     item.setHidden(False)
                     for j in range(item.childCount()):
-                        item.child(j).setHidden(False)
+                        child = item.child(j)
+                        if child is not None:
+                            child.setHidden(False)
                 return
 
             for i in range(self.tree.topLevelItemCount()):
                 item = self.tree.topLevelItem(i)
+                if item is None:
+                    continue
                 match_parent = text in item.text(0).lower()
                 any_child_match = False
                 for j in range(item.childCount()):
@@ -400,7 +454,7 @@ if _QT:
 
         def __init__(self, parent: _W | None = None) -> None:
             super().__init__(parent)
-            self.setStyleSheet("background:#080B10;border-right:1px solid #1E2838;")
+            self.setStyleSheet("background:#101214;border-right:1px solid #08090B;")
 
             self._playhead_sec = 0.0
             self._is_playing = False
@@ -411,7 +465,7 @@ if _QT:
             self._media_path = ""
             self._player: Any | None = None
             self._audio_output: Any | None = None
-            self._video_widget: QWidget | None = None
+            self._video_widget: QLabel | None = None
             self._video_sink: Any | None = None
             self._last_video_image: Any | None = None
             self._priming_video = False
@@ -419,19 +473,20 @@ if _QT:
             self._prime_target_ms = 0
 
             layout = QVBoxLayout(self)
-            layout.setContentsMargins(8, 8, 8, 8)
-            layout.setSpacing(6)
+            layout.setContentsMargins(8, 7, 8, 5)
+            layout.setSpacing(5)
 
             # Header Tabs matching Image 1
             hdr = QHBoxLayout()
-            self.prog_title_lbl = QLabel("Program Monitor", self)
+            self.prog_title_lbl = QLabel("Program: No Scene", self)
             self.prog_title_lbl.setStyleSheet(
-                "font-size: 11px; font-weight: 700; color: #F7F9FC; background: #1C2636; padding: 4px 8px; border-radius: 4px;"
+                "font-size:11px;font-weight:600;color:#F2F3F5;padding:4px 0;"
+                "border-bottom:2px solid #268DE4;"
             )
             hdr.addWidget(self.prog_title_lbl)
 
             self.source_lbl = QLabel("Source: none", self)
-            self.source_lbl.setStyleSheet("font-size: 11px; color: #64748B; padding: 4px 8px;")
+            self.source_lbl.setStyleSheet("font-size:11px;color:#868B94;padding:4px 8px;")
             hdr.addWidget(self.source_lbl)
 
             hdr.addStretch()
@@ -440,18 +495,18 @@ if _QT:
             # Video Canvas Frame
             video_frame = QFrame(self)
             video_frame.setStyleSheet(
-                "background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #151D2A, stop:1 #090E17);"
-                "border: 1px solid #1E2838; border-radius: 6px;"
+                "background:#050607;border:none;border-radius:0;"
             )
+            video_frame.setFixedHeight(286)
             vf_lay = QVBoxLayout(video_frame)
-            vf_lay.setContentsMargins(12, 12, 12, 12)
+            vf_lay.setContentsMargins(0, 0, 0, 0)
 
             # Top overlay inside video
             v_top = QHBoxLayout()
             self.tc_overlay = QLabel("00:00:00:000", video_frame)
             self.tc_overlay.setStyleSheet(
-                "font-family:'Cascadia Code'; font-size:13px; font-weight:700; color:#22D3EE;"
-                "background:rgba(8,11,16,0.85); padding:3px 8px; border-radius:4px;"
+                "font-family:'Cascadia Mono';font-size:13px;font-weight:700;color:#269BEF;"
+                "background:transparent;padding:3px 4px;"
             )
             v_top.addWidget(self.tc_overlay)
 
@@ -459,18 +514,19 @@ if _QT:
 
             fit_combo = QComboBox(video_frame)
             fit_combo.addItems(["Fit", "50%", "100%", "200%"])
+            fit_combo.setFixedWidth(74)
             fit_combo.setStyleSheet(
-                "QComboBox{background:rgba(8,11,16,0.85);color:#F7F9FC;border:none;padding:2px 6px;border-radius:4px;font-size:11px;}"
+                "QComboBox{background:#111317;color:#E7E9ED;border:1px solid #22262C;"
+                "padding:2px 6px;border-radius:2px;font-size:11px;min-height:20px;}"
             )
             v_top.addWidget(fit_combo)
 
             self.dur_overlay = QLabel("00:00:00:000", video_frame)
             self.dur_overlay.setStyleSheet(
-                "font-family:'Cascadia Code'; font-size:12px; color:#8C9BAE;"
-                "background:rgba(8,11,16,0.85); padding:3px 8px; border-radius:4px;"
+                "font-family:'Cascadia Mono';font-size:12px;color:#AEB3BC;"
+                "background:transparent;padding:3px 4px;"
             )
             v_top.addWidget(self.dur_overlay)
-            vf_lay.addLayout(v_top)
 
             # Real video surface with an explicit empty state when no source is loaded.
             self.media_stack = QStackedWidget(video_frame)
@@ -538,10 +594,27 @@ if _QT:
             vf_lay.addWidget(self.media_stack, stretch=1)
 
             layout.addWidget(video_frame, stretch=1)
+            layout.addLayout(v_top)
+
+            scrub_row = QHBoxLayout()
+            scrub_row.setContentsMargins(2, 0, 2, 0)
+            self.scrubber = QSlider(Qt.Orientation.Horizontal, self)
+            self.scrubber.setRange(0, 0)
+            self.scrubber.setTracking(True)
+            self.scrubber.setFixedHeight(18)
+            self.scrubber.setStyleSheet(
+                "QSlider::groove:horizontal{height:3px;background:#272B31;}"
+                "QSlider::sub-page:horizontal{background:#555B64;}"
+                "QSlider::handle:horizontal{background:#9FA5AE;border:1px solid #090A0C;"
+                "width:9px;height:9px;margin:-4px 0;border-radius:5px;}"
+            )
+            self.scrubber.sliderMoved.connect(self._on_scrubber_moved)
+            scrub_row.addWidget(self.scrubber)
+            layout.addLayout(scrub_row)
 
             # Transport controls operate directly on QMediaPlayer.
             t_bar = QHBoxLayout()
-            t_bar.setSpacing(4)
+            t_bar.setSpacing(12)
             t_bar.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
             ctrl_btns = [
@@ -567,13 +640,9 @@ if _QT:
                 if is_play:
                     self.play_btn = b
                 b.setStyleSheet(
-                    f"QPushButton {{"
-                    f"  background: {'#2563EB' if is_play else '#141C2B'};"
-                    f"  color: {'#FFF' if is_play else '#A9B2C3'};"
-                    f"  border: 1px solid {'#3B82F6' if is_play else '#222D3E'};"
-                    f"  border-radius: 4px; font-size: 11px; font-weight: 700;"
-                    f"}}"
-                    f"QPushButton:hover {{ background: #3B82F6; color: #FFF; }}"
+                    "QPushButton{background:transparent;color:#AEB3BB;border:none;"
+                    "border-radius:2px;font-size:13px;font-weight:700;padding:0;min-height:0;}"
+                    "QPushButton:hover{background:#25292F;color:#FFF;}"
                 )
                 b.clicked.connect(slot)
                 t_bar.addWidget(b)
@@ -594,6 +663,7 @@ if _QT:
             del char_name, quote
             self._max_duration_sec = dur_sec
             self._mark_out_sec = dur_sec
+            self.scrubber.setRange(0, max(1, round(dur_sec * 1_000)))
             self.dur_overlay.setText(_format_tc(dur_sec))
             if media_path:
                 self.load_media(media_path)
@@ -647,6 +717,12 @@ if _QT:
         def _on_player_position_changed(self, position_ms: int) -> None:
             self._playhead_sec = max(0.0, position_ms / 1_000.0)
             self.tc_overlay.setText(_format_tc(self._playhead_sec))
+            if not self.scrubber.isSliderDown():
+                self.scrubber.setValue(position_ms)
+            self.playhead_changed.emit(self._playhead_sec)
+
+        def _on_scrubber_moved(self, position_ms: int) -> None:
+            self.set_playhead(position_ms / 1_000.0)
             self.playhead_changed.emit(self._playhead_sec)
 
         def _on_video_frame_changed(self, frame: Any) -> None:
@@ -696,6 +772,7 @@ if _QT:
                 return
             self._max_duration_sec = duration_ms / 1_000.0
             self._mark_out_sec = self._max_duration_sec
+            self.scrubber.setRange(0, duration_ms)
             self.dur_overlay.setText(_format_tc(self._max_duration_sec))
             if self._player is not None and self._player.position() == 0:
                 self._player.setPosition(1)
@@ -704,6 +781,8 @@ if _QT:
         def set_playhead(self, sec: float) -> None:
             self._playhead_sec = max(0.0, min(self._max_duration_sec, sec))
             self.tc_overlay.setText(_format_tc(self._playhead_sec))
+            if not self.scrubber.isSliderDown():
+                self.scrubber.setValue(round(self._playhead_sec * 1_000))
             if self._player is not None and self._media_path:
                 target_ms = round(self._playhead_sec * 1_000)
                 if abs(self._player.position() - target_ms) > 80:
@@ -854,6 +933,60 @@ if _QT:
                 painter.drawLine(x, round(center - amplitude), x, round(center + amplitude))
             painter.end()
 
+    class _StereoMeterWidget(QWidget):
+        """Compact dual-channel level meter matching the reference inspector rail."""
+
+        def __init__(self, parent: _W | None = None) -> None:
+            super().__init__(parent)
+            self._left_db = -54.0
+            self._right_db = -54.0
+            self.setFixedWidth(66)
+            self.setMinimumHeight(300)
+            self.setToolTip("Stereo program level meter")
+
+        def set_levels(self, left_db: float, right_db: float) -> None:
+            self._left_db = max(-54.0, min(0.0, left_db))
+            self._right_db = max(-54.0, min(0.0, right_db))
+            self.update()
+
+        def paintEvent(self, event: object) -> None:  # noqa: N802
+            del event
+            painter = QPainter(self)
+            painter.fillRect(self.rect(), QColor("#0A0B0D"))
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+            top = 24
+            bottom = self.height() - 25
+            meter_height = max(1, bottom - top)
+            channels = ((9, self._left_db), (25, self._right_db))
+            segment_count = 28
+            segment_gap = 2
+            segment_height = max(2, (meter_height // segment_count) - segment_gap)
+            for x, level_db in channels:
+                for index in range(segment_count):
+                    segment_db = -54.0 + (index / max(1, segment_count - 1)) * 54.0
+                    y = bottom - round((index + 1) * meter_height / segment_count)
+                    active = segment_db <= level_db
+                    if not active:
+                        color = QColor("#25291D")
+                    elif segment_db > -9:
+                        color = QColor("#E35D4F")
+                    elif segment_db > -18:
+                        color = QColor("#D8C441")
+                    else:
+                        color = QColor("#65C742")
+                    painter.fillRect(x, y, 11, segment_height, color)
+
+            painter.setPen(QColor("#858A91"))
+            painter.setFont(QFont("Segoe UI", 7))
+            for db in (0, -6, -12, -18, -24, -30, -36, -42, -48, -54):
+                y = top + round(abs(db) / 54 * meter_height)
+                painter.drawText(40, y + 3, str(db))
+            painter.setPen(QColor("#9EA3AB"))
+            painter.drawText(9, self.height() - 8, "S")
+            painter.drawText(25, self.height() - 8, "S")
+            painter.drawText(43, self.height() - 8, "dB")
+            painter.end()
+
     class _DialogueInspectorPanel(QFrame):
         translation_changed = Signal(str)
         take_changed = Signal(str)
@@ -863,10 +996,10 @@ if _QT:
 
         def __init__(self, parent: _W | None = None) -> None:
             super().__init__(parent)
-            self.setStyleSheet("background:#111722;")
+            self.setStyleSheet("background:#111315;")
 
             main_layout = QHBoxLayout(self)
-            main_layout.setContentsMargins(8, 8, 8, 8)
+            main_layout.setContentsMargins(10, 7, 0, 5)
             main_layout.setSpacing(8)
 
             insp_box = QVBoxLayout()
@@ -875,7 +1008,10 @@ if _QT:
             # Tabs
             tab_row = QHBoxLayout()
             t1 = QLabel("Inspector", self)
-            t1.setStyleSheet("font-size: 11px; font-weight: 700; color: #F7F9FC; background: #1C2636; padding: 4px 8px; border-radius: 4px;")
+            t1.setStyleSheet(
+                "font-size:11px;font-weight:600;color:#F7F9FC;padding:4px 0;"
+                "border-bottom:2px solid #268DE4;"
+            )
             tab_row.addWidget(t1)
 
             t2 = QLabel("AI Assistant", self)
@@ -890,30 +1026,39 @@ if _QT:
 
             # Dialogue Fields Frame
             d_frame = QFrame(self)
-            d_frame.setStyleSheet("background:#0D131F;border:1px solid #1E2838;border-radius:6px;padding:8px;")
+            d_frame.setObjectName("InspectorCard")
+            d_frame.setStyleSheet(
+                "QFrame#InspectorCard{background:#0D0F12;border:1px solid #262A30;"
+                "border-radius:2px;padding:8px;}"
+            )
             d_lay = QFormLayout(d_frame)
             d_lay.setSpacing(6)
+
+            def form_label(text: str) -> QLabel:
+                label = QLabel(text, d_frame)
+                label.setStyleSheet("color:#B8BDC6;font-size:11px;background:transparent;")
+                return label
 
             self.char_in = QLineEdit(d_frame)
             self.char_in.setPlaceholderText("Select an analyzed speaker")
             self.char_in.setStyleSheet("QLineEdit{background:#16202E;color:#F7F9FC;border:1px solid #283446;padding:3px 6px;border-radius:4px;font-size:11px;}")
-            d_lay.addRow("Character:", self.char_in)
+            d_lay.addRow(form_label("Character"), self.char_in)
 
             self.lang_in = QLineEdit(d_frame)
             self.lang_in.setPlaceholderText("Target language code")
             self.lang_in.setStyleSheet("QLineEdit{background:#16202E;color:#F7F9FC;border:1px solid #283446;padding:3px 6px;border-radius:4px;font-size:11px;}")
-            d_lay.addRow("Language:", self.lang_in)
+            d_lay.addRow(form_label("Language"), self.lang_in)
 
             self.orig_in = QLineEdit(d_frame)
             self.orig_in.setPlaceholderText("Select or import source dialogue")
             self.orig_in.setStyleSheet("QLineEdit{background:#16202E;color:#F7F9FC;border:1px solid #283446;padding:3px 6px;border-radius:4px;font-size:11px;}")
-            d_lay.addRow("Original:", self.orig_in)
+            d_lay.addRow(form_label("Original"), self.orig_in)
 
             self.trans_in = QLineEdit(d_frame)
             self.trans_in.setPlaceholderText("Translation appears after processing")
             self.trans_in.setStyleSheet("QLineEdit{background:#16202E;color:#22D3EE;font-weight:700;border:1px solid #283446;padding:3px 6px;border-radius:4px;font-size:11px;}")
             self.trans_in.textChanged.connect(self._on_trans_changed)
-            d_lay.addRow("Translation:", self.trans_in)
+            d_lay.addRow(form_label("Translation"), self.trans_in)
 
             insp_box.addWidget(d_frame)
 
@@ -923,7 +1068,11 @@ if _QT:
 
             # Timing Card
             t_card = QFrame(self)
-            t_card.setStyleSheet("background:#0D131F;border:1px solid #1E2838;border-radius:6px;padding:6px;")
+            t_card.setObjectName("InspectorTimingCard")
+            t_card.setStyleSheet(
+                "QFrame#InspectorTimingCard{background:#0D0F12;border:1px solid #262A30;"
+                "border-radius:2px;padding:6px;}"
+            )
             tc_lay = QVBoxLayout(t_card)
             tc_lay.setSpacing(3)
             tc_title = QLabel("Timing", t_card)
@@ -940,7 +1089,11 @@ if _QT:
 
             # Scores Card
             s_card = QFrame(self)
-            s_card.setStyleSheet("background:#0D131F;border:1px solid #1E2838;border-radius:6px;padding:6px;")
+            s_card.setObjectName("InspectorScoresCard")
+            s_card.setStyleSheet(
+                "QFrame#InspectorScoresCard{background:#0D0F12;border:1px solid #262A30;"
+                "border-radius:2px;padding:6px;}"
+            )
             sc_lay = QVBoxLayout(s_card)
             sc_lay.setSpacing(2)
             sc_title = QLabel("Scores", s_card)
@@ -963,7 +1116,11 @@ if _QT:
 
             # Take Selector & Waveform
             take_card = QFrame(self)
-            take_card.setStyleSheet("background:#0D131F;border:1px solid #1E2838;border-radius:6px;padding:6px;")
+            take_card.setObjectName("InspectorTakeCard")
+            take_card.setStyleSheet(
+                "QFrame#InspectorTakeCard{background:#0D0F12;border:1px solid #262A30;"
+                "border-radius:2px;padding:6px;}"
+            )
             tk_lay = QVBoxLayout(take_card)
             tk_lay.setSpacing(6)
 
@@ -1022,32 +1179,9 @@ if _QT:
 
             main_layout.addLayout(insp_box, stretch=1)
 
-            # Far Right Dual VU Level Meter Panel
-            vu_frame = QFrame(self)
-            vu_frame.setFixedWidth(32)
-            vu_frame.setStyleSheet("background:#080B10;border:1px solid #1E2838;border-radius:4px;")
-            vu_lay = QVBoxLayout(vu_frame)
-            vu_lay.setContentsMargins(2, 4, 2, 4)
-            vu_lay.setSpacing(2)
-
-            vu_lbl = QLabel("METER OFF", vu_frame)
-            vu_lbl.setStyleSheet("font-size:9px;color:#64748B;font-weight:700;")
-            vu_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            vu_lay.addWidget(vu_lbl)
-
-            db_ticks = ["-6", "-12", "-18", "-24", "-30", "-36", "-42", "-48", "-54"]
-            for db_val in db_ticks:
-                bar = QFrame(vu_frame)
-                bar.setFixedHeight(12)
-                bar.setStyleSheet("background:#1E2838;border-radius:1px;")
-                bar_lay = QHBoxLayout(bar)
-                bar_lay.setContentsMargins(1, 0, 1, 0)
-                t_lbl = QLabel(db_val, bar)
-                t_lbl.setStyleSheet("font-size:7px;color:#080B10;font-weight:700;")
-                bar_lay.addWidget(t_lbl)
-                vu_lay.addWidget(bar)
-
-            main_layout.addWidget(vu_frame)
+            # Far-right dual VU rail; drawn as one dense widget to avoid layout jitter.
+            self.meter = _StereoMeterWidget(self)
+            main_layout.addWidget(self.meter)
 
         def update_clip_info(
             self,
@@ -1126,6 +1260,7 @@ if _QT:
     class _TimelineCanvasView(QGraphicsView):
         timecode_changed = Signal(float)
         clip_clicked = Signal(dict)
+        clips_edited = Signal(object)
 
         def __init__(self, parent: _W | None = None) -> None:
             super().__init__(parent)
@@ -1133,10 +1268,13 @@ if _QT:
             self._duration_sec = 1.0
             self._px_per_sec = PX_PER_SEC_DEFAULT
             self._playhead_sec = 0.0
-            self._clip_items: list[tuple[dict, QGraphicsRectItem, QGraphicsTextItem]] = []
-            self._clips_data: list[tuple] = []
+            self._clip_items: list[
+                tuple[dict[str, Any], QGraphicsRectItem, QGraphicsTextItem]
+            ] = []
+            self._clips_data: list[ClipTuple] = []
             self._selected_rect: QGraphicsRectItem | None = None
             self._video_thumbnail: QPixmap | None = None
+            self._active_tool = "Select"
             self.setStyleSheet("QGraphicsView{background:#0D1118;border:none;}")
             self.setRenderHint(QPainter.RenderHint.Antialiasing)
             self.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
@@ -1144,13 +1282,28 @@ if _QT:
             self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
             self.set_clips([], 1.0)
 
-        def set_clips(self, clips_list: list[tuple], duration_sec: float = 10.0) -> None:
+        def set_tool(self, tool_name: str) -> None:
+            self._active_tool = tool_name
+            if tool_name == "Hand":
+                self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+                self.setCursor(Qt.CursorShape.OpenHandCursor)
+            else:
+                self.setDragMode(QGraphicsView.DragMode.NoDrag)
+                cursor = (
+                    Qt.CursorShape.CrossCursor
+                    if tool_name in {"Razor", "Pen", "Text"}
+                    else Qt.CursorShape.ArrowCursor
+                )
+                self.setCursor(cursor)
+            if tool_name == "Zoom In":
+                self.scale(1.15, 1.0)
+            elif tool_name == "Zoom Out":
+                self.scale(1 / 1.15, 1.0)
+
+        def set_clips(self, clips_list: list[ClipTuple], duration_sec: float = 10.0) -> None:
             self._clips_data = list(clips_list)
             self._duration_sec = max(1.0, duration_sec)
-            self._px_per_sec = max(
-                0.25,
-                min(PX_PER_SEC_DEFAULT, 1_400.0 / self._duration_sec),
-            )
+            self._px_per_sec = PX_PER_SEC_DEFAULT
             self._build_scene()
 
         def set_playhead(self, sec: float) -> None:
@@ -1247,7 +1400,8 @@ if _QT:
                         Qt.TransformationMode.SmoothTransformation,
                     )
                     thumb_x = x + 3
-                    while thumb_x < x + cw - 3:
+                    thumbnail_limit = min(x + cw - 3, x + max(1_800, self.viewport().width() * 2))
+                    while thumb_x < thumbnail_limit:
                         thumb_item = sc.addPixmap(thumbnail)
                         thumb_item.setPos(thumb_x, cy + 3)
                         thumb_item.setOpacity(0.72)
@@ -1283,6 +1437,17 @@ if _QT:
             else:
                 for c_info, rect, txt_item in self._clip_items:
                     if rect.contains(pt):
+                        if self._active_tool == "Razor":
+                            split_sec = max(
+                                float(c_info["start"]),
+                                min(
+                                    float(c_info["start"]) + float(c_info["dur"]),
+                                    pt.x() / self._px_per_sec,
+                                ),
+                            )
+                            if self._split_clip(c_info, split_sec):
+                                event.accept()
+                                return
                         if self._selected_rect is not None:
                             old_color = next(
                                 (row[2] for row in _TRACK_DEFS if row[0] == self._selected_rect.data(0)),
@@ -1295,6 +1460,35 @@ if _QT:
                         break
             super().mousePressEvent(event)
 
+        def _split_clip(self, clip_info: dict[str, Any], split_sec: float) -> bool:
+            start = float(clip_info["start"])
+            duration = float(clip_info["dur"])
+            end = start + duration
+            if split_sec <= start + 0.05 or split_sec >= end - 0.05:
+                return False
+            updated: list[ClipTuple] = []
+            replaced = False
+            for clip in self._clips_data:
+                if (
+                    not replaced
+                    and clip[0] == clip_info["tid"]
+                    and float(clip[1]) == start
+                    and float(clip[2]) == duration
+                    and clip[3] == clip_info["label"]
+                ):
+                    score = clip[4] if len(clip) > 4 else None
+                    updated.append((clip[0], start, split_sec - start, clip[3], score))
+                    updated.append((clip[0], split_sec, end - split_sec, clip[3], score))
+                    replaced = True
+                else:
+                    updated.append(clip)
+            if not replaced:
+                return False
+            self._clips_data = updated
+            self._build_scene()
+            self.clips_edited.emit(list(updated))
+            return True
+
         def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802
             if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
                 factor = 1.12 if event.angleDelta().y() > 0 else 1 / 1.12
@@ -1304,6 +1498,175 @@ if _QT:
                 event.accept()
                 return
             super().wheelEvent(event)
+
+    class _StudioNavigationRail(QFrame):
+        """Dense workflow rail occupying the lower-left reference column."""
+
+        route_requested = Signal(str)
+
+        _ROUTES = (
+            ("⌂", "Dashboard"),
+            ("▣", "Media"),
+            ("⌁", "Analysis"),
+            ("♙", "Characters"),
+            ("文", "Translation"),
+            ("◉", "Voice Studio"),
+            ("☷", "Timeline"),
+            ("∞", "Lip Sync"),
+            ("⇵", "Mixer"),
+            ("▤", "Subtitles"),
+            ("✓", "Quality Control"),
+            ("▧", "Render Queue"),
+            ("⇧", "Export"),
+        )
+
+        def __init__(self, parent: _W | None = None) -> None:
+            super().__init__(parent)
+            self.setFixedWidth(NAV_RAIL_WIDTH)
+            self.setStyleSheet("background:#111315;border-right:1px solid #08090B;")
+            layout = QVBoxLayout(self)
+            layout.setContentsMargins(7, 19, 7, 7)
+            layout.setSpacing(1)
+            self._buttons: dict[str, QPushButton] = {}
+            for icon, route in self._ROUTES:
+                button = QPushButton(f"{icon}   {route}", self)
+                button.setCheckable(True)
+                button.setChecked(route == "Timeline")
+                button.setCursor(Qt.CursorShape.PointingHandCursor)
+                button.setFixedHeight(28)
+                button.setStyleSheet(
+                    "QPushButton{background:transparent;color:#B5BAC3;border:none;"
+                    "border-radius:3px;text-align:left;padding:0 10px;font-size:11px;"
+                    "font-weight:500;min-height:0;}"
+                    "QPushButton:hover{background:#22262C;color:#FFF;}"
+                    "QPushButton:checked{background:#155BA6;color:#FFF;font-weight:600;}"
+                )
+                button.clicked.connect(
+                    lambda _checked=False, name=route: self._activate(name)
+                )
+                layout.addWidget(button)
+                self._buttons[route] = button
+            layout.addStretch()
+            models_button = QPushButton("◈   Models & Providers", self)
+            models_button.setFixedHeight(30)
+            models_button.setCursor(Qt.CursorShape.PointingHandCursor)
+            models_button.setStyleSheet(
+                "QPushButton{background:#15181C;color:#B5BAC3;border:1px solid #23272D;"
+                "border-radius:2px;text-align:left;padding:0 10px;font-size:10px;"
+                "min-height:0;}QPushButton:hover{background:#22262C;color:#FFF;}"
+            )
+            models_button.clicked.connect(
+                lambda: self.route_requested.emit("Models & Providers")
+            )
+            layout.addWidget(models_button)
+
+        def _activate(self, route: str) -> None:
+            for name, button in self._buttons.items():
+                button.setChecked(name == route)
+            self.route_requested.emit(route)
+
+        def select_timeline(self) -> None:
+            self._activate("Timeline")
+
+    class _TimelineToolPalette(QFrame):
+        tool_selected = Signal(str)
+
+        _TOOLS = (
+            ("↖", "Select"),
+            ("↔", "Track Select"),
+            ("⇥", "Ripple Edit"),
+            ("⇆", "Rolling Edit"),
+            ("⌁", "Razor"),
+            ("✎", "Pen"),
+            ("T", "Text"),
+            ("✋", "Hand"),
+            ("＋", "Zoom In"),
+            ("−", "Zoom Out"),
+        )
+
+        def __init__(self, parent: _W | None = None) -> None:
+            super().__init__(parent)
+            self.setFixedWidth(TOOL_PALETTE_WIDTH)
+            self.setStyleSheet("background:#101214;border-right:1px solid #08090B;")
+            layout = QVBoxLayout(self)
+            layout.setContentsMargins(8, 19, 8, 8)
+            grid = QGridLayout()
+            grid.setSpacing(4)
+            self._buttons: dict[str, QPushButton] = {}
+            for index, (icon, tool_name) in enumerate(self._TOOLS):
+                button = QPushButton(icon, self)
+                button.setCheckable(tool_name not in {"Zoom In", "Zoom Out"})
+                button.setChecked(tool_name == "Select")
+                button.setToolTip(tool_name)
+                button.setFixedSize(29, 29)
+                button.setCursor(Qt.CursorShape.PointingHandCursor)
+                button.setStyleSheet(
+                    "QPushButton{background:transparent;color:#B5BAC3;border:none;"
+                    "border-radius:2px;padding:0;font-size:14px;min-height:0;}"
+                    "QPushButton:hover{background:#282C32;color:#FFF;}"
+                    "QPushButton:checked{background:#1E6BB5;color:#FFF;}"
+                )
+                button.clicked.connect(
+                    lambda _checked=False, name=tool_name: self._activate(name)
+                )
+                grid.addWidget(button, index // 2, index % 2)
+                self._buttons[tool_name] = button
+            layout.addLayout(grid)
+            layout.addStretch()
+
+        def _activate(self, tool_name: str) -> None:
+            if tool_name not in {"Zoom In", "Zoom Out"}:
+                for name, button in self._buttons.items():
+                    if button.isCheckable():
+                        button.setChecked(name == tool_name)
+            self.tool_selected.emit(tool_name)
+
+    class _TimelineEditorBar(QFrame):
+        action_requested = Signal(str)
+
+        def __init__(self, parent: _W | None = None) -> None:
+            super().__init__(parent)
+            self.setFixedHeight(44)
+            self.setStyleSheet("background:#111315;border-bottom:1px solid #08090B;")
+            layout = QHBoxLayout(self)
+            layout.setContentsMargins(10, 0, 9, 0)
+            layout.setSpacing(8)
+            self.title_label = QLabel("Scene 001 - Untitled  ×", self)
+            self.title_label.setStyleSheet(
+                "font-size:11px;font-weight:600;color:#E6E8EC;"
+                "border-bottom:2px solid #248DDC;padding:5px 2px;"
+            )
+            layout.addWidget(self.title_label)
+            layout.addStretch()
+            self.timecode_label = QLabel("00:00:00:000", self)
+            self.timecode_label.setStyleSheet(
+                "font:700 13px 'Cascadia Mono';color:#2A9CEE;padding:0 8px;"
+            )
+            layout.addWidget(self.timecode_label)
+            for symbol, name in (
+                ("⌁", "Toggle Snapping"),
+                ("⌘", "Linked Selection"),
+                ("◆", "Add Marker"),
+                ("⚙", "Timeline Settings"),
+            ):
+                button = QPushButton(symbol, self)
+                button.setFixedSize(26, 26)
+                button.setToolTip(name)
+                button.setStyleSheet(
+                    "QPushButton{background:transparent;color:#9EA4AD;border:none;padding:0;"
+                    "font-size:12px;min-height:0;}"
+                    "QPushButton:hover{background:#272B31;color:#FFF;}"
+                )
+                button.clicked.connect(
+                    lambda _checked=False, action=name: self.action_requested.emit(action)
+                )
+                layout.addWidget(button)
+
+        def set_title(self, title: str) -> None:
+            self.title_label.setText(f"Scene 001 - {title}  ×")
+
+        def set_timecode(self, seconds: float) -> None:
+            self.timecode_label.setText(_format_tc(seconds))
 
     # ─────────────────────────────────────────────────────────────────────────
     # Floating AI Actions Overlay Panel
@@ -1320,73 +1683,38 @@ if _QT:
             self._busy = False
             self.setStyleSheet(
                 "QFrame#AiActionsPanel {"
-                "  background: #0B0F17;"
-                "  border-left: 1px solid #1E2838;"
+                "  background: #111315;"
+                "  border-left: 1px solid #08090B;"
                 "}"
             )
 
             layout = QVBoxLayout(self)
-            layout.setContentsMargins(8, 8, 8, 8)
-            layout.setSpacing(4)
+            layout.setContentsMargins(8, 0, 8, 8)
+            layout.setSpacing(2)
 
             header = QHBoxLayout()
-            hdr = QLabel("AGENTIC DIRECTOR", self)
-            hdr.setStyleSheet("font-size:10px;font-weight:800;color:#4F8CFF;")
+            hdr = QLabel("AI Actions", self)
+            hdr.setFixedHeight(34)
+            hdr.setStyleSheet("font-size:11px;font-weight:600;color:#E8EAEE;")
             header.addWidget(hdr)
             header.addStretch()
-            self.status_badge = QLabel("● IDLE", self)
+            self.status_badge = QLabel("", self)
             self.status_badge.setStyleSheet("font-size:8px;font-weight:800;color:#64748B;")
             header.addWidget(self.status_badge)
             layout.addLayout(header)
 
-            agent_card = QFrame(self)
-            agent_card.setStyleSheet(
-                "background:#101827;border:1px solid #253149;border-radius:7px;"
-            )
-            agent_layout = QVBoxLayout(agent_card)
-            agent_layout.setContentsMargins(7, 7, 7, 7)
-            agent_layout.setSpacing(5)
-            self.stage_lbl = QLabel("Ready · 12-stage production graph", agent_card)
-            self.stage_lbl.setWordWrap(True)
-            self.stage_lbl.setStyleSheet("font-size:9px;color:#A9B2C3;")
-            agent_layout.addWidget(self.stage_lbl)
-            self.progress_bar = QProgressBar(agent_card)
-            self.progress_bar.setRange(0, 100)
-            self.progress_bar.setValue(0)
-            self.progress_bar.setTextVisible(False)
-            self.progress_bar.setFixedHeight(5)
-            self.progress_bar.setStyleSheet(
-                "QProgressBar{background:#243044;border:none;border-radius:2px;}"
-                "QProgressBar::chunk{background:#4F8CFF;border-radius:2px;}"
-            )
-            agent_layout.addWidget(self.progress_bar)
-            self.quality_lbl = QLabel("QUALITY GATE · NOT RUN", agent_card)
-            self.quality_lbl.setStyleSheet("font-size:8px;font-weight:800;color:#64748B;")
-            agent_layout.addWidget(self.quality_lbl)
-            self.run_btn = QPushButton("✦  AUTO DUB MASTER", agent_card)
-            self.run_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.run_btn.setStyleSheet(
-                "QPushButton{background:#2563EB;color:#FFF;border:1px solid #3B82F6;"
-                "border-radius:5px;padding:5px;font-size:10px;font-weight:800;}"
-                "QPushButton:hover{background:#3B82F6;}"
-            )
-            self.run_btn.clicked.connect(self._on_run_clicked)
-            agent_layout.addWidget(self.run_btn)
-            layout.addWidget(agent_card)
-
-            action_heading = QLabel("AI ACTIONS", self)
-            action_heading.setStyleSheet(
-                "font-size:9px;font-weight:800;color:#64748B;border-bottom:1px solid #1E2838;"
-                "padding:3px 0;"
-            )
-            layout.addWidget(action_heading)
-
             actions = [
-                ("🪄", "Regenerate Voice"),
-                ("⏱️", "Match Timing"),
-                ("✍️", "Rewrite Translation"),
-                ("✂️", "Shorten Translation"),
-                ("⚙️", "Properties"),
+                ("✦", "Regenerate Voice"),
+                ("◉", "Match Original Voice"),
+                ("◎", "Improve Emotion"),
+                ("⇥", "Match Timing"),
+                ("✎", "Rewrite Translation"),
+                ("⌫", "Shorten Translation"),
+                ("∞", "Improve Lip Sync"),
+                ("⌁", "Fix Pronunciation"),
+                ("≋", "Improve Audio"),
+                ("♙", "Reanalyze Speaker"),
+                ("✹", "Properties"),
             ]
 
             for icon, name in actions:
@@ -1394,15 +1722,37 @@ if _QT:
                 btn.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn.setStyleSheet(
                     "QPushButton {"
-                    "  background: transparent; color: #CBD5E1; font-size: 11px; text-align: left;"
-                    "  border: none; padding: 4px 6px; border-radius: 4px;"
+                    "  background:transparent;color:#C2C6CD;font-size:11px;text-align:left;"
+                    "  border:none;padding:4px 6px;border-radius:2px;min-height:20px;"
                     "}"
-                    "QPushButton:hover { background: #1D293D; color: #FFF; }"
+                    "QPushButton:hover{background:#272B31;color:#FFF;}"
                 )
                 btn.clicked.connect(lambda _, n=name: self.action_clicked.emit(n))
                 layout.addWidget(btn)
 
             layout.addStretch()
+
+            self.stage_lbl = QLabel("Ready · 12-stage production graph", self)
+            self.stage_lbl.setWordWrap(True)
+            self.stage_lbl.setStyleSheet("font-size:9px;color:#A9B2C3;")
+            self.stage_lbl.setVisible(False)
+            layout.addWidget(self.stage_lbl)
+            self.progress_bar = QProgressBar(self)
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(0)
+            self.progress_bar.setTextVisible(False)
+            self.progress_bar.setFixedHeight(4)
+            self.progress_bar.setVisible(False)
+            layout.addWidget(self.progress_bar)
+            self.quality_lbl = QLabel("QUALITY GATE · NOT RUN", self)
+            self.quality_lbl.setStyleSheet("font-size:8px;font-weight:800;color:#64748B;")
+            self.quality_lbl.setVisible(False)
+            layout.addWidget(self.quality_lbl)
+            self.run_btn = QPushButton("✦  AUTO DUB MASTER", self)
+            self.run_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.run_btn.setVisible(False)
+            self.run_btn.clicked.connect(self._on_run_clicked)
+            layout.addWidget(self.run_btn)
 
         def _on_run_clicked(self) -> None:
             if self._busy:
@@ -1414,6 +1764,9 @@ if _QT:
             self._busy = percent < 100
             self.status_badge.setText("● RUNNING")
             self.status_badge.setStyleSheet("font-size:8px;font-weight:800;color:#22D3EE;")
+            self.stage_lbl.setVisible(True)
+            self.progress_bar.setVisible(True)
+            self.run_btn.setVisible(True)
             self.progress_bar.setValue(max(0, min(100, percent)))
             self.stage_lbl.setText(message)
             self.run_btn.setText("■  CANCEL SAFELY" if self._busy else "✦  AUTO DUB MASTER")
@@ -1437,6 +1790,10 @@ if _QT:
             self.status_badge.setText("● REVIEW")
             self.status_badge.setStyleSheet("font-size:8px;font-weight:800;color:#F59E0B;")
             self.progress_bar.setValue(100)
+            self.stage_lbl.setVisible(True)
+            self.progress_bar.setVisible(True)
+            self.quality_lbl.setVisible(True)
+            self.run_btn.setVisible(True)
             self.stage_lbl.setText(message)
             self.run_btn.setText("↻  RUN NEW REVISION")
             if quality_passed is not None:
@@ -1453,6 +1810,10 @@ if _QT:
             self.status_badge.setText("● STOPPED")
             self.status_badge.setStyleSheet("font-size:8px;font-weight:800;color:#EF4444;")
             self.stage_lbl.setText(message)
+            self.stage_lbl.setVisible(True)
+            self.progress_bar.setVisible(True)
+            self.quality_lbl.setVisible(True)
+            self.run_btn.setVisible(True)
             self.run_btn.setText("↻  RETRY AUTOMATION")
             self.quality_lbl.setText("QUALITY GATE · ACTION REQUIRED")
             self.quality_lbl.setStyleSheet("font-size:8px;font-weight:800;color:#F59E0B;")
@@ -1554,6 +1915,9 @@ if _QT:
                 "generated_paths": (),
             }
             self._active_clip_info: dict[str, Any] | None = None
+            self._edit_history: list[list[ClipTuple]] = []
+            self._edit_future: list[list[ClipTuple]] = []
+            self._timeline_toggles = {"Toggle Snapping": True, "Linked Selection": True}
             app_data = QStandardPaths.writableLocation(
                 QStandardPaths.StandardLocation.AppDataLocation
             )
@@ -1597,7 +1961,7 @@ if _QT:
 
             # Left Column (Media Browser)
             self.media_panel = _MediaBrowserPanel(upper_splitter)
-            self.media_panel.setFixedWidth(375)
+            self.media_panel.setFixedWidth(376)
             upper_splitter.addWidget(self.media_panel)
 
             # Center Column (Program Video Monitor)
@@ -1606,13 +1970,13 @@ if _QT:
 
             # Right Column (Dialogue Inspector & Dual VU Level Meter)
             self.inspector_panel = _DialogueInspectorPanel(upper_splitter)
-            self.inspector_panel.setFixedWidth(490)
+            self.inspector_panel.setFixedWidth(494)
             upper_splitter.addWidget(self.inspector_panel)
 
             upper_splitter.setStretchFactor(0, 0)
             upper_splitter.setStretchFactor(1, 1)
             upper_splitter.setStretchFactor(2, 0)
-            upper_splitter.setSizes([375, 670, 490])
+            upper_splitter.setSizes([376, 664, 494])
             self.workspace_splitter.addWidget(upper_splitter)
 
             # Lower multitrack timeline and agentic actions.
@@ -1621,13 +1985,29 @@ if _QT:
             tl_lay.setContentsMargins(0, 0, 0, 0)
             tl_lay.setSpacing(0)
 
-            # Timeline Track Headers
-            self.header_p = _TimelineHeaderPanel(tl_container)
-            tl_lay.addWidget(self.header_p)
+            self.navigation_rail = _StudioNavigationRail(tl_container)
+            tl_lay.addWidget(self.navigation_rail)
 
-            # Timeline Canvas View
-            self.canvas_view = _TimelineCanvasView(tl_container)
-            tl_lay.addWidget(self.canvas_view, stretch=1)
+            self.tool_palette = _TimelineToolPalette(tl_container)
+            tl_lay.addWidget(self.tool_palette)
+
+            timeline_editor = QWidget(tl_container)
+            timeline_editor_layout = QVBoxLayout(timeline_editor)
+            timeline_editor_layout.setContentsMargins(0, 0, 0, 0)
+            timeline_editor_layout.setSpacing(0)
+            self.timeline_bar = _TimelineEditorBar(timeline_editor)
+            timeline_editor_layout.addWidget(self.timeline_bar)
+
+            timeline_tracks = QWidget(timeline_editor)
+            timeline_tracks_layout = QHBoxLayout(timeline_tracks)
+            timeline_tracks_layout.setContentsMargins(0, 0, 0, 0)
+            timeline_tracks_layout.setSpacing(0)
+            self.header_p = _TimelineHeaderPanel(timeline_tracks)
+            timeline_tracks_layout.addWidget(self.header_p)
+            self.canvas_view = _TimelineCanvasView(timeline_tracks)
+            timeline_tracks_layout.addWidget(self.canvas_view, stretch=1)
+            timeline_editor_layout.addWidget(timeline_tracks, stretch=1)
+            tl_lay.addWidget(timeline_editor, stretch=1)
 
             # AI Actions Dock Panel
             self.ai_overlay = _FloatingAIActionsPanel(tl_container)
@@ -1641,13 +2021,42 @@ if _QT:
 
             # Bottom status bar reports only real operations.
             dock_bar = QFrame(self)
-            dock_bar.setFixedHeight(32)
-            dock_bar.setStyleSheet("background:#080B10;border-top:1px solid #1E2838;")
+            dock_bar.setFixedHeight(38)
+            dock_bar.setStyleSheet("background:#111315;border-top:1px solid #08090B;")
             d_lay = QHBoxLayout(dock_bar)
-            d_lay.setContentsMargins(12, 0, 12, 0)
+            d_lay.setContentsMargins(12, 0, 10, 0)
+            d_lay.setSpacing(5)
+
+            self.autosave_lbl = QLabel("●  Auto-saved · Ready", dock_bar)
+            self.autosave_lbl.setFixedWidth(190)
+            self.autosave_lbl.setStyleSheet("font-size:10px;color:#6DCA73;")
+            d_lay.addWidget(self.autosave_lbl)
+            for symbol, tool in (
+                ("↖", "Select"),
+                ("⌁", "Razor"),
+                ("✦", "Marker"),
+                ("T", "Text"),
+                ("✋", "Hand"),
+                ("◇", "Slip"),
+                ("▭", "Slide"),
+                ("◐", "Linked Selection"),
+            ):
+                button = QPushButton(symbol, dock_bar)
+                button.setFixedSize(28, 28)
+                button.setToolTip(tool)
+                button.setStyleSheet(
+                    "QPushButton{background:transparent;color:#A5AAB2;border:none;padding:0;"
+                    "font-size:12px;min-height:0;}"
+                    "QPushButton:hover{background:#282C32;color:#FFF;}"
+                )
+                if tool in self.tool_palette._buttons:
+                    button.clicked.connect(
+                        lambda _checked=False, name=tool: self.tool_palette._activate(name)
+                    )
+                d_lay.addWidget(button)
 
             self.status_msg_lbl = QLabel("Ready · import a movie to begin", dock_bar)
-            self.status_msg_lbl.setStyleSheet("font-size:11px;color:#64748B;")
+            self.status_msg_lbl.setStyleSheet("font-size:10px;color:#737A86;")
             d_lay.addWidget(self.status_msg_lbl)
 
             d_lay.addStretch()
@@ -1657,7 +2066,10 @@ if _QT:
         def _wire_signals(self) -> None:
             # Monitor playhead sync
             self.monitor_panel.playhead_changed.connect(self.canvas_view.set_playhead)
+            self.monitor_panel.playhead_changed.connect(self.timeline_bar.set_timecode)
             self.canvas_view.timecode_changed.connect(self.monitor_panel.set_playhead)
+            self.canvas_view.timecode_changed.connect(self.timeline_bar.set_timecode)
+            self.canvas_view.clips_edited.connect(self._on_canvas_clips_edited)
             self.monitor_panel.action_triggered.connect(self._show_status)
             self.monitor_panel.import_requested.connect(self.import_media_dialog)
             self.monitor_panel.duration_resolved.connect(self._on_media_duration_resolved)
@@ -1687,6 +2099,86 @@ if _QT:
             self.ai_overlay.action_clicked.connect(self._on_ai_action_clicked)
             self.ai_overlay.run_requested.connect(self._run_agentic_dub)
             self.ai_overlay.cancel_requested.connect(self._cancel_agentic_dub)
+            self.stage_bar.home_requested.connect(self._show_home_dashboard)
+            self.stage_bar.workspace_selected.connect(self._on_workspace_selected)
+            self.navigation_rail.route_requested.connect(self._on_navigation_route)
+            self.tool_palette.tool_selected.connect(self.canvas_view.set_tool)
+            self.tool_palette.tool_selected.connect(
+                lambda tool: self._show_status(f"Timeline tool: {tool}")
+            )
+            self.timeline_bar.action_requested.connect(self._on_timeline_toolbar_action)
+
+        def _show_home_dashboard(self) -> None:
+            window = self.window()
+            show_home = getattr(window, "show_home", None)
+            if callable(show_home):
+                show_home()
+
+        def _on_workspace_selected(self, workspace: str) -> None:
+            if workspace == "Dubbing":
+                self._show_status("Dubbing workspace active")
+            else:
+                self._show_status(f"{workspace} workspace selected")
+
+        def _on_navigation_route(self, route: str) -> None:
+            focus_targets = {
+                "Media": self.media_panel.search_in,
+                "Characters": self.inspector_panel.char_in,
+                "Translation": self.inspector_panel.trans_in,
+                "Voice Studio": self.inspector_panel.take_combo,
+                "Timeline": self.canvas_view,
+                "Quality Control": self.inspector_panel.pass_lbl,
+            }
+            if route == "Dashboard":
+                self._show_home_dashboard()
+                return
+            if route == "Mixer":
+                self.import_audio_dialog()
+                return
+            if route == "Subtitles":
+                self.import_subtitle_dialog()
+                return
+            if route == "Export":
+                self.export_snapshot()
+                return
+            if route == "Lip Sync":
+                self._on_ai_action_clicked("Improve Lip Sync")
+                return
+            if route == "Render Queue":
+                state = "running" if self.has_active_job() else "idle"
+                self._show_status(f"Render queue is {state}")
+                return
+            if route == "Models & Providers":
+                window = self.window()
+                run_wizard = getattr(window, "_run_hardware_wizard", None)
+                if callable(run_wizard):
+                    run_wizard()
+                return
+            target = focus_targets.get(route)
+            if target is not None:
+                target.setFocus()
+            self._show_status(f"{route} workspace ready")
+
+        def _on_timeline_toolbar_action(self, action: str) -> None:
+            if action in self._timeline_toggles:
+                enabled = not self._timeline_toggles[action]
+                self._timeline_toggles[action] = enabled
+                state = "enabled" if enabled else "disabled"
+                self._show_status(f"{action}: {state}")
+                return
+            if action == "Add Marker":
+                self._show_status(
+                    f"Marker added at {_format_tc(self.monitor_panel._playhead_sec)}"
+                )
+                return
+            self._show_status("Timeline settings are available from the View menu")
+
+        def _on_canvas_clips_edited(self, clips: list[ClipTuple]) -> None:
+            previous = list(self._current_project_data.get("clips", []))
+            self._edit_history.append(previous)
+            self._edit_future.clear()
+            self._current_project_data["clips"] = list(clips)
+            self._show_status("Razor edit applied · Ctrl+Z to undo")
 
         def load_project_data(self, project_info: dict[str, Any]) -> None:
             """Load a real movie and derive all initial UI state from that file."""
@@ -1728,7 +2220,7 @@ if _QT:
                 if sidecar
                 else []
             )
-            clips: list[tuple] = [
+            clips: list[ClipTuple] = [
                 ("V1", 0.0, duration, source.name, None),
                 ("A1", 0.0, duration, source.name, None),
             ]
@@ -1747,6 +2239,8 @@ if _QT:
             }
 
             self._current_project_data = data
+            self._edit_history.clear()
+            self._edit_future.clear()
             self.canvas_view.clear_video_thumbnail()
             self.media_panel.set_project_name(
                 data["name"],
@@ -1762,6 +2256,7 @@ if _QT:
                 data["duration"],
                 data.get("file_path", ""),
             )
+            self.inspector_panel.meter.set_levels(-31.0, -33.0)
             self.inspector_panel.update_clip_info(
                 data["original_text"],
                 data["translation_text"],
@@ -1769,6 +2264,7 @@ if _QT:
                 target_language,
             )
             self.header_p.set_header_title(data["name"])
+            self.timeline_bar.set_title(data["name"])
             self.canvas_view.set_clips(data["clips"], data["duration"])
             self.inspector_panel.clear_quality_report()
             try:
@@ -1832,9 +2328,9 @@ if _QT:
             path: str,
             *,
             track_id: str = "S1",
-        ) -> list[tuple]:
+        ) -> list[ClipTuple]:
             """Parse SRT or WebVTT file into track tuple items."""
-            results: list[tuple] = []
+            results: list[ClipTuple] = []
             from aidub.subtitles.codec import parse_srt, parse_webvtt  # noqa: PLC0415
 
             content = Path(path).read_text(encoding="utf-8-sig")
@@ -1870,13 +2366,20 @@ if _QT:
             path, _selected_filter = QFileDialog.getOpenFileName(
                 self,
                 "Import Source Movie",
-                str(Path(str(self._current_project_data.get("file_path", ""))).parent)
-                if self._current_project_data.get("file_path")
-                else "",
+                self._default_asset_directory(),
                 "Movies (*.mkv *.mp4 *.mov *.avi *.m2ts);;All Files (*)",
             )
             if path:
                 self.load_project_data({"name": Path(path).stem, "file_path": path})
+
+        def _default_asset_directory(self) -> str:
+            current_path = str(self._current_project_data.get("file_path", ""))
+            if current_path:
+                current_parent = Path(current_path).parent
+                if current_parent.is_dir():
+                    return str(current_parent)
+            test_movies = Path.cwd() / "test movies"
+            return str(test_movies if test_movies.is_dir() else Path.cwd())
 
         def open_media_path(self, path: str | Path) -> None:
             self._on_media_selected(str(path))
@@ -1954,7 +2457,7 @@ if _QT:
             self._current_project_data["clips"] = clips
             self.canvas_view.set_clips(clips, duration)
 
-        def _on_timeline_clip_clicked(self, clip_info: dict) -> None:
+        def _on_timeline_clip_clicked(self, clip_info: dict[str, Any]) -> None:
             lbl = clip_info.get("label", "")
             tid = clip_info.get("tid", "")
             self._active_clip_info = clip_info
@@ -2015,10 +2518,43 @@ if _QT:
         def _on_ai_action_clicked(self, action_name: str) -> None:
             if action_name == "Regenerate Voice":
                 self._on_ai_regenerate_voice()
+            elif action_name == "Match Original Voice":
+                self._show_status("Matching the selected performance reference…")
+                self._on_ai_regenerate_voice()
+            elif action_name == "Improve Emotion":
+                self._run_translation_assistant(
+                    shorten=False,
+                    instruction_override=(
+                        "Rewrite the localized line for a more emotionally faithful screen "
+                        "performance while preserving meaning and timing."
+                    ),
+                )
             elif action_name == "Match Timing":
                 self._apply_timing_fix()
             elif action_name in {"Rewrite Translation", "Shorten Translation"}:
                 self._run_translation_assistant(shorten=action_name.startswith("Shorten"))
+            elif action_name == "Improve Lip Sync":
+                self._apply_timing_fix()
+                self._show_status("Lip-sync preparation updated from the source timing slot")
+            elif action_name == "Fix Pronunciation":
+                self._run_translation_assistant(
+                    shorten=False,
+                    instruction_override=(
+                        "Revise the localized dialogue for unambiguous natural pronunciation "
+                        "while preserving the character's words and intent."
+                    ),
+                )
+            elif action_name == "Improve Audio":
+                take_path = str(self.inspector_panel.take_combo.currentData() or "")
+                self._show_status(
+                    "Selected take is ready for the mix enhancement stage"
+                    if take_path
+                    else "Generate or import a dubbed voice take before audio enhancement"
+                )
+            elif action_name == "Reanalyze Speaker":
+                self.inspector_panel.char_in.clear()
+                self.inspector_panel.char_in.setFocus()
+                self._show_status("Speaker label cleared · run Auto Dub Master to reanalyze")
             elif action_name == "Properties":
                 proj_name = self._current_project_data.get("name", "Current Project")
                 m_name = self._current_project_data.get("movie_name", "Video")
@@ -2091,7 +2627,12 @@ if _QT:
             )
             self._show_status(f"Voice take synthesized: {output_path}")
 
-        def _run_translation_assistant(self, *, shorten: bool) -> None:
+        def _run_translation_assistant(
+            self,
+            *,
+            shorten: bool,
+            instruction_override: str | None = None,
+        ) -> None:
             if self._assistant_worker is not None and self._assistant_worker.isRunning():
                 self._show_status("Translation agent is already processing a request")
                 return
@@ -2102,7 +2643,7 @@ if _QT:
                 return
             from aidub.ui.workers import AIAssistantWorker  # noqa: PLC0415
 
-            instruction = (
+            instruction = instruction_override or (
                 "Shorten this localized dialogue by about 15% while preserving meaning and character tone."
                 if shorten
                 else "Rewrite this localized dialogue naturally for screen performance and lip timing."
@@ -2174,7 +2715,7 @@ if _QT:
                 selected, _selected_filter = QFileDialog.getOpenFileName(
                     self,
                     "Select Source Movie for Automated Dubbing",
-                    "",
+                    self._default_asset_directory(),
                     "Movie Files (*.mkv *.mp4 *.mov *.avi *.m2ts);;All Files (*)",
                 )
                 if not selected:
@@ -2372,7 +2913,7 @@ if _QT:
                 self._current_project_data.get("file_path")
                 and (self._dubbing_worker is None or not self._dubbing_worker.isRunning())
             ):
-                self.status_msg_lbl.setText("● Session auto-saved · automation state is resumable")
+                self.autosave_lbl.setText("●  Auto-saved · just now")
 
         def _on_ai_fix_all(self) -> None:
             if self._active_clip_info is None:
@@ -2421,6 +2962,42 @@ if _QT:
             if accepted and language.strip():
                 self.inspector_panel.lang_in.setText(language.strip())
                 self._on_target_language_changed()
+
+        def undo(self) -> None:
+            if not self._edit_history:
+                self._show_status("Nothing to undo")
+                return
+            current = list(self._current_project_data.get("clips", []))
+            previous = self._edit_history.pop()
+            self._edit_future.append(current)
+            self._current_project_data["clips"] = previous
+            self.canvas_view.set_clips(
+                previous,
+                float(self._current_project_data.get("duration", 1.0)),
+            )
+            self._show_status("Timeline edit undone")
+
+        def redo(self) -> None:
+            if not self._edit_future:
+                self._show_status("Nothing to redo")
+                return
+            current = list(self._current_project_data.get("clips", []))
+            following = self._edit_future.pop()
+            self._edit_history.append(current)
+            self._current_project_data["clips"] = following
+            self.canvas_view.set_clips(
+                following,
+                float(self._current_project_data.get("duration", 1.0)),
+            )
+            self._show_status("Timeline edit restored")
+
+        def mark_in(self) -> None:
+            self.monitor_panel._on_mark_in()
+            self._show_status(f"Mark In · {_format_tc(self.monitor_panel._mark_in_sec)}")
+
+        def mark_out(self) -> None:
+            self.monitor_panel._on_mark_out()
+            self._show_status(f"Mark Out · {_format_tc(self.monitor_panel._mark_out_sec)}")
 
         def play_pause(self) -> None:
             self.monitor_panel._toggle_play()

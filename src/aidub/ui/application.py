@@ -26,6 +26,7 @@ class DesktopApplication:
     ) -> None:
         require_pyside6()
         from PySide6.QtCore import QCoreApplication  # noqa: PLC0415
+        from PySide6.QtGui import QFont  # noqa: PLC0415
         from PySide6.QtWidgets import QApplication  # noqa: PLC0415
 
         from .studio_window import AIDubStudioWindow  # noqa: PLC0415
@@ -37,6 +38,13 @@ class DesktopApplication:
         QCoreApplication.setOrganizationDomain("aidubbing.studio")
         QCoreApplication.setApplicationName("AI Movie Dubbing Studio")
         QCoreApplication.setApplicationVersion(__version__)
+        if hasattr(self.application, "setFont"):
+            default_font = QFont("Segoe UI", 10)
+            default_font.setStyleHint(QFont.StyleHint.SansSerif)
+            QFont.insertSubstitutions(
+                "Segoe UI", ["Segoe UI Variable", "Inter", "Arial", "sans-serif"]
+            )
+            self.application.setFont(default_font)
         if hasattr(self.application, "setStyleSheet"):
             self.application.setStyleSheet(APPLICATION_STYLE)
         self.locale_service = LocaleService(locale)

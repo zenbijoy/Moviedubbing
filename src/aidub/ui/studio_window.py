@@ -12,6 +12,7 @@ try:
         QCloseEvent,
         QDragEnterEvent,
         QDropEvent,
+        QKeyEvent,
         QKeySequence,
         QMouseEvent,
     )
@@ -23,6 +24,8 @@ try:
         QMenuBar,
         QMessageBox,
         QPushButton,
+        QStackedWidget,
+        QVBoxLayout,
     )
 
     _QT = True
@@ -46,6 +49,127 @@ if _QT:
             self.completed.emit(probe_system_telemetry(Path.cwd()))
 
 
+    class _HomeDashboardPanel(QFrame):
+        """Home overview dashboard for project selection, hardware stats, and navigation."""
+
+        def __init__(self, window: "AIDubStudioWindow") -> None:
+            super().__init__(window)
+            self._window = window
+            self.setObjectName("HomeDashboardPanel")
+            self.setStyleSheet(
+                "QFrame#HomeDashboardPanel{background:#0D1118;color:#F7F9FC;}"
+            )
+
+            layout = QVBoxLayout(self)
+            layout.setContentsMargins(40, 30, 40, 30)
+            layout.setSpacing(24)
+
+            # Hero Banner
+            hero = QFrame(self)
+            hero.setStyleSheet(
+                "background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #161D28,stop:1 #1C2431);"
+                "border:1px solid #283241;border-radius:12px;padding:24px;"
+            )
+            h_layout = QVBoxLayout(hero)
+            title = QLabel("AI MOVIE DUBBING STUDIO", hero)
+            title.setStyleSheet("font-size:24px;font-weight:900;color:#F7F9FC;letter-spacing:1px;")
+            subtitle = QLabel(
+                "Local-First Professional Multilingual Editorial Workstation", hero
+            )
+            subtitle.setStyleSheet("font-size:13px;color:#9CA3AF;margin-top:4px;")
+            h_layout.addWidget(title)
+            h_layout.addWidget(subtitle)
+            layout.addWidget(hero)
+
+            # Cards row
+            cards_layout = QHBoxLayout()
+            cards_layout.setSpacing(18)
+
+            # Card 1: Import / Open Project
+            c1 = QFrame(self)
+            c1.setStyleSheet(
+                "QFrame{background:#161D28;border:1px solid #283241;border-radius:10px;padding:16px;}"
+                "QFrame:hover{border-color:#4F8CFF;}"
+            )
+            c1_lay = QVBoxLayout(c1)
+            c1_t = QLabel("📁  Import Source Movie", c1)
+            c1_t.setStyleSheet("font-size:15px;font-weight:700;color:#F7F9FC;")
+            c1_d = QLabel(
+                "Load a video file to begin automated transcription, translation, and dubbing.", c1
+            )
+            c1_d.setWordWrap(True)
+            c1_d.setStyleSheet("font-size:12px;color:#9CA3AF;margin-top:6px;")
+            c1_btn = QPushButton("Open Media Movie…", c1)
+            c1_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            c1_btn.setStyleSheet(
+                "QPushButton{background:#4F8CFF;color:#FFF;font-weight:700;padding:8px 16px;border-radius:6px;}"
+                "QPushButton:hover{background:#3B82F6;}"
+            )
+            c1_btn.clicked.connect(window.import_from_home)
+            c1_lay.addWidget(c1_t)
+            c1_lay.addWidget(c1_d)
+            c1_lay.addStretch()
+            c1_lay.addWidget(c1_btn)
+            cards_layout.addWidget(c1, stretch=1)
+
+            # Card 2: NLE Editorial Studio Timeline
+            c2 = QFrame(self)
+            c2.setStyleSheet(
+                "QFrame{background:#161D28;border:1px solid #283241;border-radius:10px;padding:16px;}"
+                "QFrame:hover{border-color:#8B5CF6;}"
+            )
+            c2_lay = QVBoxLayout(c2)
+            c2_t = QLabel("🎬  Timeline Editor", c2)
+            c2_t.setStyleSheet("font-size:15px;font-weight:700;color:#F7F9FC;")
+            c2_d = QLabel(
+                "Multi-track editorial workspace with dual monitor, inspector, waveform, and AI overlay.", c2
+            )
+            c2_d.setWordWrap(True)
+            c2_d.setStyleSheet("font-size:12px;color:#9CA3AF;margin-top:6px;")
+            c2_btn = QPushButton("Go to Timeline Studio →", c2)
+            c2_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            c2_btn.setStyleSheet(
+                "QPushButton{background:#8B5CF6;color:#FFF;font-weight:700;padding:8px 16px;border-radius:6px;}"
+                "QPushButton:hover{background:#7C3AED;}"
+            )
+            c2_btn.clicked.connect(window.show_studio)
+            c2_lay.addWidget(c2_t)
+            c2_lay.addWidget(c2_d)
+            c2_lay.addStretch()
+            c2_lay.addWidget(c2_btn)
+            cards_layout.addWidget(c2, stretch=1)
+
+            # Card 3: First Run Hardware Wizard
+            c3 = QFrame(self)
+            c3.setStyleSheet(
+                "QFrame{background:#161D28;border:1px solid #283241;border-radius:10px;padding:16px;}"
+                "QFrame:hover{border-color:#10B981;}"
+            )
+            c3_lay = QVBoxLayout(c3)
+            c3_t = QLabel("⚡  Hardware Diagnostics", c3)
+            c3_t.setStyleSheet("font-size:15px;font-weight:700;color:#F7F9FC;")
+            c3_d = QLabel(
+                "Probe GPU VRAM, CPU cores, FFmpeg runtime, and calibrate execution tier.", c3
+            )
+            c3_d.setWordWrap(True)
+            c3_d.setStyleSheet("font-size:12px;color:#9CA3AF;margin-top:6px;")
+            c3_btn = QPushButton("Run Hardware Self-Test", c3)
+            c3_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            c3_btn.setStyleSheet(
+                "QPushButton{background:#10B981;color:#FFF;font-weight:700;padding:8px 16px;border-radius:6px;}"
+                "QPushButton:hover{background:#059669;}"
+            )
+            c3_btn.clicked.connect(window._run_hardware_wizard)
+            c3_lay.addWidget(c3_t)
+            c3_lay.addWidget(c3_d)
+            c3_lay.addStretch()
+            c3_lay.addWidget(c3_btn)
+            cards_layout.addWidget(c3, stretch=1)
+
+            layout.addLayout(cards_layout)
+            layout.addStretch()
+
+
     class _StudioChrome(QFrame):
         """Frameless title/menu bar matching the production reference."""
 
@@ -58,23 +182,27 @@ if _QT:
                 "QFrame#StudioChrome{background:#080B10;border-bottom:1px solid #161F2E;}"
             )
             layout = QHBoxLayout(self)
-            layout.setContentsMargins(12, 0, 8, 0)
+            layout.setContentsMargins(16, 0, 0, 0)
             layout.setSpacing(8)
 
             logo = QLabel("AI", self)
+            logo.setFixedWidth(24)
+            logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
             logo.setStyleSheet(
-                "color:#9B6DFF;font-size:16px;font-weight:900;letter-spacing:-1px;"
+                "color:#A970FF;font-size:18px;font-weight:900;letter-spacing:-2px;"
             )
             layout.addWidget(logo)
             self.app_label = QLabel("AI DUBBING STUDIO", self)
-            self.app_label.setStyleSheet("color:#F7F9FC;font-size:11px;font-weight:800;")
+            self.app_label.setFixedWidth(144)
+            self.app_label.setStyleSheet("color:#F7F9FC;font-size:12px;font-weight:800;")
             layout.addWidget(self.app_label)
 
             self.menu_bar = QMenuBar(self)
             self.menu_bar.setNativeMenuBar(False)
+            self.menu_bar.setFixedWidth(440)
             self.menu_bar.setStyleSheet(
-                "QMenuBar{background:transparent;color:#A9B2C3;font-size:10px;}"
-                "QMenuBar::item{padding:5px 7px;background:transparent;}"
+                "QMenuBar{background:transparent;color:#C4CAD4;font-size:11px;}"
+                "QMenuBar::item{padding:5px 8px;background:transparent;}"
                 "QMenuBar::item:selected{background:#1C2636;color:#FFF;border-radius:3px;}"
                 "QMenu{background:#111722;color:#E2E8F0;border:1px solid #283446;}"
                 "QMenu::item{padding:6px 26px 6px 12px;}"
@@ -82,22 +210,34 @@ if _QT:
                 "QMenu::separator{height:1px;background:#283446;margin:4px 8px;}"
             )
             layout.addWidget(self.menu_bar)
-            layout.addStretch(2)
+            layout.addStretch(1)
 
-            self.project_label = QLabel("NO PROJECT", self)
+            self.project_label = QLabel("Untitled - Bengali Dub ⌄", self)
             self.project_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.project_label.setMinimumWidth(220)
-            self.project_label.setStyleSheet("color:#CBD5E1;font-size:10px;font-weight:600;")
+            self.project_label.setFixedWidth(260)
+            self.project_label.setStyleSheet("color:#E1E5EC;font-size:11px;font-weight:600;")
             layout.addWidget(self.project_label)
-            layout.addStretch(2)
+            layout.addStretch(3)
 
-            self.gpu_label = QLabel("GPU  —", self)
-            self.vram_label = QLabel("VRAM  —", self)
-            self.jobs_label = QLabel("JOBS  0", self)
+            self.gpu_label = QLabel("GPU  N/A", self)
+            self.vram_label = QLabel("VRAM  N/A", self)
+            self.jobs_label = QLabel("Jobs  0", self)
+            self.gpu_label.setFixedWidth(76)
+            self.vram_label.setFixedWidth(128)
+            self.jobs_label.setFixedWidth(58)
             for label in (self.gpu_label, self.vram_label, self.jobs_label):
-                label.setStyleSheet("color:#8C9BAE;font-size:10px;font-weight:600;")
+                label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                label.setStyleSheet("color:#B7BECA;font-size:11px;font-weight:600;")
                 layout.addWidget(label)
 
+            for _index in range(2):
+                divider = QFrame(self)
+                divider.setFixedSize(1, 22)
+                divider.setStyleSheet("background:#202631;")
+                insert_at = layout.count() - (2 - _index)
+                layout.insertWidget(insert_at, divider)
+
+            self.max_btn: QPushButton | None = None
             for text, tooltip, callback in (
                 ("—", "Minimize", window.showMinimized),
                 ("□", "Maximize / Restore", window._toggle_maximized),
@@ -105,12 +245,15 @@ if _QT:
             ):
                 button = QPushButton(text, self)
                 button.setToolTip(tooltip)
-                button.setFixedSize(30, 26)
+                button.setFixedSize(38, 42)
                 button.setStyleSheet(
                     "QPushButton{background:transparent;color:#A9B2C3;border:none;"
-                    "font-size:13px;}QPushButton:hover{background:#1C2636;color:#FFF;}"
+                    "font-size:14px;padding:0;min-height:0;}"
+                    "QPushButton:hover{background:#1C2636;color:#FFF;}"
                 )
-                if text == "×":
+                if text == "□":
+                    self.max_btn = button
+                elif text == "×":
                     button.setStyleSheet(
                         "QPushButton{background:transparent;color:#A9B2C3;border:none;"
                         "font-size:16px;}QPushButton:hover{background:#B4232E;color:#FFF;}"
@@ -118,16 +261,24 @@ if _QT:
                 button.clicked.connect(callback)
                 layout.addWidget(button)
 
+        def set_maximized(self, is_maximized: bool) -> None:
+            if self.max_btn is not None:
+                self.max_btn.setText("❐" if is_maximized else "□")
+
         def set_project(self, project_name: str) -> None:
-            self.project_label.setText(project_name.upper())
+            self.project_label.setText(f"{project_name} - Bengali Dub ⌄")
+            self.project_label.setToolTip(project_name)
 
         def set_telemetry(self, report: object) -> None:
             gpu_usage = int(getattr(report, "gpu_usage_pct", 0))
             vram_used = float(getattr(report, "vram_used_gb", 0.0))
             vram_total = float(getattr(report, "vram_total_gb", 0.0))
             gpu_name = str(getattr(report, "gpu_name", "Unavailable"))
-            self.gpu_label.setText(
-                f"GPU  {gpu_usage}%" if gpu_name != "Unavailable" else "GPU  N/A"
+            self.gpu_label.setText(f"GPU  {gpu_usage}%" if gpu_name != "Unavailable" else "GPU  N/A")
+            self.gpu_label.setStyleSheet(
+                "color:#63D46E;font-size:11px;font-weight:700;"
+                if gpu_name != "Unavailable"
+                else "color:#8C94A2;font-size:11px;font-weight:600;"
             )
             self.gpu_label.setToolTip(gpu_name)
             self.vram_label.setText(
@@ -135,9 +286,19 @@ if _QT:
                 if vram_total > 0
                 else "VRAM  N/A"
             )
+            self.vram_label.setStyleSheet(
+                "color:#57A5F8;font-size:11px;font-weight:700;"
+                if vram_total > 0
+                else "color:#8C94A2;font-size:11px;font-weight:600;"
+            )
 
         def set_jobs(self, count: int) -> None:
-            self.jobs_label.setText(f"JOBS  {count}")
+            self.jobs_label.setText(f"Jobs  {count}")
+            self.jobs_label.setStyleSheet(
+                "color:#63D46E;font-size:11px;font-weight:700;"
+                if count
+                else "color:#B7BECA;font-size:11px;font-weight:600;"
+            )
 
         def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:  # noqa: N802
             if event.button() is Qt.MouseButton.LeftButton:
@@ -156,7 +317,7 @@ if _QT:
             super().mousePressEvent(event)
 
     class AIDubStudioWindow(QMainWindow):
-        """One authoritative Studio surface; no secondary screen registry."""
+        """One authoritative Studio surface with stacked Home overview and Timeline Screens."""
 
         def __init__(
             self,
@@ -177,9 +338,17 @@ if _QT:
                 Qt.WindowType.Window
                 | Qt.WindowType.FramelessWindowHint
                 | Qt.WindowType.WindowSystemMenuHint
+                | Qt.WindowType.WindowMinMaxButtonsHint
+                | Qt.WindowType.WindowCloseButtonHint
             )
+            self.stack = QStackedWidget(self)
+            self.home_view = _HomeDashboardPanel(self)
             self.studio = TimelineScreen(self)
-            self.setCentralWidget(self.studio)
+            self.stack.addWidget(self.home_view)
+            self.stack.addWidget(self.studio)
+            self.stack.setCurrentWidget(self.studio)
+            self.setCentralWidget(self.stack)
+
             self.setObjectName("AIDubStudioWindow")
             self.setAcceptDrops(True)
             self.setMinimumSize(1_200, 760)
@@ -199,6 +368,37 @@ if _QT:
             self._telemetry_worker.start()
             self._apply_locale(self._locale_service.locale)
 
+        def show_home(self) -> None:
+            self.stack.setCurrentWidget(self.home_view)
+
+        def show_studio(self) -> None:
+            self.stack.setCurrentWidget(self.studio)
+
+        def import_from_home(self) -> None:
+            self.show_studio()
+            self.studio.import_media_dialog()
+
+        def _run_hardware_wizard(self) -> None:
+            from PySide6.QtWidgets import QDialog  # noqa: PLC0415
+
+            from aidub.ui.first_run_wizard import FirstRunHardwareWizardWidget  # noqa: PLC0415
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Hardware Setup & Self-Test")
+            dialog.setMinimumSize(540, 360)
+            layout = QVBoxLayout(dialog)
+            wizard = FirstRunHardwareWizardWidget(dialog)
+            layout.addWidget(wizard)
+            dialog.exec()
+
+        def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
+            if event.key() == Qt.Key.Key_Escape and self.isFullScreen():
+                self.showNormal()
+                self.chrome.set_maximized(False)
+                event.accept()
+                return
+            super().keyPressEvent(event)
+
         def _build_menus(self) -> None:
             menu_bar = self.chrome.menu_bar
             menu_bar.clear()
@@ -214,6 +414,26 @@ if _QT:
             self._add_action(file_menu, "Exit", self.close, "Alt+F4")
 
             edit_menu = menu_bar.addMenu("Edit")
+            self._add_action(
+                edit_menu,
+                "Command Palette…",
+                self._open_command_palette,
+                "Ctrl+K",
+            )
+            edit_menu.addSeparator()
+            self._add_action(
+                edit_menu,
+                "Undo",
+                getattr(self.studio, "undo", lambda: None),
+                "Ctrl+Z",
+            )
+            self._add_action(
+                edit_menu,
+                "Redo",
+                getattr(self.studio, "redo", lambda: None),
+                "Ctrl+Y",
+            )
+            edit_menu.addSeparator()
             self._add_action(
                 edit_menu,
                 "Rewrite Selected Translation",
@@ -261,59 +481,147 @@ if _QT:
                 "Set Target Language…",
                 self.studio.configure_target_language,
             )
-
-            ai_menu = menu_bar.addMenu("AI")
             self._add_action(
-                ai_menu,
+                sequence_menu,
                 "Auto Dub Master",
                 self.studio.run_auto_dub,
                 "Ctrl+Enter",
             )
             self._add_action(
-                ai_menu,
+                sequence_menu,
                 "Cancel Active Job",
                 self.studio.cancel_active_job,
                 "Esc",
             )
 
-            audio_menu = menu_bar.addMenu("Audio")
+            markers_menu = menu_bar.addMenu("Markers")
             self._add_action(
-                audio_menu,
-                "Import Audio Asset…",
-                self.studio.import_audio_dialog,
+                markers_menu,
+                "Mark In",
+                self.studio.mark_in,
+                "I",
+            )
+            self._add_action(
+                markers_menu,
+                "Mark Out",
+                self.studio.mark_out,
+                "O",
             )
 
-            subtitle_menu = menu_bar.addMenu("Subtitle")
+            graphics_menu = menu_bar.addMenu("Graphics")
             self._add_action(
-                subtitle_menu,
+                graphics_menu,
+                "Export Current Frame…",
+                self.studio.export_snapshot,
+                "Ctrl+Shift+E",
+            )
+            graphics_menu.addSeparator()
+            self._add_action(
+                graphics_menu,
                 "Import Source Subtitles…",
                 self.studio.import_subtitle_dialog,
                 "Ctrl+Shift+I",
             )
             self._add_action(
-                subtitle_menu,
+                graphics_menu,
                 "Import Target Subtitles…",
                 lambda: self.studio.import_subtitle_dialog(target=True),
             )
-
-            render_menu = menu_bar.addMenu("Render")
             self._add_action(
-                render_menu,
-                "Auto Dub Master",
-                self.studio.run_auto_dub,
-            )
-            self._add_action(
-                render_menu,
-                "Export Current Frame…",
-                self.studio.export_snapshot,
-                "Ctrl+Shift+E",
+                graphics_menu,
+                "Import Audio Asset…",
+                self.studio.import_audio_dialog,
             )
 
             view_menu = menu_bar.addMenu("View")
             self._add_action(view_menu, "Toggle Full Screen", self._toggle_full_screen, "F11")
+            theme_menu = view_menu.addMenu("Theme")
+            for theme_mode, theme_label in (
+                ("studio_dark", "Studio Dark (Default)"),
+                ("broadcast_gray", "Broadcast Gray"),
+                ("cyber_dark", "Cyber Dark"),
+                ("high_contrast", "High Contrast"),
+                ("light_studio", "Light Studio"),
+            ):
+                self._add_action(
+                    theme_menu,
+                    theme_label,
+                    lambda mode=theme_mode: self._set_theme(mode),
+                )
+
+            window_menu = menu_bar.addMenu("Window")
+            self._add_action(window_menu, "Home Dashboard", self.show_home, "Ctrl+H")
+            self._add_action(window_menu, "Dubbing Workspace", self.show_studio)
+            self._add_action(
+                window_menu,
+                "Hardware Diagnostics…",
+                self._run_hardware_wizard,
+            )
 
             help_menu = menu_bar.addMenu("Help")
+            self._add_action(help_menu, "Command Palette…", self._open_command_palette, "Ctrl+K")
             self._add_action(help_menu, "About", self._show_about)
+
+        def _open_command_palette(self) -> None:
+            from aidub.ui.command_palette import CommandPaletteDialog  # noqa: PLC0415
+            from aidub.ui.commands import Command, CommandRegistry  # noqa: PLC0415
+
+            registry = CommandRegistry()
+            registry.register_many(
+                [
+                    Command(
+                        "media.import",
+                        "Import Source Movie",
+                        self.studio.import_media_dialog,
+                        shortcuts=("Ctrl+O",),
+                    ),
+                    Command(
+                        "ai.autodub",
+                        "Auto Dub Master",
+                        self.studio.run_auto_dub,
+                        shortcuts=("Ctrl+Enter",),
+                    ),
+                    Command(
+                        "clip.rewrite",
+                        "Rewrite Selected Translation",
+                        self.studio.rewrite_selected_translation,
+                    ),
+                    Command(
+                        "clip.voice",
+                        "Regenerate Selected Voice",
+                        self.studio.regenerate_selected_voice,
+                    ),
+                    Command(
+                        "export.snapshot",
+                        "Export Current Frame",
+                        self.studio.export_snapshot,
+                        shortcuts=("Ctrl+Shift+E",),
+                    ),
+                    Command(
+                        "view.fullscreen",
+                        "Toggle Full Screen",
+                        self._toggle_full_screen,
+                        shortcuts=("F11",),
+                    ),
+                ]
+            )
+            dialog = CommandPaletteDialog(registry, self._locale_service, self)
+            dialog.exec()
+
+        def _set_theme(self, mode_name: str) -> None:
+            from PySide6.QtWidgets import QApplication  # noqa: PLC0415
+
+            from aidub.ui.theme import (  # noqa: PLC0415
+                ThemeMode,
+                build_enterprise_stylesheet,
+                get_theme_tokens,
+            )
+
+            tokens = get_theme_tokens(ThemeMode(mode_name))
+            style = build_enterprise_stylesheet(tokens)
+            app = QApplication.instance()
+            if app and hasattr(app, "setStyleSheet"):
+                app.setStyleSheet(style)
 
         @staticmethod
         def _add_action(
@@ -331,7 +639,7 @@ if _QT:
 
         def _apply_locale(self, _locale: str) -> None:
             self.setWindowTitle(self._locale_service("app.title"))
-            self.chrome.app_label.setText(self._locale_service("app.title").upper())
+            self.chrome.app_label.setText("AI DUBBING STUDIO")
 
         def _on_project_loaded(self, project_name: str) -> None:
             self.chrome.set_project(project_name)
@@ -340,8 +648,10 @@ if _QT:
         def _toggle_maximized(self) -> None:
             if self.isMaximized():
                 self.showNormal()
+                self.chrome.set_maximized(False)
             else:
                 self.showMaximized()
+                self.chrome.set_maximized(True)
 
         def _toggle_full_screen(self) -> None:
             if self.isFullScreen():
@@ -387,6 +697,7 @@ if _QT:
                     return
                 self.studio.cancel_active_job()
             if self._telemetry_worker.isRunning():
+                self._telemetry_worker.quit()
                 self._telemetry_worker.wait(4_000)
             self._unsubscribe_locale()
             event.accept()
@@ -394,7 +705,7 @@ if _QT:
 
 else:
 
-    class AIDubStudioWindow:  # pragma: no cover
+    class AIDubStudioWindow:  # type: ignore[no-redef]  # pragma: no cover
         """Import-safe diagnostic when the optional desktop dependency is absent."""
 
         def __init__(self, *_args: object, **_kwargs: object) -> None:

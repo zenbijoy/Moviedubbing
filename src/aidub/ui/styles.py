@@ -69,6 +69,16 @@ QLabel {{
     background-color: transparent;
 }}
 
+QToolTip {{
+    background-color: {ELEVATED};
+    color: {TEXT_PRIMARY};
+    border: 1px solid {BORDER_LIGHT};
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: "Segoe UI", "Inter", sans-serif;
+    font-size: 12px;
+}}
+
 /* =====================================================================
    MAIN WINDOW
    ===================================================================== */
