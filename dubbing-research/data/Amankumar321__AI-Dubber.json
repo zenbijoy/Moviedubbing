@@ -1,0 +1,13 @@
+{
+  "repo": "Amankumar321/AI-Dubber",
+  "status": "ok",
+  "stars": 2,
+  "updated_at": "2026-08-14T16:10:00Z",
+  "pushed_at": "2025-01-17T07:11:40Z",
+  "license": "None",
+  "archived": false,
+  "open_issues": 0,
+  "description": "Dub Chinese or Japanese videos to English with easy steps using openAI whisper and VALLEX model",
+  "default_branch": "main",
+  "readme": "## AI Dubber\n\nConvert videos in Chinese or Japanese to English with easy steps.\n\nUses OpenAI whispher and VALLEX model.\n\n### Setup\n\nCreate a virtual python environment\n\nRefer to packages.txt for details of packages used for development\n\n### Steps\n\nRefers to steps.txt for step by step guide\n\n### Sample\n\nRefer to folder /final_videos for original and converted videos\n\n\nChinese -\n\n\n\n\nhttps://github.com/user-attachments/assets/201bd47a-bef8-4af1-80d4-903dabf5914c\n\n\n\n\n\nEnglish -\n\n\n\n\nhttps://github.com/user-attachments/assets/c28c1f2f-3ae6-48b7-8ccc-73edc7dbc449\n\n\n\n"
+}

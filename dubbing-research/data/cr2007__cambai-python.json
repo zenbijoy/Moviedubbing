@@ -1,0 +1,5 @@
+{
+  "repo": "cr2007/cambai-python",
+  "status": "HTTP 403",
+  "readme": "<!-- omit from toc -->\n# Camb AI API Wrapper\n\n[![PyPI version](https://badge.fury.io/py/cambai.svg)](https://badge.fury.io/py/cambai)\n![PyPI - Python Version](https://img.shields.io/pypi/pyversions/cambai)\n\nThis is a Python wrapper for the [Camb.ai](https://camb.ai) API. It is designed to make it easy to interact with the API from Python.\n\n> [!IMPORTANT]\n> This library is still in active development.\n> There will be some fixes and improvements to be made.\n\n<!-- omit from toc -->\n## Index\n\n- [Installation](#installation)\n- [Usage](#usage)\n\n## Installation\n\nTo install the CambAI API Wrapper, you can use `pip` to install:\n\n```bash\n# Install from PyPI\npip install cambai\n```\n\n## Usage\n\nCheckout the '[**examples**](https://github.com/cr2007/cambai-python/tree/master/examples)' directory for examples on how to use the CambAI API Wrapper.\n"
+}

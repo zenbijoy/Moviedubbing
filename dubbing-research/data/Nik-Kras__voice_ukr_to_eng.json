@@ -1,0 +1,13 @@
+{
+  "repo": "Nik-Kras/voice_ukr_to_eng",
+  "status": "ok",
+  "stars": 4,
+  "updated_at": "2026-08-14T16:09:48Z",
+  "pushed_at": "2024-12-18T10:47:55Z",
+  "license": "Apache-2.0",
+  "archived": false,
+  "open_issues": 6,
+  "description": "Tool to generate English AI Dubbing for a YouTube video",
+  "default_branch": "main",
+  "readme": "# voice_ukr_to_eng\n\nThe project is designed to perform AI Dubbing from the source language (tested on Ukrainian only as for now) to English for a YouTube video, preserving the voice and intonations.\n\nCurrently, it only works for videos with one speaker and with no background noises. It could be a good tool to dub your lectures or webinars to English.\n\n## Setup\n\n1. For Linux\n\n```bash\nsudo apt update\nsudo apt install -y ffmpeg build-essential cmake clang nvtop nodejs\n```\n\n2. Install dependencies\n\n```bash\npython -m venv venv\nsource venv/bin/activate\npip install yt-dlp torch==2.3.1 soundfile transformers googletrans==4.0.0rc1 whisperx==3.1.5 pydub nltk git+https://github.com/Nik-Kras/StyleTTS2.git translators moviepy youtube-transcript-api\n```\n\n## Use\n\n```bash\npython main.py <url> --model_url <model_url> --config_url <config_url> --video_name <video_name>\n```\n\nFor Example:\n\n\n```bash\npython main.py https://www.youtube.com/watch?v=prfaWHQoxVg\n```\n\nor\n\n```bash\npython main.py https://www.youtube.com/watch?v=prfaWHQoxVg --model_url \"https://huggingface.co/ShoukanLabs/Vokan/resolve/main/Model/epoch_2nd_00012.pth\" --config_url \"https://huggingface.co/ShoukanLabs/Vokan/resolve/main/Model/config.yml\" --video_name result.mp4\n```\n\n## Errors:\n\n\n-- libcudnn_ops_infer.so.8\n\nLinux:\n```bash\npip install gdown\ngdown 1wj9UU7xjF_1R21ysUxg7o2rULmVVz79-\nsudo apt install nvidia-cuda-toolkit\nsudo dpkg -i cudnn-local-repo-ubuntu2204-8.9.7.29_1.0-1_amd64.deb\nsudo find /var/cudnn-local-repo-ubuntu2204-8.9.7.29/ -name '*keyring.gpg' -exec cp {} /usr/share/keyrings/ \\;\nsudo apt-get update\nsudo apt-get install --reinstall libcudnn8 libcudnn8-dev libcudnn8-samples\n```\n\nTo verify:\n```bash\nls /usr/lib/x86_64-linux-gnu/libcudnn* | grep libcudnn_ops_infer.so.8\nls /usr/lib/x86_64-linux-gnu/libcudnn* | grep libcudnn_cnn_infer.so.8\n```\n\n-- AttributeError: 'Wav2Vec2Processor' object has no attribute 'sampling_rate'\n\nModify WhisperX:\n```python\n(device)\n```\n\nto\n\n```python\ninputs = processor(waveform_segment.squeeze(), sampling_rate=processor.feature_extractor.sampling_rate, return_tensors=\"pt\").to(device)\n```\n\n-- execjs._exceptions.RuntimeUnavailableError: Could not find an available JavaScript runtime.\n\n```bash\nsudo apt-get install nodejs\n```\n"
+}

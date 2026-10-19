@@ -1,0 +1,13 @@
+{
+  "repo": "DablewCodes/voicevoyage.ai",
+  "status": "ok",
+  "stars": 3,
+  "updated_at": "2026-08-14T16:09:50Z",
+  "pushed_at": "2024-06-19T13:45:56Z",
+  "license": "None",
+  "archived": false,
+  "open_issues": 0,
+  "description": "FYP which creates a pipeline based on several APIs to dub an English video's dialogue to another language",
+  "default_branch": "main",
+  "readme": "# voicevoyage.ai\n\n### Setup the .evn file using the sample.env file\n### Create the environment and install required packages\n### Start the server and start voyaging!\n"
+}

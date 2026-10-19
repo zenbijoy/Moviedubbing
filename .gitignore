@@ -22,12 +22,13 @@ build/
 *.staged
 .idea/
 .vscode/
-models/
-cache/
-renders/
-exports/
-test movies/
-test_movies/
+/models/
+/cache/
+/renders/
+/exports/
+/test movies/
+/test_movies/
+/dubbing-research/repos/
 opensourcemoviedubbing/
 *.aidub/recovery/
 *.aidub/logs/
