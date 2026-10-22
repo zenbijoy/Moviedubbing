@@ -159,6 +159,7 @@ class DemucsSeparationAdapter:
             me_preserved=True,
         )
 
+
 __all__ = [
     "DemucsSeparationAdapter",
     "DemucsSeparationOptions",

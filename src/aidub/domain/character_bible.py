@@ -111,7 +111,9 @@ class ProjectCharacterBible(ContractModel):
     def get_glossary(self, source_language: str, target_language: str) -> dict[str, str]:
         glossary_dict = {}
         for t in self.terms:
-            if (t.source_language == source_language and t.target_language == target_language) or t.language_code == target_language:
+            if (
+                t.source_language == source_language and t.target_language == target_language
+            ) or t.language_code == target_language:
                 glossary_dict[t.source_term] = t.target_term
         return glossary_dict
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from pydantic import Field
+from pydantic import ConfigDict
 
 from aidub.contracts.base import ContractModel, Identifier
 
@@ -27,7 +27,7 @@ class SegmentState(ContractModel):
     assigned_voice: str = ""
     dubbed_audio_path: str = ""
 
-    model_config = {"frozen": False}
+    model_config = ConfigDict(frozen=False)
 
 
 @dataclass

@@ -20,9 +20,9 @@ class EmotionObservation(ContractModel):
 
     dominant_category: str = Field(default="neutral", max_length=32)
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
-    valence: float = Field(default=0.0, ge=-1.0, le=1.0)     # -1.0 (unpleasant) to +1.0 (pleasant)
-    arousal: float = Field(default=0.0, ge=-1.0, le=1.0)     # -1.0 (calm) to +1.0 (excited)
-    dominance: float = Field(default=0.0, ge=-1.0, le=1.0)   # -1.0 (submissive) to +1.0 (dominant)
+    valence: float = Field(default=0.0, ge=-1.0, le=1.0)  # -1.0 (unpleasant) to +1.0 (pleasant)
+    arousal: float = Field(default=0.0, ge=-1.0, le=1.0)  # -1.0 (calm) to +1.0 (excited)
+    dominance: float = Field(default=0.0, ge=-1.0, le=1.0)  # -1.0 (submissive) to +1.0 (dominant)
     intensity: float = Field(default=0.5, ge=0.0, le=1.0)
     secondary_emotions: dict[str, float] = Field(default_factory=dict)
 
@@ -49,7 +49,9 @@ class PerformanceEmotionState(ContractModel):
     utterance_id: Identifier
     source_observation: EmotionObservation
     target_intent: EmotionObservation
-    actual_parameters: dict[str, float] = Field(default_factory=dict)  # "pitch_scale", "speed_scale", "exaggeration"
+    actual_parameters: dict[str, float] = Field(
+        default_factory=dict
+    )  # "pitch_scale", "speed_scale", "exaggeration"
 
 
 __all__ = [

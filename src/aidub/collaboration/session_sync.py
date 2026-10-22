@@ -29,7 +29,9 @@ class CollaborativeSessionSync:
         pid = Identifier(project_id)
         self.state = CollaborativeSessionState(session_id=sid, project_id=pid)
 
-    def register_editor(self, user_id: str, display_name: str, role: str = "editor") -> EditorSession:
+    def register_editor(
+        self, user_id: str, display_name: str, role: str = "editor"
+    ) -> EditorSession:
         """
         Connect new editor session.
         """
@@ -41,7 +43,12 @@ class CollaborativeSessionSync:
         active[cid] = editor
         self.state = self.state.model_copy(update={"active_editors": active})
 
-        logger.info("session_sync: editor '%s' (%s) joined session %s", display_name, role, self.state.session_id)
+        logger.info(
+            "session_sync: editor '%s' (%s) joined session %s",
+            display_name,
+            role,
+            self.state.session_id,
+        )
         return editor
 
     def apply_delta_operation(self, delta: DeltaOperation) -> CollaborativeSessionState:
@@ -50,13 +57,17 @@ class CollaborativeSessionSync:
         """
         # Validate client membership
         if delta.client_id not in self.state.active_editors:
-            raise ValueError(f"Unregistered client {delta.client_id} cannot apply deltas to session {self.state.session_id}")
+            raise ValueError(
+                f"Unregistered client {delta.client_id} cannot apply deltas to session {self.state.session_id}"
+            )
 
         history = list(self.state.applied_deltas)
         history.append(delta)
 
         new_version = self.state.sequence_version + 1
-        self.state = self.state.model_copy(update={"sequence_version": new_version, "applied_deltas": history})
+        self.state = self.state.model_copy(
+            update={"sequence_version": new_version, "applied_deltas": history}
+        )
 
         logger.info(
             "session_sync: applied delta %s (%s) from client %s [Version: %d]",

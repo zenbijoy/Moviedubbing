@@ -18,10 +18,12 @@ class SpeakerEmbedding(ContractModel):
     """Model-agnostic opaque speaker embedding container."""
 
     embedding_id: Identifier
-    model_id: str = Field(min_length=1)         # e.g. "speechbrain/spkrec-ecapa-voxceleb" or "pyannote/embedding"
+    model_id: str = Field(
+        min_length=1
+    )  # e.g. "speechbrain/spkrec-ecapa-voxceleb" or "pyannote/embedding"
     model_version: str = Field(default="1.0.0", min_length=1)
-    dimension: int = Field(gt=0)                # e.g. 192, 256, 512
-    vector: list[float] = Field(min_length=1)   # Serialized float array
+    dimension: int = Field(gt=0)  # e.g. 192, 256, 512
+    vector: list[float] = Field(min_length=1)  # Serialized float array
     normalized: bool = True
     source_artifact_id: Identifier
     quality_score: float = Field(default=1.0, ge=0.0, le=1.0)
@@ -36,7 +38,9 @@ class SpeakerEmbedding(ContractModel):
     def compute_cosine_similarity(self, other: SpeakerEmbedding) -> float:
         """Calculate cosine similarity with another speaker embedding."""
         if self.dimension != other.dimension:
-            raise ValueError(f"cannot compare embeddings with mismatching dimensions ({self.dimension} vs {other.dimension})")
+            raise ValueError(
+                f"cannot compare embeddings with mismatching dimensions ({self.dimension} vs {other.dimension})"
+            )
         vec_a = self.to_numpy()
         vec_b = other.to_numpy()
         dot = float(np.dot(vec_a, vec_b))

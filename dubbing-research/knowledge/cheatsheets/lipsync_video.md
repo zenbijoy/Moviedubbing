@@ -21,16 +21,24 @@
 # LatentSync selective close-up invocation
 import subprocess
 
+
 def run_latentsync(video_clip, audio_clip, output_path):
     cmd = [
-        "python", "LatentSync/inference.py",
-        "--unet_config_path", "LatentSync/configs/unet/second_stage.yaml",
-        "--inference_ckpt_path", "checkpoints/latentsync_unet.pt",
-        "--video_path", video_clip,
-        "--audio_path", audio_clip,
-        "--video_out_path", output_path
+        "python",
+        "LatentSync/inference.py",
+        "--unet_config_path",
+        "LatentSync/configs/unet/second_stage.yaml",
+        "--inference_ckpt_path",
+        "checkpoints/latentsync_unet.pt",
+        "--video_path",
+        video_clip,
+        "--audio_path",
+        audio_clip,
+        "--video_out_path",
+        output_path,
     ]
     subprocess.run(cmd, check=True)
+
 
 # Run only if shot detector confirms speaking face close-up
 ```

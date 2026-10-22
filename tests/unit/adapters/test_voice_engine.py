@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from aidub.adapters.voice_base import (
     EmotionLabel,
@@ -75,7 +76,7 @@ def test_synthesis_request_emotion_labels() -> None:
 
 
 def test_synthesis_request_pace_multiplier_bounds() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         SynthesisRequest(
             request_id=Identifier("req"),
             utterance_id=Identifier("utt"),
@@ -91,5 +92,3 @@ def test_synthesis_result_has_seed_metadata(tmp_path: Path) -> None:
     result = engine.synthesize(_make_request(seed=99), str(tmp_path))
     assert result.seed_used == 99
     assert "99" in Path(result.output_path).name
-
-

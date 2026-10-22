@@ -29,7 +29,7 @@ from openai import OpenAI
 from bnunicodenormalizer import Normalizer
 
 norm = Normalizer()
-client = OpenAI(base_url="http://localhost:8000/v1", api_key="local") # or DeepSeek / Gemini
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="local")  # or DeepSeek / Gemini
 
 prompt = """Translate the following English movie dialogue line into natural colloquial Bengali.
 Rules:
@@ -43,14 +43,18 @@ response = client.chat.completions.create(
     model="qwen2.5-7b-instruct",
     messages=[
         {"role": "system", "content": "You are a professional film localization director."},
-        {"role": "user", "content": prompt.format(
-            duration_ms=2100, 
-            char_budget=35, 
-            character_tone="urgent confrontation",
-            honorific="tumi"
-        ) + "\nSource: 'Drop your gun right now!'"}
+        {
+            "role": "user",
+            "content": prompt.format(
+                duration_ms=2100,
+                char_budget=35,
+                character_tone="urgent confrontation",
+                honorific="tumi",
+            )
+            + "\nSource: 'Drop your gun right now!'",
+        },
     ],
-    response_format={"type": "json_object"}
+    response_format={"type": "json_object"},
 )
 
 data = json.loads(response.choices[0].message.content)

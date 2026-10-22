@@ -46,8 +46,11 @@ def test_color_tokens_and_stylesheet() -> None:
 def test_waveform_downsample_audio() -> None:
     # 1 second of 48000Hz dummy sine samples
     import math
+
     samples = [math.sin(i * 0.1) for i in range(48_000)]
-    data = WaveformGenerator.downsample_audio("clip_002", samples, sample_rate=48_000, target_peaks=50)
+    data = WaveformGenerator.downsample_audio(
+        "clip_002", samples, sample_rate=48_000, target_peaks=50
+    )
 
     assert data.clip_id == "clip_002"
     assert data.duration_ms == 1000
@@ -92,7 +95,9 @@ def test_timeline_marker_manager_markers() -> None:
 
 
 def test_editorial_slip_edit() -> None:
-    clip = TimelineClip(clip_id=Identifier("c1"), track_id=TrackId.A1, start_ms=1000, duration_ms=2000)
+    clip = TimelineClip(
+        clip_id=Identifier("c1"), track_id=TrackId.A1, start_ms=1000, duration_ms=2000
+    )
     slipped = EditorialCommandEngine.slip_edit(clip, offset_ms=500)
     assert slipped.clip_id == clip.clip_id
     assert slipped.start_ms == 1000
@@ -100,8 +105,12 @@ def test_editorial_slip_edit() -> None:
 
 def test_editorial_slide_edit() -> None:
     left = TimelineClip(clip_id=Identifier("c1"), track_id=TrackId.A1, start_ms=0, duration_ms=2000)
-    mid = TimelineClip(clip_id=Identifier("c2"), track_id=TrackId.A1, start_ms=2000, duration_ms=1000)
-    right = TimelineClip(clip_id=Identifier("c3"), track_id=TrackId.A1, start_ms=3000, duration_ms=2000)
+    mid = TimelineClip(
+        clip_id=Identifier("c2"), track_id=TrackId.A1, start_ms=2000, duration_ms=1000
+    )
+    right = TimelineClip(
+        clip_id=Identifier("c3"), track_id=TrackId.A1, start_ms=3000, duration_ms=2000
+    )
 
     # Slide mid clip 500ms right
     new_left, new_mid, new_right = EditorialCommandEngine.slide_edit(left, mid, right, shift_ms=500)
@@ -163,4 +172,3 @@ def test_nle_profile_shortcuts() -> None:
     mgr.load_profile(NleProfile.PREMIERE_PRO)
     assert mgr.profile == NleProfile.PREMIERE_PRO
     assert mgr.resolve("C") == ShortcutAction.TOOL_BLADE  # Premiere C = Razor
-

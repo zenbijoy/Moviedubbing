@@ -7,7 +7,6 @@ exceed duration and quality thresholds. Evaluates loss curves and speaker verifi
 
 from __future__ import annotations
 
-import logging
 from enum import StrEnum
 
 from pydantic import Field
@@ -15,12 +14,14 @@ from pydantic import Field
 from aidub.contracts.base import ContractModel, Identifier
 from aidub.domain.voice_profile import CharacterVoiceProfile
 
-logger = logging.getLogger(__name__)
+
+class FineTuningUnavailableError(RuntimeError):
+    """Raised when no real voice-model training backend is configured."""
 
 
 class AdapterStatus(StrEnum):
     QUALIFIED = "qualified"  # Speaker similarity >= 0.88, Loss <= 0.15
-    REJECTED = "rejected"    # Quality threshold not met
+    REJECTED = "rejected"  # Quality threshold not met
 
 
 class FineTuningConfig(ContractModel):
@@ -49,37 +50,18 @@ class VoiceAdapterFineTuner:
     Automates LoRA adapter training loops for character voice conditioning.
     """
 
-    def execute_fine_tuning_job(self, job_id: str, profile: CharacterVoiceProfile, config: FineTuningConfig) -> FineTuningReport:
-        """
-        Execute LoRA adapter training loop on profile reference banks.
-        """
-        jid = Identifier(job_id)
-
+    def execute_fine_tuning_job(
+        self, job_id: str, profile: CharacterVoiceProfile, config: FineTuningConfig
+    ) -> FineTuningReport:
+        """Require consent, then fail closed until a real LoRA trainer is configured."""
         if not profile.consent_authorized:
-            raise PermissionError(f"Cannot fine-tune voice model for profile '{profile.display_name}': authorization consent is missing")
+            raise PermissionError(
+                f"Cannot fine-tune voice model for profile '{profile.display_name}': authorization consent is missing"
+            )
 
-        # Simulate training loop result
-        final_loss = 0.12
-        sim_score = 0.94
-        adapter_path = f"models/adapters/{profile.character_id}_lora_v1.pt"
-
-        status = AdapterStatus.QUALIFIED if (final_loss <= 0.20 and sim_score >= 0.85) else AdapterStatus.REJECTED
-
-        logger.info(
-            "finetune_pipeline: completed LoRA fine-tuning for character %s (Loss: %.4f, Sim: %.4f, Status: %s)",
-            profile.character_id,
-            final_loss,
-            sim_score,
-            status,
-        )
-
-        return FineTuningReport(
-            job_id=jid,
-            character_id=profile.character_id,
-            final_loss=final_loss,
-            speaker_similarity_score=sim_score,
-            adapter_model_path=adapter_path,
-            status=status,
+        raise FineTuningUnavailableError(
+            "Voice fine-tuning is unavailable: no LoRA training backend is configured. "
+            "No adapter was trained or saved."
         )
 
 
@@ -87,5 +69,6 @@ __all__ = [
     "AdapterStatus",
     "FineTuningConfig",
     "FineTuningReport",
+    "FineTuningUnavailableError",
     "VoiceAdapterFineTuner",
 ]

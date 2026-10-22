@@ -42,7 +42,12 @@ class SpeedRampEngine:
         """
         Compute effective clip duration scaling factor.
         """
-        logger.info("effects: applied speed factor %.2fx (Freeze frame: %s) to %s", config.speed_factor, config.is_freeze_frame, config.clip_id)
+        logger.info(
+            "effects: applied speed factor %.2fx (Freeze frame: %s) to %s",
+            config.speed_factor,
+            config.is_freeze_frame,
+            config.clip_id,
+        )
         return config.speed_factor
 
 

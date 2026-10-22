@@ -19,7 +19,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-from aidub.contracts.base import Identifier
 from aidub.providers.router import (
     LlmProviderError,
     LlmProviderKind,
@@ -33,8 +32,8 @@ DEFAULT_MODEL = "gemini-2.0-flash"
 
 # Gemini safety settings — permissive for film dialogue content
 _SAFETY_SETTINGS = [
-    {"category": "HARM_CATEGORY_HARASSMENT",        "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_HATE_SPEECH",       "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
     {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
 ]
@@ -58,12 +57,24 @@ class GeminiAdapter:
         api_key: str,
         model: str = DEFAULT_MODEL,
         *,
+        api_keys: list[str] | None = None,
         timeout_s: float = 120.0,
     ) -> None:
-        self._api_key = api_key
+        self._api_keys: list[str] = list(api_keys) if api_keys else ([api_key] if api_key else [])
+        self._key_index = 0
+        self._api_key = self._api_keys[0] if self._api_keys else api_key
         self._model_name = model
         self._timeout_s = timeout_s
-        self._model: Any | None = None   # lazy-init
+        self._model: Any | None = None  # lazy-init
+
+    def _rotate_key(self) -> bool:
+        if len(self._api_keys) <= 1:
+            return False
+        self._key_index = (self._key_index + 1) % len(self._api_keys)
+        self._api_key = self._api_keys[self._key_index]
+        self._model = None
+        logger.info("Gemini: Rotated to key %d of %d", self._key_index + 1, len(self._api_keys))
+        return True
 
     # ── LlmAdapter protocol ───────────────────────────────────────────────────
 
@@ -72,22 +83,36 @@ class GeminiAdapter:
         return LlmProviderKind.GEMINI
 
     def complete(self, request: LlmRequest) -> LlmResponse:
-        """Send a text chat-completion request to Gemini."""
-        model = self._get_model()
-        contents = _build_contents(request)
+        """Send a text chat-completion request to Gemini with automatic key pool rotation."""
+        max_attempts = max(1, len(self._api_keys))
+        last_exc: Exception | None = None
 
-        generation_config = _generation_config(request)
-        t0 = time.monotonic()
-        try:
-            response = model.generate_content(
-                contents,
-                generation_config=generation_config,
-                safety_settings=_SAFETY_SETTINGS,
-            )
-        except Exception as exc:
-            raise LlmProviderError(
-                "gemini", f"API error: {exc}", retryable=_is_retryable(exc)
-            ) from exc
+        for attempt in range(max_attempts):
+            model = self._get_model()
+            contents = _build_contents(request)
+            generation_config = _generation_config(request)
+            t0 = time.monotonic()
+            try:
+                response = model.generate_content(
+                    contents,
+                    generation_config=generation_config,
+                    safety_settings=_SAFETY_SETTINGS,
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+                if attempt < max_attempts - 1 and self._rotate_key():
+                    logger.warning(
+                        "Gemini attempt %d failed (%s), rotating to next API key...",
+                        attempt + 1,
+                        exc,
+                    )
+                    continue
+                raise LlmProviderError(
+                    "gemini", f"API error: {exc}", retryable=_is_retryable(exc)
+                ) from exc
+        else:
+            raise LlmProviderError("gemini", f"All API keys failed: {last_exc}", retryable=True)
 
         latency_ms = (time.monotonic() - t0) * 1_000
         content = _extract_text(response)
@@ -96,12 +121,15 @@ class GeminiAdapter:
             raise LlmProviderError("gemini", "empty response", retryable=True)
 
         usage = getattr(response, "usage_metadata", None)
-        in_tok  = getattr(usage, "prompt_token_count",     0) if usage else 0
+        in_tok = getattr(usage, "prompt_token_count", 0) if usage else 0
         out_tok = getattr(usage, "candidates_token_count", 0) if usage else 0
 
         logger.debug(
             "gemini: model=%s tokens=%s/%s latency=%.0fms",
-            self._model_name, in_tok, out_tok, latency_ms,
+            self._model_name,
+            in_tok,
+            out_tok,
+            latency_ms,
         )
 
         return LlmResponse(
@@ -149,7 +177,7 @@ class GeminiAdapter:
             parts.append(request.system_prompt + "\n\n")
 
         # Attach video keyframes
-        for frame_path in (frames or []):
+        for frame_path in frames or []:
             if frame_path.exists():
                 img = genai.upload_file(str(frame_path), mime_type="image/jpeg")
                 parts.append(img)
@@ -181,7 +209,7 @@ class GeminiAdapter:
         content = _extract_text(response)
 
         usage = getattr(response, "usage_metadata", None)
-        in_tok  = getattr(usage, "prompt_token_count",     0) if usage else 0
+        in_tok = getattr(usage, "prompt_token_count", 0) if usage else 0
         out_tok = getattr(usage, "candidates_token_count", 0) if usage else 0
 
         return LlmResponse(
@@ -213,6 +241,7 @@ class GeminiAdapter:
 
 # ── Module helpers ────────────────────────────────────────────────────────────
 
+
 def _build_contents(request: LlmRequest) -> list[dict[str, str]]:
     """
     Gemini uses a different message format than OpenAI.
@@ -224,7 +253,7 @@ def _build_contents(request: LlmRequest) -> list[dict[str, str]]:
     if request.system_prompt:
         # Gemini: system role goes in GenerativeModel(system_instruction=…)
         # but for backward compat we add it as first user content
-        parts.append({"role": "user",  "parts": [request.system_prompt]})
+        parts.append({"role": "user", "parts": [request.system_prompt]})
         parts.append({"role": "model", "parts": ["Understood. I will follow those instructions."]})
     parts.append({"role": "user", "parts": [request.user_prompt]})
     return parts
@@ -232,7 +261,7 @@ def _build_contents(request: LlmRequest) -> list[dict[str, str]]:
 
 def _generation_config(request: LlmRequest) -> dict[str, Any]:
     cfg: dict[str, Any] = {
-        "temperature":  request.temperature,
+        "temperature": request.temperature,
         "max_output_tokens": request.max_tokens,
     }
     if request.json_mode:
@@ -255,9 +284,7 @@ def _is_retryable(exc: Exception) -> bool:
     msg = str(exc).lower()
     if any(k in msg for k in ("429", "quota", "resource_exhausted", "deadline")):
         return True
-    if any(k in msg for k in ("api_key", "permission", "401", "403")):
-        return False
-    return True
+    return not any(k in msg for k in ("api_key", "permission", "401", "403"))
 
 
-__all__ = ["GeminiAdapter", "DEFAULT_MODEL"]
+__all__ = ["DEFAULT_MODEL", "GeminiAdapter"]

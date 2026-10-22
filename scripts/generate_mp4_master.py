@@ -9,11 +9,13 @@ from __future__ import annotations
 import sys
 import time
 from pathlib import Path
+
 import cv2
 
 # Ensure UTF-8 output encoding for Windows terminals
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
+
 
 def render_native_windows_playable_master() -> None:
     source_path = Path("test movies/Bad Genius_ The Series-S1E1-480P.mp4")
@@ -104,7 +106,9 @@ def render_native_windows_playable_master() -> None:
             pct = (processed / total_frames) * 100
             elapsed = time.time() - start_time
             fps_render = processed / max(elapsed, 0.001)
-            print(f"  * Rendered {processed:,}/{total_frames:,} frames ({pct:.1f}%) | TC: {timecode_str} | Speed: {fps_render:.1f} FPS")
+            print(
+                f"  * Rendered {processed:,}/{total_frames:,} frames ({pct:.1f}%) | TC: {timecode_str} | Speed: {fps_render:.1f} FPS"
+            )
 
     cap.release()
     writer_wmv.release()
@@ -122,6 +126,7 @@ def render_native_windows_playable_master() -> None:
     print(f"Duration:      {duration_minutes:.2f} minutes ({processed:,} frames)")
     print(f"Render Time:   {total_time:.2f} seconds")
     print("=" * 80)
+
 
 if __name__ == "__main__":
     render_native_windows_playable_master()

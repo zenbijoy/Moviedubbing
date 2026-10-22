@@ -13,15 +13,21 @@ Comprehensive Unit Test Suite for Phases 12 through 20:
 
 from __future__ import annotations
 
+import pytest
+
 from aidub.ai.memory.scene_memory import SceneMemoryEngine
 from aidub.ai.vision.face_tracker_3d import MultiFace3DTracker
 from aidub.ai.vision.visual_qc import VisualQCEvaluator
 from aidub.application.voice.cross_scene_persistence import CrossSceneVoicePersistence
 from aidub.contracts.base import Identifier
-from aidub.diagnostics.ga_certifier import StudioGACertifier
+from aidub.diagnostics.ga_certifier import GACertificationUnavailableError, StudioGACertifier
 from aidub.domain.character_bible import CharacterBibleEntry
 from aidub.domain.voice_profile import CharacterVoiceProfile
-from aidub.infrastructure.fleet_deployer import FleetDeploymentManifest, FleetModelDeployer
+from aidub.infrastructure.fleet_deployer import (
+    FleetDeploymentManifest,
+    FleetDeploymentUnavailableError,
+    FleetModelDeployer,
+)
 from aidub.interchange.conform_verifier import NLEConformVerifier
 from aidub.interchange.cue_sheet_exporter import CueSheetExporter, CueSheetItem
 from aidub.interchange.edl_fcpxml_adapter import EDLFCPXMLAdapter
@@ -30,24 +36,36 @@ from aidub.media.acoustic_ir import AcousticIRConvolutionEngine, ImpulseResponse
 from aidub.media.acoustic_presets import AcousticEnvironmentPreset, AcousticPresetProcessor
 from aidub.media.ambience_fill import AmbienceFillGenerator, AmbienceFillProfile
 from aidub.media.effects import SpeedRampConfig, SpeedRampEngine
-from aidub.media.multicam import MulticamAngle, MulticamEngine
+from aidub.media.multicam import (
+    MulticamAngle,
+    MulticamEngine,
+    MulticamSyncUnavailableError,
+)
 from aidub.media.transforms import KeyframeInterpolationMode, KeyframeInterpolator, KeyframePoint
 from aidub.media.transitions import VideoTransition, VideoTransitionEngine
 from aidub.orchestration.cluster_scheduler import ClusterWorkerNode, DistributedClusterScheduler
 from aidub.orchestration.fleet_manager import FleetManager
-from aidub.sdk.plugin_abi import NLEPluginSDK, PluginManifest
-from aidub.security.c2pa_manifest import C2PAManifestBuilder
+from aidub.sdk.plugin_abi import NLEPluginSDK, PluginLoaderUnavailableError, PluginManifest
+from aidub.security.c2pa_manifest import C2PAManifestBuilder, C2PAManifestUnavailableError
 from aidub.security.disclosure_auditor import DataDisclosureAuditor, DisclosureRecord
-from aidub.security.provenance_watermark import AIProvenanceWatermarker
+from aidub.security.provenance_watermark import AIProvenanceWatermarker, WatermarkUnavailableError
 from aidub.security.rbac_policy import PermissionAction, RBACPolicyEngine
 from aidub.security.sso_auth import SSOAuthenticationManager
 from aidub.security.studio_policy import StudioGovernancePolicy, StudioPolicyEvaluator
 
 
 def test_phase12_interchange() -> None:
-    clip = OTIOClip(clip_id=Identifier("c1"), name="Clip 1", source_range_start_ms=0, source_range_duration_ms=5000, media_reference_path="video.mp4")
+    clip = OTIOClip(
+        clip_id=Identifier("c1"),
+        name="Clip 1",
+        source_range_start_ms=0,
+        source_range_duration_ms=5000,
+        media_reference_path="video.mp4",
+    )
     track = OTIOTrack(track_id=Identifier("t1"), clips=[clip])
-    timeline = OTIOTimeline(timeline_id=Identifier("tl1"), name="Test Timeline", frame_rate=24.0, tracks=[track])
+    timeline = OTIOTimeline(
+        timeline_id=Identifier("tl1"), name="Test Timeline", frame_rate=24.0, tracks=[track]
+    )
 
     otio_adapter = OTIOTimelineAdapter()
     json_str = otio_adapter.export_otio_json(timeline)
@@ -62,7 +80,14 @@ def test_phase12_interchange() -> None:
     assert "<fcpxml" in fcpxml_str
 
     cue_exporter = CueSheetExporter()
-    cue_item = CueSheetItem(cue_id=Identifier("q1"), character_name="HERO", timecode_in="01:00:00:00", timecode_out="01:00:05:00", source_text="Hello", target_text="Shalom")
+    cue_item = CueSheetItem(
+        cue_id=Identifier("q1"),
+        character_name="HERO",
+        timecode_in="01:00:00:00",
+        timecode_out="01:00:05:00",
+        source_text="Hello",
+        target_text="Shalom",
+    )
     report = cue_exporter.generate_cue_sheet("Movie Title", "he-IL", [cue_item])
     assert report.target_language == "he-IL"
 
@@ -78,8 +103,15 @@ def test_phase12_interchange() -> None:
 
 def test_phase13_editing_and_effects() -> None:
     interpolator = KeyframeInterpolator()
-    kf1 = KeyframePoint(keyframe_id=Identifier("k1"), time_ms=0, value=0.0, mode=KeyframeInterpolationMode.LINEAR)
-    kf2 = KeyframePoint(keyframe_id=Identifier("k2"), time_ms=1000, value=100.0, mode=KeyframeInterpolationMode.LINEAR)
+    kf1 = KeyframePoint(
+        keyframe_id=Identifier("k1"), time_ms=0, value=0.0, mode=KeyframeInterpolationMode.LINEAR
+    )
+    kf2 = KeyframePoint(
+        keyframe_id=Identifier("k2"),
+        time_ms=1000,
+        value=100.0,
+        mode=KeyframeInterpolationMode.LINEAR,
+    )
     val = interpolator.interpolate([kf1, kf2], target_time_ms=500)
     assert val == 50.0
 
@@ -102,7 +134,9 @@ def test_phase14_character_bible_and_memory() -> None:
     assert state.dominant_mood == "dramatic"
 
     persistence = CrossSceneVoicePersistence()
-    prof = CharacterVoiceProfile(profile_id=Identifier("p1"), character_id=Identifier("HERO"), display_name="Hero")
+    prof = CharacterVoiceProfile(
+        profile_id=Identifier("p1"), character_id=Identifier("HERO"), display_name="Hero"
+    )
     persistence.register_profile(prof)
     assert persistence.find_matching_profile("HERO") is not None
 
@@ -150,8 +184,14 @@ def test_phase17_distributed_orchestration() -> None:
     assert status["n2"] == "HEALTHY"
 
     deployer = FleetModelDeployer()
-    manifest = FleetDeploymentManifest(deployment_id=Identifier("d1"), package_name="TTSModel", version="1.0", checksum_sha256="a"*64)
-    assert deployer.deploy_package_to_nodes(manifest, ["n1", "n2"]) is True
+    manifest = FleetDeploymentManifest(
+        deployment_id=Identifier("d1"),
+        package_name="TTSModel",
+        version="1.0",
+        checksum_sha256="a" * 64,
+    )
+    with pytest.raises(FleetDeploymentUnavailableError, match="No package was sent"):
+        deployer.deploy_package_to_nodes(manifest, ["n1", "n2"])
 
 
 def test_phase18_visual_ai_enhancement() -> None:
@@ -166,29 +206,36 @@ def test_phase18_visual_ai_enhancement() -> None:
 
 def test_phase19_c2pa_and_watermarking() -> None:
     c2pa_builder = C2PAManifestBuilder()
-    manifest = c2pa_builder.build_c2pa_manifest("proj_c2pa")
-    assert manifest.claim_generator == "AI_Movie_Dubbing_Studio_v2.0"
+    with pytest.raises(C2PAManifestUnavailableError, match="No signed credential was created"):
+        c2pa_builder.build_c2pa_manifest("proj_c2pa")
 
     watermarker = AIProvenanceWatermarker()
-    wm_audio = watermarker.watermark_audio_payload(b"AUDIO", "prov_123")
-    assert b"AI_PROVENANCE_WATERMARKED" in wm_audio
+    with pytest.raises(WatermarkUnavailableError, match="No payload was modified"):
+        watermarker.watermark_audio_payload(b"AUDIO", "prov_123")
 
     auditor = DataDisclosureAuditor()
-    rec = DisclosureRecord(record_id=Identifier("r1"), provider_name="OpenAI", data_category="text", retained_by_provider=False)
+    rec = DisclosureRecord(
+        record_id=Identifier("r1"),
+        provider_name="OpenAI",
+        data_category="text",
+        retained_by_provider=False,
+    )
     assert auditor.audit_disclosures([rec]) is True
 
 
 def test_phase20_plugin_abi_and_ga_certifier() -> None:
     sdk = NLEPluginSDK()
-    manifest = PluginManifest(plugin_id=Identifier("p1"), name="Custom Filter", version="1.0", entry_point="main.py")
-    assert sdk.load_plugin(manifest) is True
+    manifest = PluginManifest(
+        plugin_id=Identifier("p1"), name="Custom Filter", version="1.0", entry_point="main.py"
+    )
+    with pytest.raises(PluginLoaderUnavailableError, match="No extension was loaded"):
+        sdk.load_plugin(manifest)
 
     multicam = MulticamEngine()
     ang = MulticamAngle(angle_id=Identifier("a1"), camera_label="Cam A", media_path="a.mp4")
-    offsets = multicam.sync_camera_angles([ang])
-    assert "a1" in offsets
+    with pytest.raises(MulticamSyncUnavailableError, match="No zero-offset sync result"):
+        multicam.sync_camera_angles([ang])
 
     certifier = StudioGACertifier()
-    cert = certifier.generate_ga_certificate(tests_passed=670)
-    assert cert.status == "CERTIFIED_PRODUCTION_GA"
-    assert cert.total_unit_tests_passed == 670
+    with pytest.raises(GACertificationUnavailableError, match="cannot certify a release"):
+        certifier.generate_ga_certificate()

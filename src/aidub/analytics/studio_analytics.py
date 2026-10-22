@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 
 class BudgetAlertStatus(StrEnum):
-    HEALTHY = "healthy"      # Spent < 80% of budget
-    WARNING = "warning"      # Spent 80% - 99% of budget
-    EXCEEDED = "exceeded"    # Spent >= 100% of budget
+    HEALTHY = "healthy"  # Spent < 80% of budget
+    WARNING = "warning"  # Spent 80% - 99% of budget
+    EXCEEDED = "exceeded"  # Spent >= 100% of budget
 
 
 class ProjectCostMetrics(ContractModel):
@@ -51,12 +51,14 @@ class StudioAnalyticsPlatform:
     Studio analytics engine aggregating tenant costs and GPU utilization.
     """
 
-    def compute_project_cost(self, project_id: str, audio_minutes: float, gpu_hours: float) -> ProjectCostMetrics:
+    def compute_project_cost(
+        self, project_id: str, audio_minutes: float, gpu_hours: float
+    ) -> ProjectCostMetrics:
         """
         Calculate compute costs for a localization project.
         """
         pid = Identifier(project_id)
-        local_cost = round(gpu_hours * 1.50, 2)     # $1.50 per GPU hour
+        local_cost = round(gpu_hours * 1.50, 2)  # $1.50 per GPU hour
         cloud_cost = round(audio_minutes * 0.10, 2)  # $0.10 per audio minute cloud API
         total = round(local_cost + cloud_cost, 2)
 
@@ -70,7 +72,10 @@ class StudioAnalyticsPlatform:
         )
 
     def generate_tenant_report(
-        self, tenant_id: str, project_costs: Sequence[ProjectCostMetrics], budget_limit_usd: float = 1000.0
+        self,
+        tenant_id: str,
+        project_costs: Sequence[ProjectCostMetrics],
+        budget_limit_usd: float = 1000.0,
     ) -> TenantAnalyticsReport:
         """
         Aggregate costs and check budget alerts.
@@ -83,10 +88,20 @@ class StudioAnalyticsPlatform:
 
         if tot_cost >= budget_limit_usd:
             status = BudgetAlertStatus.EXCEEDED
-            logger.warning("studio_analytics: BUDGET EXCEEDED for tenant %s ($%.2f >= $%.2f)", tid, tot_cost, budget_limit_usd)
+            logger.warning(
+                "studio_analytics: BUDGET EXCEEDED for tenant %s ($%.2f >= $%.2f)",
+                tid,
+                tot_cost,
+                budget_limit_usd,
+            )
         elif tot_cost >= budget_limit_usd * 0.8:
             status = BudgetAlertStatus.WARNING
-            logger.warning("studio_analytics: BUDGET WARNING for tenant %s ($%.2f of $%.2f)", tid, tot_cost, budget_limit_usd)
+            logger.warning(
+                "studio_analytics: BUDGET WARNING for tenant %s ($%.2f of $%.2f)",
+                tid,
+                tot_cost,
+                budget_limit_usd,
+            )
         else:
             status = BudgetAlertStatus.HEALTHY
 

@@ -47,7 +47,9 @@ def aggregate_progress(
     ordered_stages = tuple(sorted(stages, key=lambda stage: stage.stage_id))
     if not ordered_stages:
         raise ValueError("analysis progress requires at least one stage")
-    require_unique(tuple(stage.stage_id for stage in ordered_stages), field_name="analysis stage_ids")
+    require_unique(
+        tuple(stage.stage_id for stage in ordered_stages), field_name="analysis stage_ids"
+    )
     instant = normalize_utc(emitted_at)
     latest_stage_update = max(stage.updated_at for stage in ordered_stages)
     if instant < latest_stage_update:
@@ -81,7 +83,9 @@ def aggregate_confidence(
     values = tuple(assessments)
     if not values:
         raise ConfidenceAggregationError("confidence aggregation requires at least one assessment")
-    require_unique(tuple(item.assessment_id for item in values), field_name="confidence assessment_ids")
+    require_unique(
+        tuple(item.assessment_id for item in values), field_name="confidence assessment_ids"
+    )
     first = values[0]
     incompatible = tuple(
         item.assessment_id
@@ -95,7 +99,8 @@ def aggregate_confidence(
     if incompatible:
         joined = ", ".join(sorted(incompatible))
         raise ConfidenceAggregationError(
-            "confidence assessments require identical metric, calibration, and source hash: " + joined
+            "confidence assessments require identical metric, calibration, and source hash: "
+            + joined
         )
     instant = normalize_utc(aggregated_at)
     latest_assessment = max(item.assessed_at for item in values)
@@ -116,13 +121,17 @@ def aggregate_confidence(
 
 def _validate_monotonic_progress(previous: AnalysisProgress, current: AnalysisProgress) -> None:
     if previous.run_id != current.run_id:
-        raise AnalysisProgressRegressionError("progress snapshots belong to different analysis runs")
+        raise AnalysisProgressRegressionError(
+            "progress snapshots belong to different analysis runs"
+        )
     if current.emitted_at < previous.emitted_at:
         raise AnalysisProgressRegressionError("analysis progress timestamp cannot move backwards")
     previous_stages = {stage.stage_id: stage for stage in previous.stages}
     current_stages = {stage.stage_id: stage for stage in current.stages}
     if previous_stages.keys() != current_stages.keys():
-        raise AnalysisProgressRegressionError("analysis run stage plan cannot change after publication")
+        raise AnalysisProgressRegressionError(
+            "analysis run stage plan cannot change after publication"
+        )
     for stage_id, prior_stage in previous_stages.items():
         next_stage = current_stages[stage_id]
         if not can_transition_stage_status(prior_stage.status, next_stage.status):
@@ -132,7 +141,9 @@ def _validate_monotonic_progress(previous: AnalysisProgress, current: AnalysisPr
         if next_stage.completed_units * prior_stage.total_units < (
             prior_stage.completed_units * next_stage.total_units
         ):
-            raise AnalysisProgressRegressionError(f"stage {stage_id} progress cannot move backwards")
+            raise AnalysisProgressRegressionError(
+                f"stage {stage_id} progress cannot move backwards"
+            )
     if current.progress_basis_points < previous.progress_basis_points:
         raise AnalysisProgressRegressionError("aggregate analysis progress cannot move backwards")
 

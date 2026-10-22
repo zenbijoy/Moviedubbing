@@ -9,9 +9,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 from aidub.subtitles.models import SubtitleTrack
 
@@ -45,11 +44,11 @@ class SubtitleRepository:
             Path to saved JSON file.
         """
         if not track.created_at:
-            track.created_at = datetime.now().isoformat()
+            track.created_at = datetime.now(UTC).isoformat()
 
         json_path = self.subtitles_dir / filename
         data = track.to_dict()
-        
+
         # Calculate content hash if empty
         data_str = json.dumps(data, sort_keys=True)
         if not track.content_hash:
@@ -75,7 +74,12 @@ class SubtitleRepository:
             raw_text = json_path.read_text(encoding="utf-8")
             data = json.loads(raw_text)
             track = SubtitleTrack.from_dict(data)
-            logger.info("Loaded subtitle track '%s' (%d segments) from '%s'", track.name, len(track.segments), json_path)
+            logger.info(
+                "Loaded subtitle track '%s' (%d segments) from '%s'",
+                track.name,
+                len(track.segments),
+                json_path,
+            )
             return track
         except Exception as e:
             logger.error("Failed to load subtitle track from '%s': %e", json_path, e)

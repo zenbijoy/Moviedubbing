@@ -35,8 +35,7 @@ speech_timestamps = get_speech_timestamps(wav, vad_model, sampling_rate=16000)
 
 # 2. Pyannote Diarization (Multi-Speaker with Overlap)
 pipeline = Pipeline.from_pretrained(
-    "pyannote/speaker-diarization-3.1",
-    use_auth_token="HF_TOKEN_HERE"
+    "pyannote/speaker-diarization-3.1", use_auth_token="HF_TOKEN_HERE"
 )
 pipeline.to(torch.device("cuda"))
 

@@ -7,18 +7,20 @@ and tenant budget reports to the Qt Quick QML presentation layer.
 
 from __future__ import annotations
 
-import logging
+from collections.abc import Sequence
 
 from aidub.ai.finetuning.finetune_pipeline import (
     FineTuningConfig,
     FineTuningReport,
     VoiceAdapterFineTuner,
 )
-from aidub.analytics.studio_analytics import StudioAnalyticsPlatform, TenantAnalyticsReport
+from aidub.analytics.studio_analytics import (
+    ProjectCostMetrics,
+    StudioAnalyticsPlatform,
+    TenantAnalyticsReport,
+)
 from aidub.cloud.hybrid_sync import CloudHybridSyncEngine, CloudSyncManifest
 from aidub.domain.voice_profile import CharacterVoiceProfile
-
-logger = logging.getLogger(__name__)
 
 
 class AnalyticsStudioController:
@@ -38,20 +40,29 @@ class AnalyticsStudioController:
         manifest = self.sync_engine.create_sync_manifest(project_id)
         return self.sync_engine.synchronize_project(manifest)
 
-    def fine_tune_character_voice(self, job_id: str, profile: CharacterVoiceProfile) -> FineTuningReport:
+    def fine_tune_character_voice(
+        self, job_id: str, profile: CharacterVoiceProfile
+    ) -> FineTuningReport:
         """
         Trigger LoRA fine-tuning job for character voice adapter.
         """
         cfg = FineTuningConfig(character_id=profile.character_id)
         return self.finetuner.execute_fine_tuning_job(job_id, profile, cfg)
 
-    def fetch_tenant_analytics_summary(self, tenant_id: str) -> TenantAnalyticsReport:
+    def fetch_tenant_analytics_summary(
+        self,
+        tenant_id: str,
+        project_costs: Sequence[ProjectCostMetrics],
+        budget_limit_usd: float,
+    ) -> TenantAnalyticsReport:
         """
-        Fetch aggregate studio cost analytics and budget alert status.
+        Aggregate caller-supplied project costs into a tenant budget report.
         """
-        c1 = self.analytics.compute_project_cost("proj_01", audio_minutes=120.0, gpu_hours=4.5)
-        c2 = self.analytics.compute_project_cost("proj_02", audio_minutes=90.0, gpu_hours=3.0)
-        return self.analytics.generate_tenant_report(tenant_id, [c1, c2], budget_limit_usd=500.0)
+        return self.analytics.generate_tenant_report(
+            tenant_id,
+            project_costs,
+            budget_limit_usd=budget_limit_usd,
+        )
 
 
 __all__ = [

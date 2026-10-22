@@ -21,7 +21,9 @@ class AuditEvent(ContractModel):
     """Single audit log entry with SHA-256 hash chaining."""
 
     event_id: Identifier
-    event_type: str = Field(min_length=1)  # e.g. "CONSENT_CHECK", "VOICE_CLONE", "RENDER_PASS", "EXPORT_DCP"
+    event_type: str = Field(
+        min_length=1
+    )  # e.g. "CONSENT_CHECK", "VOICE_CLONE", "RENDER_PASS", "EXPORT_DCP"
     actor_id: Identifier
     details: str = Field(min_length=1)
     timestamp_iso: str = Field(min_length=1)
@@ -42,7 +44,14 @@ class CryptographicAuditLogger:
     def __init__(self) -> None:
         self.chain: list[AuditEvent] = []
 
-    def log_event(self, event_id: str, event_type: str, actor_id: str, details: str, timestamp_iso: str = "2026-08-14T10:00:00Z") -> AuditEvent:
+    def log_event(
+        self,
+        event_id: str,
+        event_type: str,
+        actor_id: str,
+        details: str,
+        timestamp_iso: str = "2026-08-14T10:00:00Z",
+    ) -> AuditEvent:
         """
         Append entry to tamper-evident audit chain.
         """

@@ -20,10 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 class DualViewerMode(StrEnum):
-    SOURCE = "source"                 # Source Video Only
-    DUB = "dub"                       # Dubbed/Lipsynced Video Only
-    SPLIT_COMPARE = "split_compare"   # Side-by-Side Split View
-    OVERLAY_COMPARE = "overlay"       # Alpha Overlay Comparison
+    SOURCE = "source"  # Source Video Only
+    DUB = "dub"  # Dubbed/Lipsynced Video Only
+    SPLIT_COMPARE = "split_compare"  # Side-by-Side Split View
+    OVERLAY_COMPARE = "overlay"  # Alpha Overlay Comparison
 
 
 class PlaybackState(ContractModel):
@@ -43,8 +43,7 @@ class PlaybackState(ContractModel):
 
     def seek_frame(self, frame_index: int) -> int:
         """Seek to target frame index, returning new position_ms."""
-        new_ms = max(0, int((frame_index / self.fps) * 1000.0))
-        return new_ms
+        return max(0, int((frame_index / self.fps) * 1000.0))
 
 
 class PlaybackController:
@@ -63,14 +62,10 @@ class PlaybackController:
         return self._state
 
     def play(self) -> None:
-        self._state = self._state.model_copy(
-            update={"playing": True, "shuttle_speed": 1.0}
-        )
+        self._state = self._state.model_copy(update={"playing": True, "shuttle_speed": 1.0})
 
     def pause(self) -> None:
-        self._state = self._state.model_copy(
-            update={"playing": False, "shuttle_speed": 0.0}
-        )
+        self._state = self._state.model_copy(update={"playing": False, "shuttle_speed": 0.0})
 
     def toggle_play_pause(self) -> None:
         if self._state.playing:
@@ -82,9 +77,7 @@ class PlaybackController:
         """J key: Reverse playback at 1x, 2x, 4x, 8x speed."""
         speed = self._state.shuttle_speed
         new_speed = -1.0 if speed >= 0 else max(-16.0, speed * 2.0)
-        self._state = self._state.model_copy(
-            update={"playing": True, "shuttle_speed": new_speed}
-        )
+        self._state = self._state.model_copy(update={"playing": True, "shuttle_speed": new_speed})
 
     def shuttle_k(self) -> None:
         """K key: Pause playback immediately."""
@@ -94,14 +87,10 @@ class PlaybackController:
         """L key: Forward playback at 1x, 2x, 4x, 8x speed."""
         speed = self._state.shuttle_speed
         new_speed = 1.0 if speed <= 0 else min(16.0, speed * 2.0)
-        self._state = self._state.model_copy(
-            update={"playing": True, "shuttle_speed": new_speed}
-        )
+        self._state = self._state.model_copy(update={"playing": True, "shuttle_speed": new_speed})
 
     def seek_ms(self, position_ms: int) -> None:
-        self._state = self._state.model_copy(
-            update={"position_ms": max(0, position_ms)}
-        )
+        self._state = self._state.model_copy(update={"position_ms": max(0, position_ms)})
 
     def set_viewer_mode(self, mode: DualViewerMode) -> None:
         self._state = self._state.model_copy(update={"viewer_mode": mode})

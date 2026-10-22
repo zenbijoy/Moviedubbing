@@ -22,12 +22,12 @@ logger = logging.getLogger(__name__)
 
 class ClipColorLabel(StrEnum):
     DIALOGUE = "#10B981"  # Emerald
-    MUSIC = "#F59E0B"     # Amber
-    EFFECTS = "#EC4899"   # Pink
-    FOLEY = "#8B5CF6"     # Purple
+    MUSIC = "#F59E0B"  # Amber
+    EFFECTS = "#EC4899"  # Pink
+    FOLEY = "#8B5CF6"  # Purple
     AMBIENCE = "#14B8A6"  # Teal
     SUBTITLE = "#06B6D4"  # Cyan
-    CUSTOM = "#6366F1"    # Indigo
+    CUSTOM = "#6366F1"  # Indigo
 
 
 class ClipGroup(ContractModel):
@@ -74,12 +74,16 @@ class TimelineCustomizationEngine:
     def create_group(self, name: str, clip_ids: list[str]) -> ClipGroup:
         """Group multiple clip IDs together."""
         group = ClipGroup(
-            group_id=Identifier(f"grp_{len(self._groups)+1:03d}"),
+            group_id=Identifier(f"grp_{len(self._groups) + 1:03d}"),
             name=name,
             clip_ids=clip_ids,
         )
         self._groups[group.group_id] = group
-        logger.info("timeline_customization: created clip group %s (%d clips)", group.group_id, len(clip_ids))
+        logger.info(
+            "timeline_customization: created clip group %s (%d clips)",
+            group.group_id,
+            len(clip_ids),
+        )
         return group
 
     def get_group_for_clip(self, clip_id: str) -> ClipGroup | None:

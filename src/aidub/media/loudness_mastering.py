@@ -28,9 +28,9 @@ LOUDNESS_GATE_RELATIVE_DB = -10.0  # EBU R128 gating relative threshold
 
 
 class LoudnessStandard(StrEnum):
-    EBU_R128 = "ebu_r128"        # -23 LUFS (European broadcast)
-    ATSC_A85 = "atsc_a85"        # -24 LUFS (North American broadcast)
-    STREAMING = "streaming"       # -14 LUFS (Spotify/YouTube recommendation)
+    EBU_R128 = "ebu_r128"  # -23 LUFS (European broadcast)
+    ATSC_A85 = "atsc_a85"  # -24 LUFS (North American broadcast)
+    STREAMING = "streaming"  # -14 LUFS (Spotify/YouTube recommendation)
     CUSTOM = "custom"
 
 
@@ -125,20 +125,22 @@ class LoudnessMasteringBus:
             output_peak_dbtp = cfg.true_peak_limit_dbtp
             logger.debug(
                 "loudness_bus: %s true-peak limit triggered, gain reduced by %.2fdB",
-                utterance_id, excess_db
+                utterance_id,
+                excess_db,
             )
 
         output_integrated_lufs = measurement.integrated_lufs + gain_db
         delta_lu = abs(output_integrated_lufs - cfg.target_lufs)
         within_tolerance = delta_lu <= cfg.tolerance_lu
-        broadcast_compliant = (
-            within_tolerance
-            and output_peak_dbtp <= cfg.true_peak_limit_dbtp
-        )
+        broadcast_compliant = within_tolerance and output_peak_dbtp <= cfg.true_peak_limit_dbtp
 
         logger.info(
             "loudness_bus: %s  gain=%.2fdB  out=%.1f LUFS  peak=%.1f dBTP  compliant=%s",
-            utterance_id, gain_db, output_integrated_lufs, output_peak_dbtp, broadcast_compliant,
+            utterance_id,
+            gain_db,
+            output_integrated_lufs,
+            output_peak_dbtp,
+            broadcast_compliant,
         )
 
         return LoudnessNormalizationResult(

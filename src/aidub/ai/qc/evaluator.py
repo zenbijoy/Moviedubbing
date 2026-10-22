@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from enum import StrEnum
+from typing import ClassVar
 
 from pydantic import Field
 
@@ -27,14 +28,14 @@ logger = logging.getLogger(__name__)
 
 class StudioQcPreset(StrEnum):
     BROADCAST_STUDIO = "broadcast_studio"  # Strict EBU R128 (-24 LUFS), high lip-sync threshold
-    STREAMING_OTT = "streaming_ott"        # Balanced (-14 to -24 LUFS), subtitle CPS focus
-    SOCIAL_MEDIA = "social_media"          # Fast-paced, burn-in subtitle focus
+    STREAMING_OTT = "streaming_ott"  # Balanced (-14 to -24 LUFS), subtitle CPS focus
+    SOCIAL_MEDIA = "social_media"  # Fast-paced, burn-in subtitle focus
 
 
 class QcSeverityLevel(StrEnum):
-    PASS_GREEN = "pass_green"        # Meets studio standards (> 0.85)
+    PASS_GREEN = "pass_green"  # Meets studio standards (> 0.85)
     WARNING_AMBER = "warning_amber"  # Minor defect requiring review (0.70 - 0.85)
-    BLOCKING_RED = "blocking_red"    # Major defect failing QC threshold (< 0.70)
+    BLOCKING_RED = "blocking_red"  # Major defect failing QC threshold (< 0.70)
 
 
 class QcDimensionScore(ContractModel):
@@ -50,7 +51,9 @@ class AutoRepairAction(ContractModel):
     """Actionable automated fix trigger for a detected QC defect."""
 
     action_id: Identifier
-    action_type: str = Field(min_length=1)  # "normalize_loudness", "wsola_timestretch", "condense_translation", "force_lipsync_cinema"
+    action_type: str = Field(
+        min_length=1
+    )  # "normalize_loudness", "wsola_timestretch", "condense_translation", "force_lipsync_cinema"
     description: str = Field(min_length=1)
     target_utterance_id: Identifier
     parameters: dict[str, str | float | int] = Field(default_factory=dict)
@@ -85,7 +88,7 @@ class MultiDimensionalQCEvaluator:
     Enterprise multi-dimensional AI quality evaluator engine.
     """
 
-    PRESET_WEIGHTS: dict[StudioQcPreset, dict[str, float]] = {
+    PRESET_WEIGHTS: ClassVar[dict[StudioQcPreset, dict[str, float]]] = {
         StudioQcPreset.BROADCAST_STUDIO: {
             "transcription": 0.10,
             "diarization": 0.10,
@@ -161,7 +164,11 @@ class MultiDimensionalQCEvaluator:
         loudness_score = max(0.0, min(1.0, 1.0 - (loudness_diff / 10.0)))
 
         # Subtitle CPS score calculation
-        cps_score = 1.0 if subtitle_cps <= self.max_cps else max(0.0, 1.0 - ((subtitle_cps - self.max_cps) / 10.0))
+        cps_score = (
+            1.0
+            if subtitle_cps <= self.max_cps
+            else max(0.0, 1.0 - ((subtitle_cps - self.max_cps) / 10.0))
+        )
 
         scores = {
             "transcription": QcDimensionScore(
@@ -209,7 +216,9 @@ class MultiDimensionalQCEvaluator:
         }
 
         # Preset weighted overall score
-        weights = self.PRESET_WEIGHTS.get(self.preset, self.PRESET_WEIGHTS[StudioQcPreset.BROADCAST_STUDIO])
+        weights = self.PRESET_WEIGHTS.get(
+            self.preset, self.PRESET_WEIGHTS[StudioQcPreset.BROADCAST_STUDIO]
+        )
         overall = round(sum(d.score * weights[k] for k, d in scores.items()), 2)
         overall_severity = self._determine_severity(overall)
 
@@ -217,7 +226,9 @@ class MultiDimensionalQCEvaluator:
         repair_actions: list[AutoRepairAction] = []
 
         if timing_fit < self.blocking_threshold:
-            recommendations.append("Timing duration mismatch: apply WSOLA time-stretching or adjust speed ratio")
+            recommendations.append(
+                "Timing duration mismatch: apply WSOLA time-stretching or adjust speed ratio"
+            )
             repair_actions.append(
                 AutoRepairAction(
                     action_id=Identifier(f"fix_timing_{utterance_id}"),
@@ -229,7 +240,9 @@ class MultiDimensionalQCEvaluator:
             )
 
         if loudness_score < self.blocking_threshold:
-            recommendations.append(f"Loudness deviation ({integrated_lufs:.1f} LUFS): apply EBU R128 normalization")
+            recommendations.append(
+                f"Loudness deviation ({integrated_lufs:.1f} LUFS): apply EBU R128 normalization"
+            )
             repair_actions.append(
                 AutoRepairAction(
                     action_id=Identifier(f"fix_loudness_{utterance_id}"),
@@ -241,7 +254,9 @@ class MultiDimensionalQCEvaluator:
             )
 
         if cps_score < self.blocking_threshold:
-            recommendations.append(f"Subtitle reading speed ({subtitle_cps:.1f} CPS) exceeds target: condense translation text")
+            recommendations.append(
+                f"Subtitle reading speed ({subtitle_cps:.1f} CPS) exceeds target: condense translation text"
+            )
             repair_actions.append(
                 AutoRepairAction(
                     action_id=Identifier(f"fix_subtitle_{utterance_id}"),
@@ -253,7 +268,9 @@ class MultiDimensionalQCEvaluator:
             )
 
         if lipsync_score < self.blocking_threshold:
-            recommendations.append("Visual lip-sync artifact: check visual QC fallback or force preview tier")
+            recommendations.append(
+                "Visual lip-sync artifact: check visual QC fallback or force preview tier"
+            )
             repair_actions.append(
                 AutoRepairAction(
                     action_id=Identifier(f"fix_lipsync_{utterance_id}"),

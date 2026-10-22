@@ -66,7 +66,7 @@ def test_multi_dimensional_qc_evaluator() -> None:
         voice_quality=0.85,
         lipsync_score=0.80,
         integrated_lufs=-12.0,  # Loudness deviation
-        subtitle_cps=25.0,     # Too fast
+        subtitle_cps=25.0,  # Too fast
     )
     assert report_bad.overall_score < 0.85
     assert len(report_bad.actionable_recommendations) > 0
@@ -164,9 +164,19 @@ def test_dag_invalidation_fine_grained() -> None:
     graph = InvalidationGraph()
 
     # Build DAG: Translation -> Voice -> Timing -> LipSync -> Mix -> Export
-    n_trans = DependencyNode(key="trans_1", stage=ArtifactStage.TRANSLATION, localization_id="bn", utterance_id="u1")
-    n_voice = DependencyNode(key="voice_1", stage=ArtifactStage.VOICE, localization_id="bn", utterance_id="u1", character_id="char_hero")
-    n_timing = DependencyNode(key="timing_1", stage=ArtifactStage.TIMING, localization_id="bn", utterance_id="u1")
+    n_trans = DependencyNode(
+        key="trans_1", stage=ArtifactStage.TRANSLATION, localization_id="bn", utterance_id="u1"
+    )
+    n_voice = DependencyNode(
+        key="voice_1",
+        stage=ArtifactStage.VOICE,
+        localization_id="bn",
+        utterance_id="u1",
+        character_id="char_hero",
+    )
+    n_timing = DependencyNode(
+        key="timing_1", stage=ArtifactStage.TIMING, localization_id="bn", utterance_id="u1"
+    )
     n_lipsync = DependencyNode(key="lipsync_1", stage=ArtifactStage.LIPSYNC, shot_id="shot_1")
     n_mix = DependencyNode(key="mix_1", stage=ArtifactStage.MIX)
     n_music = DependencyNode(key="music_track", stage=ArtifactStage.STEMS)
@@ -230,12 +240,23 @@ def test_master_media_exporter(tmp_path) -> None:
         ebu_r128_normalize=True,
         target_lufs=-24.0,
         audio_tracks=[
-            AudioStreamTrack(track_index=0, language_code="en", title="Original Audio", file_path="orig_audio.wav"),
-            AudioStreamTrack(track_index=1, language_code="bn", title="Bengali Dub", file_path="bn_dub.wav"),
+            AudioStreamTrack(
+                track_index=0,
+                language_code="en",
+                title="Original Audio",
+                file_path="orig_audio.wav",
+            ),
+            AudioStreamTrack(
+                track_index=1, language_code="bn", title="Bengali Dub", file_path="bn_dub.wav"
+            ),
         ],
         subtitle_tracks=[
-            SubtitleStreamTrack(track_index=0, language_code="en", title="English Subtitles", file_path="en_sub.srt"),
-            SubtitleStreamTrack(track_index=1, language_code="bn", title="Bengali Subtitles", file_path="bn_sub.srt"),
+            SubtitleStreamTrack(
+                track_index=0, language_code="en", title="English Subtitles", file_path="en_sub.srt"
+            ),
+            SubtitleStreamTrack(
+                track_index=1, language_code="bn", title="Bengali Subtitles", file_path="bn_sub.srt"
+            ),
         ],
     )
 
@@ -297,7 +318,7 @@ def test_nle_interchange_serializers() -> None:
 
     # 3. Test FCPXML export
     fcpxml_str = NleInterchangeAdapter.export_fcpxml(timeline)
-    assert "<fcpxml version=\"1.9\">" in fcpxml_str
+    assert '<fcpxml version="1.9">' in fcpxml_str
     assert "asset-clip" in fcpxml_str
 
     # 4. Test Dialogue Cue Sheet CSV export

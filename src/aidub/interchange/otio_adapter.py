@@ -54,7 +54,11 @@ class OTIOTimelineAdapter:
         Serialize OTIOTimeline to JSON string.
         """
         data = timeline.model_dump()
-        logger.info("otio_adapter: exported OTIO timeline '%s' with %d tracks", timeline.name, len(timeline.tracks))
+        logger.info(
+            "otio_adapter: exported OTIO timeline '%s' with %d tracks",
+            timeline.name,
+            len(timeline.tracks),
+        )
         return json.dumps(data, indent=2)
 
     def import_otio_json(self, raw_json: str) -> OTIOTimeline:
@@ -63,7 +67,11 @@ class OTIOTimelineAdapter:
         """
         data = json.loads(raw_json)
         timeline = OTIOTimeline.model_validate(data)
-        logger.info("otio_adapter: imported OTIO timeline '%s' (%d tracks)", timeline.name, len(timeline.tracks))
+        logger.info(
+            "otio_adapter: imported OTIO timeline '%s' (%d tracks)",
+            timeline.name,
+            len(timeline.tracks),
+        )
         return timeline
 
 

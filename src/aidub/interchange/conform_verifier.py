@@ -46,8 +46,7 @@ class NLEConformVerifier:
         pid = Identifier(project_id)
         passed = timecode_drift_ms < 5.0 and audio_sample_drift < 48
         logger.info(
-            "conform_verifier: audited NLE conform for %s against %s "
-            "(Drift: %.2f ms, Passed: %s)",
+            "conform_verifier: audited NLE conform for %s against %s (Drift: %.2f ms, Passed: %s)",
             pid,
             target_nle,
             timecode_drift_ms,

@@ -42,6 +42,7 @@ def get_real_ram_bytes() -> tuple[int, int]:
     """Return (used_bytes, total_bytes) of physical memory using OS APIs."""
     if sys.platform == "win32":
         try:
+
             class MEMORYSTATUSEX(ctypes.Structure):
                 _fields_ = [
                     ("dwLength", ctypes.c_ulong),
@@ -54,6 +55,7 @@ def get_real_ram_bytes() -> tuple[int, int]:
                     ("ullAvailVirtual", ctypes.c_ulonglong),
                     ("sullAvailExtendedVirtual", ctypes.c_ulonglong),
                 ]
+
             stat = MEMORYSTATUSEX()
             stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
             if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat)):
@@ -61,13 +63,14 @@ def get_real_ram_bytes() -> tuple[int, int]:
                 avail = int(stat.ullAvailPhys)
                 used = max(0, total - avail)
                 return used, total
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug("Win32 memory status check fallback: %s", exc)
 
     try:
-        import psutil  # type: ignore[import-not-found] # noqa: PLC0415
+        import psutil  # type: ignore[import-not-found]
+
         mem = psutil.virtual_memory()
-    except (ImportError, Exception) as exc:  # noqa: BLE001
+    except (ImportError, Exception) as exc:
         logger.debug("psutil check fallback: %s", exc)
     else:
         return mem.used, mem.total
@@ -83,7 +86,7 @@ def get_real_gpu_telemetry() -> tuple[str, int, float, float]:
     nvidia_smi = shutil.which("nvidia-smi")
     if nvidia_smi:
         try:
-            output = subprocess.check_output(  # noqa: S603
+            output = subprocess.check_output(
                 [
                     nvidia_smi,
                     "--query-gpu=name,utilization.gpu,memory.used,memory.total",
@@ -105,7 +108,8 @@ def get_real_gpu_telemetry() -> tuple[str, int, float, float]:
             logger.debug("nvidia-smi telemetry probe failed: %s", exc)
 
     try:
-        import torch  # type: ignore[import-not-found] # noqa: PLC0415
+        import torch  # type: ignore[import-not-found]
+
         if torch.cuda.is_available():
             gpu_name = torch.cuda.get_device_name(0)
             props = torch.cuda.get_device_properties(0)
@@ -114,7 +118,7 @@ def get_real_gpu_telemetry() -> tuple[str, int, float, float]:
             vram_used_gb = round((total_bytes - free_bytes) / (1024**3), 1)
             pct = int((vram_used_gb / max(0.1, vram_total_gb)) * 100)
             return gpu_name, pct, vram_used_gb, vram_total_gb
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug("PyTorch CUDA telemetry probe fallback: %s", exc)
 
     return "Unavailable", 0, 0.0, 0.0
@@ -126,7 +130,7 @@ def probe_system_telemetry(target_dir: Path | str | None = None) -> SystemTeleme
     cpu_cores = os.cpu_count() or 0
     cpu_usage_pct = 0.0
     try:
-        import psutil  # type: ignore[import-not-found]  # noqa: PLC0415
+        import psutil  # type: ignore[import-not-found]
 
         cpu_usage_pct = float(psutil.cpu_percent(interval=None))
     except ImportError:
@@ -143,21 +147,22 @@ def probe_system_telemetry(target_dir: Path | str | None = None) -> SystemTeleme
         usage = shutil.disk_usage(check_path)
         disk_free_gb = round(usage.free / (1024**3), 1)
         disk_total_gb = round(usage.total / (1024**3), 1)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug("Storage check fallback: %s", exc)
         disk_free_gb, disk_total_gb = 0.0, 0.0
 
     loaded_models_count = 0
     models_summary = "No models currently loaded in VRAM"
     try:
-        from aidub.infrastructure.model_manager import (  # type: ignore[import-not-found] # noqa: PLC0415
+        from aidub.infrastructure.model_manager import (  # type: ignore[import-not-found]
             ModelManager,
         )
+
         manager = ModelManager.get_instance()  # type: ignore[attr-defined]
         loaded_models_count = len(manager.loaded_models)
         if loaded_models_count > 0:
             models_summary = ", ".join(manager.loaded_models.keys())
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug("Model manager check fallback: %s", exc)
 
     return SystemTelemetryReport(

@@ -16,19 +16,17 @@ class PipelineConfig:
     tgt_lang: str = "bn"
     work_dir: Path | None = None
 
-    # Pipeline mode flags
-    mode: str = "auto"          # "auto" | "dub" | "nodub"
+    # Stages that have real pipeline implementations.
     dub: bool = True
     keep_music: bool = True
     diarize: bool = True
-    captions: bool = False
-    ctx_translate: bool = False
+    lipsync: bool = False
+    lipsync_tier: str = "preview_fast"
 
-    # Models & Synthesis
+    # Configured analysis and speech providers.
     asr_model: str = "large-v3"
-    tts_model: str = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
-    voice_mode: str = "clone"   # "clone" | "autocast" | "auto" | "voice"
     voice_name: str | None = None
+    character_voices: dict[str, str] | None = None
     max_stretch: float = 2.0
 
 

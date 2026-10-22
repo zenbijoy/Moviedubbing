@@ -6,11 +6,8 @@ import tempfile
 import time
 from pathlib import Path
 
-import pytest
-
 from aidub.subtitles.encoding import detect_and_read_subtitle_file
-from aidub.subtitles.exporter import SubtitleExporter
-from aidub.subtitles.models import DialogueSegment, SubtitleTrack
+from aidub.subtitles.models import DialogueSegment
 from aidub.subtitles.repository import SubtitleRepository
 from aidub.subtitles.services import SubtitleService
 from aidub.subtitles.srt_parser import SRTParser, ms_to_srt_timestamp, srt_timestamp_to_ms
@@ -115,7 +112,9 @@ def test_utf8_bom_and_encodings():
 def test_validator_overlaps_and_warnings():
     segs = [
         DialogueSegment(subtitle_index=1, start_ms=1000, end_ms=4000, original_text="Seg 1"),
-        DialogueSegment(subtitle_index=2, start_ms=3000, end_ms=6000, original_text="Seg 2"), # Overlaps
+        DialogueSegment(
+            subtitle_index=2, start_ms=3000, end_ms=6000, original_text="Seg 2"
+        ),  # Overlaps
     ]
     report = SubtitleValidator.validate_segments(segs, movie_duration_ms=5000)
     assert report.overlap_count == 1
@@ -142,7 +141,6 @@ def test_large_srt_performance():
 
     assert len(segs) == 10000
     assert dur < 2.0  # Must parse 10,000 segments in under 2 seconds!
-    print(f"Parsed 10,000 SRT segments in {dur:.3f}s")
 
 
 def test_export_and_repository():
@@ -153,7 +151,7 @@ def test_export_and_repository():
         srt_path = Path(tmpdir) / "test.srt"
         srt_path.write_text("1\n00:00:01,000 --> 00:00:04,000\nHello Test\n", encoding="utf-8")
 
-        track, summary = service.import_subtitle_file(srt_path)
+        _track, summary = service.import_subtitle_file(srt_path)
         assert summary.segment_count == 1
         assert summary.format == "SRT"
 

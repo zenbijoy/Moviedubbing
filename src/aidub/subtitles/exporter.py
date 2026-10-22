@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+
 from aidub.subtitles.models import SubtitleTrack
 from aidub.subtitles.srt_parser import ms_to_srt_timestamp
 
@@ -81,7 +82,11 @@ class SubtitleExporter:
         for i, seg in enumerate(sorted_segs, start=1):
             start_ts = ms_to_srt_timestamp(seg.start_ms).replace(",", ".")
             end_ts = ms_to_srt_timestamp(seg.end_ms).replace(",", ".")
-            text = seg.translated_text if (use_translated and seg.translated_text) else seg.original_text
+            text = (
+                seg.translated_text
+                if (use_translated and seg.translated_text)
+                else seg.original_text
+            )
 
             lines.append(f"{i}")
             lines.append(f"{start_ts} --> {end_ts}")

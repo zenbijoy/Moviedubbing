@@ -16,7 +16,9 @@ from pydantic import ValidationError
 from aidub import __version__
 from aidub.application import OpenedProject, ProjectPackageError, ProjectPackageService
 from aidub.diagnostics import (
+    DubbingDiagnosticReport,
     SystemDiagnosticReport,
+    collect_dubbing_diagnostics,
     collect_system_diagnostics,
     render_human_diagnostics,
 )
@@ -112,7 +114,7 @@ def _run_desktop(
     *,
     locale: str | None = None,
 ) -> int:
-    from aidub.ui.application import run_desktop  # noqa: PLC0415 - optional dependency boundary.
+    from aidub.ui.application import run_desktop
 
     return run_desktop(argv, locale=locale)
 
@@ -126,6 +128,9 @@ class CliDependencies:
     """Injectable application seams used by command handlers and tests."""
 
     diagnostics_collector: Callable[[], SystemDiagnosticReport] = collect_system_diagnostics
+    dubbing_diagnostics_collector: Callable[[], DubbingDiagnosticReport] = (
+        collect_dubbing_diagnostics
+    )
     project_service: ProjectService = field(
         default_factory=lambda: ProjectPackageService(
             catalog=ProjectCatalog(default_catalog_path())
@@ -268,6 +273,30 @@ def _handle_doctor(
     stdout: TextIO,
     _stderr: TextIO,
 ) -> int:
+    if getattr(arguments, "dubbing", False):
+        dub_report = dependencies.dubbing_diagnostics_collector()
+        if arguments.output_json:
+            payload = {
+                "all_passed": dub_report.all_passed,
+                "checks": [
+                    {
+                        "detail": c.detail,
+                        "fix": c.fix,
+                        "name": c.name,
+                        "ok": c.ok,
+                    }
+                    for c in dub_report.checks
+                ],
+                "passed_count": dub_report.passed_count,
+                "total_count": dub_report.total_count,
+            }
+            _write_json(stdout, payload)
+        else:
+            stdout.write(f"{dub_report.render()}\n")
+        if arguments.require_runtime and not dub_report.all_passed:
+            return EXIT_RUNTIME_UNAVAILABLE
+        return EXIT_OK
+
     report = dependencies.diagnostics_collector()
     if arguments.output_json:
         _write_json(stdout, report.as_dict())
@@ -454,8 +483,12 @@ def _handle_dub(
     _stderr: TextIO,
 ) -> int:
     from dataclasses import asdict
+
     from aidub.pipeline.config import PipelineConfig
     from aidub.pipeline.engine import DubbingEngine
+
+    if getattr(arguments, "overwrite", False) and arguments.output.is_file():
+        arguments.output.unlink()
 
     cfg = PipelineConfig(
         input=arguments.input,
@@ -464,6 +497,11 @@ def _handle_dub(
         tgt_lang=arguments.target_lang,
         work_dir=arguments.work_dir,
         keep_music=arguments.keep_music,
+        diarize=arguments.diarize,
+        lipsync=getattr(arguments, "lipsync", False),
+        lipsync_tier=getattr(arguments, "lipsync_tier", "preview_fast"),
+        asr_model=arguments.asr_model,
+        voice_name=arguments.voice_name,
     )
 
     engine = DubbingEngine(cfg)
@@ -473,6 +511,8 @@ def _handle_dub(
         _write_json(stdout, asdict(outputs))
     else:
         stdout.write(f"Successfully generated dubbed video: {outputs.dubbed_video}\n")
+        if outputs.lipsynced_video:
+            stdout.write(f"Lip-synced video: {outputs.lipsynced_video}\n")
         stdout.write(f"Bilingual SRT: {outputs.bilingual_srt}\n")
 
     return EXIT_OK
@@ -484,7 +524,7 @@ CommandHandler = Callable[
 ]
 
 
-def build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
+def build_parser() -> argparse.ArgumentParser:
     """Build the public CLI grammar without resolving optional dependencies."""
 
     parser = argparse.ArgumentParser(
@@ -496,6 +536,11 @@ def build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
 
     doctor = commands.add_parser("doctor", help="inspect local runtime readiness")
     doctor.add_argument("--json", action="store_true", dest="output_json")
+    doctor.add_argument(
+        "--dubbing",
+        action="store_true",
+        help="inspect readiness of end-to-end dubbing pipeline dependencies",
+    )
     doctor.add_argument(
         "--require-runtime",
         action="store_true",
@@ -537,11 +582,52 @@ def build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
 
     dub = commands.add_parser("dub", help="execute end-to-end AI movie dubbing engine")
     dub.add_argument("--input", "-i", type=Path, required=True, help="input media file path")
-    dub.add_argument("--output", "-o", type=Path, required=True, help="output dubbed video MP4 path")
-    dub.add_argument("--target-lang", "-t", default="bn", help="target language code (default: bn for Bengali)")
-    dub.add_argument("--source-lang", "-s", default="auto", help="source language code (default: auto)")
+    dub.add_argument(
+        "--output", "-o", type=Path, required=True, help="output dubbed video MP4 path"
+    )
+    dub.add_argument(
+        "--target-lang", "-t", default="bn", help="target language code (default: bn for Bengali)"
+    )
+    dub.add_argument(
+        "--source-lang", "-s", default="auto", help="source language code (default: auto)"
+    )
     dub.add_argument("--work-dir", type=Path, help="temporary work directory for checkpoints")
-    dub.add_argument("--no-music", action="store_false", dest="keep_music", help="disable background music track retention")
+    dub.add_argument(
+        "--asr-model", default="large-v3", help="Faster-Whisper model size (default: large-v3)"
+    )
+    dub.add_argument("--voice-name", help="optional Edge TTS voice name")
+    dub.add_argument(
+        "--no-music",
+        action="store_false",
+        dest="keep_music",
+        help="disable background music track retention",
+    )
+    dub.add_argument(
+        "--no-diarization",
+        action="store_false",
+        dest="diarize",
+        default=True,
+        help="disable PyAnnote speaker diarization; one configured target voice will be used",
+    )
+    dub.add_argument(
+        "--lipsync",
+        action="store_true",
+        default=False,
+        help="enable AI lip-sync synthesis for face-matching dialogue animation",
+    )
+    dub.add_argument(
+        "--lipsync-tier",
+        choices=["preview_fast", "cinema_quality"],
+        default="preview_fast",
+        help="lip-sync rendering tier: preview_fast (MuseTalk) or cinema_quality (LatentSync)",
+    )
+    dub.add_argument(
+        "--overwrite",
+        "--force",
+        action="store_true",
+        dest="overwrite",
+        help="overwrite existing output file if present",
+    )
     dub.add_argument("--json", action="store_true", dest="output_json")
     dub.set_defaults(handler=_handle_dub)
 
@@ -614,7 +700,7 @@ def main(
     except (MediaProbeError, ProjectPackageError, ValidationError, OSError, ValueError) as error:
         errors.write(f"error: {error}\n")
         return EXIT_FAILURE
-    except Exception as error:  # noqa: BLE001 - final console boundary must not emit a traceback.
+    except Exception as error:
         errors.write(f"error: {type(error).__name__}: {error}\n")
         return EXIT_FAILURE
 

@@ -42,23 +42,20 @@ if _QT:
         completed = Signal(object)
 
         def run(self) -> None:
-            from aidub.infrastructure.system_telemetry import (  # noqa: PLC0415
+            from aidub.infrastructure.system_telemetry import (
                 probe_system_telemetry,
             )
 
             self.completed.emit(probe_system_telemetry(Path.cwd()))
 
-
     class _HomeDashboardPanel(QFrame):
         """Home overview dashboard for project selection, hardware stats, and navigation."""
 
-        def __init__(self, window: "AIDubStudioWindow") -> None:
+        def __init__(self, window: AIDubStudioWindow) -> None:
             super().__init__(window)
             self._window = window
             self.setObjectName("HomeDashboardPanel")
-            self.setStyleSheet(
-                "QFrame#HomeDashboardPanel{background:#0D1118;color:#F7F9FC;}"
-            )
+            self.setStyleSheet("QFrame#HomeDashboardPanel{background:#0D1118;color:#F7F9FC;}")
 
             layout = QVBoxLayout(self)
             layout.setContentsMargins(40, 30, 40, 30)
@@ -73,9 +70,7 @@ if _QT:
             h_layout = QVBoxLayout(hero)
             title = QLabel("AI MOVIE DUBBING STUDIO", hero)
             title.setStyleSheet("font-size:24px;font-weight:900;color:#F7F9FC;letter-spacing:1px;")
-            subtitle = QLabel(
-                "Local-First Professional Multilingual Editorial Workstation", hero
-            )
+            subtitle = QLabel("Local-First Professional Multilingual Editorial Workstation", hero)
             subtitle.setStyleSheet("font-size:13px;color:#9CA3AF;margin-top:4px;")
             h_layout.addWidget(title)
             h_layout.addWidget(subtitle)
@@ -122,7 +117,8 @@ if _QT:
             c2_t = QLabel("🎬  Timeline Editor", c2)
             c2_t.setStyleSheet("font-size:15px;font-weight:700;color:#F7F9FC;")
             c2_d = QLabel(
-                "Multi-track editorial workspace with dual monitor, inspector, waveform, and AI overlay.", c2
+                "Multi-track editorial workspace with dual monitor, inspector, waveform, and AI overlay.",
+                c2,
             )
             c2_d.setWordWrap(True)
             c2_d.setStyleSheet("font-size:12px;color:#9CA3AF;margin-top:6px;")
@@ -169,11 +165,10 @@ if _QT:
             layout.addLayout(cards_layout)
             layout.addStretch()
 
-
     class _StudioChrome(QFrame):
         """Frameless title/menu bar matching the production reference."""
 
-        def __init__(self, window: "AIDubStudioWindow") -> None:
+        def __init__(self, window: AIDubStudioWindow) -> None:
             super().__init__(window)
             self._window = window
             self.setFixedHeight(42)
@@ -188,9 +183,7 @@ if _QT:
             logo = QLabel("AI", self)
             logo.setFixedWidth(24)
             logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            logo.setStyleSheet(
-                "color:#A970FF;font-size:18px;font-weight:900;letter-spacing:-2px;"
-            )
+            logo.setStyleSheet("color:#A970FF;font-size:18px;font-weight:900;letter-spacing:-2px;")
             layout.addWidget(logo)
             self.app_label = QLabel("AI DUBBING STUDIO", self)
             self.app_label.setFixedWidth(144)
@@ -274,7 +267,9 @@ if _QT:
             vram_used = float(getattr(report, "vram_used_gb", 0.0))
             vram_total = float(getattr(report, "vram_total_gb", 0.0))
             gpu_name = str(getattr(report, "gpu_name", "Unavailable"))
-            self.gpu_label.setText(f"GPU  {gpu_usage}%" if gpu_name != "Unavailable" else "GPU  N/A")
+            self.gpu_label.setText(
+                f"GPU  {gpu_usage}%" if gpu_name != "Unavailable" else "GPU  N/A"
+            )
             self.gpu_label.setStyleSheet(
                 "color:#63D46E;font-size:11px;font-weight:700;"
                 if gpu_name != "Unavailable"
@@ -282,9 +277,7 @@ if _QT:
             )
             self.gpu_label.setToolTip(gpu_name)
             self.vram_label.setText(
-                f"VRAM  {vram_used:.1f} / {vram_total:.1f} GB"
-                if vram_total > 0
-                else "VRAM  N/A"
+                f"VRAM  {vram_used:.1f} / {vram_total:.1f} GB" if vram_total > 0 else "VRAM  N/A"
             )
             self.vram_label.setStyleSheet(
                 "color:#57A5F8;font-size:11px;font-weight:700;"
@@ -326,11 +319,11 @@ if _QT:
         ) -> None:
             super().__init__(parent)
             if locale_service is None:
-                from aidub.i18n import LocaleService  # noqa: PLC0415
+                from aidub.i18n import LocaleService
 
                 locale_service = LocaleService()
 
-            from aidub.ui.screens.timeline_editor import TimelineScreen  # noqa: PLC0415
+            from aidub.ui.screens.timeline_editor import TimelineScreen
 
             self._locale_service = locale_service
             self._unsubscribe_locale = self._locale_service.subscribe(self._apply_locale)
@@ -379,9 +372,9 @@ if _QT:
             self.studio.import_media_dialog()
 
         def _run_hardware_wizard(self) -> None:
-            from PySide6.QtWidgets import QDialog  # noqa: PLC0415
+            from PySide6.QtWidgets import QDialog
 
-            from aidub.ui.first_run_wizard import FirstRunHardwareWizardWidget  # noqa: PLC0415
+            from aidub.ui.first_run_wizard import FirstRunHardwareWizardWidget
 
             dialog = QDialog(self)
             dialog.setWindowTitle("Hardware Setup & Self-Test")
@@ -410,28 +403,77 @@ if _QT:
                 self.studio.import_media_dialog,
                 "Ctrl+O",
             )
+            self._add_action(
+                file_menu,
+                "Import Source Subtitles (SRT/VTT)…",
+                self.studio.import_subtitle_dialog,
+                "Ctrl+Shift+I",
+            )
+            self._add_action(
+                file_menu,
+                "Import Target Subtitles (SRT/VTT)…",
+                lambda: self.studio.import_subtitle_dialog(target=True),
+            )
+            self._add_action(
+                file_menu,
+                "Import Bilingual Subtitles (SRT/VTT)…",
+                self.studio.import_bilingual_subtitle_dialog,
+            )
+            self._add_action(
+                file_menu,
+                "Import Audio Track…",
+                self.studio.import_audio_dialog,
+            )
+            file_menu.addSeparator()
+            self._add_action(
+                file_menu,
+                "Export Dubbed Master Video…",
+                self.studio.export_dubbed_video,
+                "Ctrl+E",
+            )
+            self._add_action(
+                file_menu,
+                "Export Source Subtitles (SRT)…",
+                lambda: self.studio.export_subtitles_dialog(target=False),
+            )
+            self._add_action(
+                file_menu,
+                "Export Target Subtitles (SRT)…",
+                lambda: self.studio.export_subtitles_dialog(target=True),
+            )
+            self._add_action(
+                file_menu,
+                "Export Bilingual Subtitles (SRT)…",
+                lambda: self.studio.export_subtitles_dialog(bilingual=True),
+            )
+            self._add_action(
+                file_menu,
+                "Export Current Frame…",
+                self.studio.export_snapshot,
+                "Ctrl+Shift+E",
+            )
             file_menu.addSeparator()
             self._add_action(file_menu, "Exit", self.close, "Alt+F4")
 
             edit_menu = menu_bar.addMenu("Edit")
             self._add_action(
                 edit_menu,
-                "Command Palette…",
-                self._open_command_palette,
-                "Ctrl+K",
-            )
-            edit_menu.addSeparator()
-            self._add_action(
-                edit_menu,
                 "Undo",
-                getattr(self.studio, "undo", lambda: None),
+                self.studio.undo,
                 "Ctrl+Z",
             )
             self._add_action(
                 edit_menu,
                 "Redo",
-                getattr(self.studio, "redo", lambda: None),
+                self.studio.redo,
                 "Ctrl+Y",
+            )
+            edit_menu.addSeparator()
+            self._add_action(
+                edit_menu,
+                "Command Palette…",
+                self._open_command_palette,
+                "Ctrl+K",
             )
             edit_menu.addSeparator()
             self._add_action(
@@ -453,9 +495,25 @@ if _QT:
             clip_menu = menu_bar.addMenu("Clip")
             self._add_action(
                 clip_menu,
+                "Auto-Detect Movie Characters",
+                self.studio.auto_detect_characters,
+            )
+            self._add_action(
+                clip_menu,
                 "Regenerate Selected Voice",
                 self.studio.regenerate_selected_voice,
             )
+            self._add_action(
+                clip_menu,
+                "Character & Speaker Manager…",
+                self.studio._open_character_manager,
+            )
+            self._add_action(
+                clip_menu,
+                "Audio Analysis & Speech Tools…",
+                self.studio._open_audio_analysis,
+            )
+            clip_menu.addSeparator()
             self._add_action(
                 clip_menu,
                 "Play / Pause",
@@ -492,6 +550,17 @@ if _QT:
                 "Cancel Active Job",
                 self.studio.cancel_active_job,
                 "Esc",
+            )
+            sequence_menu.addSeparator()
+            self._add_action(
+                sequence_menu,
+                "Subtitle Quality Control (QC)…",
+                self.studio._run_subtitle_qc,
+            )
+            self._add_action(
+                sequence_menu,
+                "Dubbing Pipeline Readiness…",
+                self.studio._show_pipeline_readiness,
             )
 
             markers_menu = menu_bar.addMenu("Markers")
@@ -563,8 +632,8 @@ if _QT:
             self._add_action(help_menu, "About", self._show_about)
 
         def _open_command_palette(self) -> None:
-            from aidub.ui.command_palette import CommandPaletteDialog  # noqa: PLC0415
-            from aidub.ui.commands import Command, CommandRegistry  # noqa: PLC0415
+            from aidub.ui.command_palette import CommandPaletteDialog
+            from aidub.ui.commands import Command, CommandRegistry
 
             registry = CommandRegistry()
             registry.register_many(
@@ -609,9 +678,9 @@ if _QT:
             dialog.exec()
 
         def _set_theme(self, mode_name: str) -> None:
-            from PySide6.QtWidgets import QApplication  # noqa: PLC0415
+            from PySide6.QtWidgets import QApplication
 
-            from aidub.ui.theme import (  # noqa: PLC0415
+            from aidub.ui.theme import (
                 ThemeMode,
                 build_enterprise_stylesheet,
                 get_theme_tokens,

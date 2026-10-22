@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from enum import StrEnum
+from typing import Any
 
 from pydantic import Field
 
@@ -15,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 class VocalizationKind(StrEnum):
     """Non-verbal vocalizations injected alongside or replacing dialogue."""
+
     BREATH = "breath"
     SIGH = "sigh"
     GASP = "gasp"
@@ -26,6 +28,7 @@ class VocalizationKind(StrEnum):
 
 class VocalizationMarker(ContractModel):
     """A non-verbal vocalization annotation on an utterance."""
+
     utterance_id: Identifier
     kind: VocalizationKind
     position_ms: int = Field(ge=0, description="Offset from utterance start in ms")
@@ -34,6 +37,7 @@ class VocalizationMarker(ContractModel):
 
 class PerformanceEdit(ContractModel):
     """An atomic performance parameter override for a single utterance."""
+
     utterance_id: Identifier
     emotion_label: str = Field(default="", max_length=64)
     emotion_intensity: float = Field(default=0.5, ge=0.0, le=1.0)
@@ -66,9 +70,7 @@ class PerformanceService:
         Raises ValueError if the utterance is LOCKED.
         """
         if utterance.status == UtteranceStatus.LOCKED:
-            raise ValueError(
-                f"utterance {utterance.utterance_id!r} is LOCKED and cannot be edited"
-            )
+            raise ValueError(f"utterance {utterance.utterance_id!r} is LOCKED and cannot be edited")
         if edit.utterance_id != utterance.utterance_id:
             raise ValueError(
                 f"edit targets {edit.utterance_id!r} but utterance is {utterance.utterance_id!r}"
@@ -129,12 +131,12 @@ class PerformanceService:
             }
         )
 
-    def build_synthesis_overrides(self, utterance: Utterance) -> dict:
+    def build_synthesis_overrides(self, utterance: Utterance) -> dict[str, Any]:
         """
         Serialize current performance parameters into a synthesis payload dict.
         Used by TTS workers to apply all performance overrides.
         """
-        overrides: dict = {}
+        overrides: dict[str, Any] = {}
         if utterance.emotion is not None:
             overrides["emotion"] = utterance.emotion.label
             overrides["emotion_intensity"] = utterance.emotion.intensity

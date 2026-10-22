@@ -78,7 +78,7 @@ class SubtitleCue(ContractModel):
     @property
     def max_line_length(self) -> int:
         lines = self.text.splitlines()
-        return max((len(l) for l in lines), default=0)
+        return max((len(line) for line in lines), default=0)
 
 
 class SubtitleQcReport(ContractModel):
@@ -126,68 +126,89 @@ class SubtitleQcEngine:
 
             # Empty text
             if not cue.text.strip():
-                violations.append(QcViolation(
-                    cue_index=idx, cue_id=cue_id,
-                    kind=QcViolationKind.EMPTY_TEXT,
-                    message=f"Cue {cue_id} has empty text",
-                ))
+                violations.append(
+                    QcViolation(
+                        cue_index=idx,
+                        cue_id=cue_id,
+                        kind=QcViolationKind.EMPTY_TEXT,
+                        message=f"Cue {cue_id} has empty text",
+                    )
+                )
 
             # Line length
             max_line = cue.max_line_length
             if max_line > cfg.max_chars_per_line:
-                violations.append(QcViolation(
-                    cue_index=idx, cue_id=cue_id,
-                    kind=QcViolationKind.LINE_TOO_LONG,
-                    message=f"Cue {cue_id}: longest line {max_line} chars exceeds max {cfg.max_chars_per_line}",
-                ))
+                violations.append(
+                    QcViolation(
+                        cue_index=idx,
+                        cue_id=cue_id,
+                        kind=QcViolationKind.LINE_TOO_LONG,
+                        message=f"Cue {cue_id}: longest line {max_line} chars exceeds max {cfg.max_chars_per_line}",
+                    )
+                )
 
             # Reading speed
             dur_s = cue.duration_s
             if dur_s > 0:
                 cps = cue.char_count / dur_s
                 if cps > cfg.max_reading_speed_cps:
-                    violations.append(QcViolation(
-                        cue_index=idx, cue_id=cue_id,
-                        kind=QcViolationKind.READING_SPEED_EXCEEDED,
-                        message=f"Cue {cue_id}: {cps:.1f} chars/sec exceeds max {cfg.max_reading_speed_cps:.0f}",
-                    ))
+                    violations.append(
+                        QcViolation(
+                            cue_index=idx,
+                            cue_id=cue_id,
+                            kind=QcViolationKind.READING_SPEED_EXCEEDED,
+                            message=f"Cue {cue_id}: {cps:.1f} chars/sec exceeds max {cfg.max_reading_speed_cps:.0f}",
+                        )
+                    )
 
             # Duration
             if dur_s < cfg.min_duration_s:
-                violations.append(QcViolation(
-                    cue_index=idx, cue_id=cue_id,
-                    kind=QcViolationKind.DURATION_TOO_SHORT,
-                    message=f"Cue {cue_id}: {dur_s:.2f}s below min {cfg.min_duration_s:.1f}s",
-                ))
+                violations.append(
+                    QcViolation(
+                        cue_index=idx,
+                        cue_id=cue_id,
+                        kind=QcViolationKind.DURATION_TOO_SHORT,
+                        message=f"Cue {cue_id}: {dur_s:.2f}s below min {cfg.min_duration_s:.1f}s",
+                    )
+                )
             elif dur_s > cfg.max_duration_s:
-                violations.append(QcViolation(
-                    cue_index=idx, cue_id=cue_id,
-                    kind=QcViolationKind.DURATION_TOO_LONG,
-                    message=f"Cue {cue_id}: {dur_s:.2f}s exceeds max {cfg.max_duration_s:.1f}s",
-                ))
+                violations.append(
+                    QcViolation(
+                        cue_index=idx,
+                        cue_id=cue_id,
+                        kind=QcViolationKind.DURATION_TOO_LONG,
+                        message=f"Cue {cue_id}: {dur_s:.2f}s exceeds max {cfg.max_duration_s:.1f}s",
+                    )
+                )
 
             # Overlap and gap checks against previous cue
             if idx > 0:
                 prev = cues[idx - 1]
                 if cue.start_ms < prev.end_ms:
-                    violations.append(QcViolation(
-                        cue_index=idx, cue_id=cue_id,
-                        kind=QcViolationKind.OVERLAPPING_CUES,
-                        message=(
-                            f"Cue {cue_id} starts at {cue.start_ms}ms but previous cue "
-                            f"ends at {prev.end_ms}ms (overlap {prev.end_ms - cue.start_ms}ms)"
-                        ),
-                    ))
+                    violations.append(
+                        QcViolation(
+                            cue_index=idx,
+                            cue_id=cue_id,
+                            kind=QcViolationKind.OVERLAPPING_CUES,
+                            message=(
+                                f"Cue {cue_id} starts at {cue.start_ms}ms but previous cue "
+                                f"ends at {prev.end_ms}ms (overlap {prev.end_ms - cue.start_ms}ms)"
+                            ),
+                        )
+                    )
                 elif (cue.start_ms - prev.end_ms) < cfg.min_gap_ms:
-                    violations.append(QcViolation(
-                        cue_index=idx, cue_id=cue_id,
-                        kind=QcViolationKind.GAP_TOO_SHORT,
-                        message=(
-                            f"Cue {cue_id}: gap {cue.start_ms - prev.end_ms}ms to previous cue "
-                            f"is below minimum {cfg.min_gap_ms}ms"
-                        ),
-                        severity="warning",
-                    ))
+                    violations.append(
+                        QcViolation(
+                            cue_index=idx,
+                            cue_id=cue_id,
+                            kind=QcViolationKind.GAP_TOO_SHORT,
+                            message=(
+                                f"Cue {cue_id}: gap {cue.start_ms - prev.end_ms}ms to previous cue "
+                                f"is below minimum {cfg.min_gap_ms}ms"
+                            ),
+                            severity="warning",
+                        )
+                    )
 
         error_count = sum(1 for v in violations if v.severity == "error")
         warning_count = sum(1 for v in violations if v.severity == "warning")
@@ -196,7 +217,10 @@ class SubtitleQcEngine:
         if violations:
             logger.warning(
                 "subtitle_qc: %s — %d error(s), %d warning(s) across %d cues",
-                track_id, error_count, warning_count, len(cues),
+                track_id,
+                error_count,
+                warning_count,
+                len(cues),
             )
 
         return SubtitleQcReport(

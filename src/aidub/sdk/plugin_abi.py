@@ -6,13 +6,13 @@ Extensible C/Python API contract for custom AI models, audio DSP filters, and cu
 
 from __future__ import annotations
 
-import logging
-
 from pydantic import Field
 
 from aidub.contracts.base import ContractModel, Identifier
 
-logger = logging.getLogger(__name__)
+
+class PluginLoaderUnavailableError(RuntimeError):
+    """Raised when no isolated plugin loader/runtime is configured."""
 
 
 class PluginManifest(ContractModel):
@@ -31,13 +31,17 @@ class NLEPluginSDK:
 
     def load_plugin(self, manifest: PluginManifest) -> bool:
         """
-        Load third-party plugin extension.
+        Reject plugin loading until a real isolated runtime is configured.
         """
-        logger.info("plugin_sdk: loaded extension '%s' v%s (%s)", manifest.name, manifest.version, manifest.plugin_id)
-        return True
+        del manifest
+        raise PluginLoaderUnavailableError(
+            "Plugin loading is unavailable: no ABI-compatible isolated plugin runtime is "
+            "configured. No extension was loaded."
+        )
 
 
 __all__ = [
     "NLEPluginSDK",
+    "PluginLoaderUnavailableError",
     "PluginManifest",
 ]

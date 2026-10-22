@@ -22,7 +22,9 @@ from aidub.contracts.base import ContractModel, Identifier
 logger = logging.getLogger(__name__)
 
 SECRET_PATTERNS = [
-    re.compile(r"(?i)(api[_-]?key|secret|token|password|auth|bearer)\s*[:=]\s*['\"]?([^\s'\"]+)['\"]?"),
+    re.compile(
+        r"(?i)(api[_-]?key|secret|token|password|auth|bearer)\s*[:=]\s*['\"]?([^\s'\"]+)['\"]?"
+    ),
     re.compile(r"sk-[a-zA-Z0-9]{32,}"),
     re.compile(r"bearer\s+[a-zA-Z0-9\._\-]{20,}", re.IGNORECASE),
 ]
@@ -55,7 +57,9 @@ class SupportBundleGenerator:
             for m in matches:
                 full_match = m.group(0)
                 if ":" in full_match or "=" in full_match:
-                    prefix = full_match.split("=")[0] if "=" in full_match else full_match.split(":")[0]
+                    prefix = (
+                        full_match.split("=")[0] if "=" in full_match else full_match.split(":")[0]
+                    )
                     redacted_text = redacted_text.replace(full_match, f"{prefix}=REDACTED_SECRET")
                 else:
                     redacted_text = redacted_text.replace(full_match, "REDACTED_SECRET")
@@ -95,7 +99,9 @@ class SupportBundleGenerator:
             # 2. Environment Variables (Sanitized)
             env_dict = dict(os.environ)
             sanitized_env = {
-                k: "REDACTED_SECRET" if any(s in k.lower() for s in ["key", "secret", "pass", "token"]) else v
+                k: "REDACTED_SECRET"
+                if any(s in k.lower() for s in ["key", "secret", "pass", "token"])
+                else v
                 for k, v in env_dict.items()
             }
             env_str, r_count = self.redact_sensitive_text(json.dumps(sanitized_env, indent=2))
@@ -113,7 +119,11 @@ class SupportBundleGenerator:
                     zf.writestr(f"logs/{p.name}", clean_content)
                     file_count += 1
 
-        logger.info("support_bundle: created diagnostic bundle %s with %d redactions", zip_path, total_redactions)
+        logger.info(
+            "support_bundle: created diagnostic bundle %s with %d redactions",
+            zip_path,
+            total_redactions,
+        )
 
         return SupportBundleResult(
             bundle_id=bundle_id,

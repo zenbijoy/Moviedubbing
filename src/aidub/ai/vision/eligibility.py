@@ -125,7 +125,10 @@ class LipSyncEligibilityEvaluator:
             )
 
         # 3D Head Pose angle evaluation
-        if abs(head_yaw_deg) > self.max_yaw_angle_deg or abs(head_pitch_deg) > self.max_pitch_angle_deg:
+        if (
+            abs(head_yaw_deg) > self.max_yaw_angle_deg
+            or abs(head_pitch_deg) > self.max_pitch_angle_deg
+        ):
             return EligibilityScore(
                 shot_id=sid,
                 face_track_id=face_track.track_id,

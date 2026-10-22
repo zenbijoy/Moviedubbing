@@ -19,13 +19,13 @@ from typing import NamedTuple
 
 
 class EditToolMode(StrEnum):
-    SELECT = "select"       # V
-    BLADE = "blade"         # B
-    TRIM = "trim"           # T
-    RIPPLE = "ripple"       # R
-    ROLL = "roll"           # N/A
-    SLIP = "slip"           # Y
-    SLIDE = "slide"         # U
+    SELECT = "select"  # V
+    BLADE = "blade"  # B
+    TRIM = "trim"  # T
+    RIPPLE = "ripple"  # R
+    ROLL = "roll"  # N/A
+    SLIP = "slip"  # Y
+    SLIDE = "slide"  # U
 
 
 class ShortcutAction(StrEnum):
@@ -36,11 +36,11 @@ class ShortcutAction(StrEnum):
     SPLIT_PLAYHEAD = "timeline.split_playhead"
     TOGGLE_SNAPPING = "timeline.toggle_snapping"
     SHUTTLE_REVERSE = "playback.shuttle_reverse"  # J
-    SHUTTLE_PAUSE = "playback.shuttle_pause"      # K
+    SHUTTLE_PAUSE = "playback.shuttle_pause"  # K
     SHUTTLE_FORWARD = "playback.shuttle_forward"  # L
-    PLAY_PAUSE = "playback.play_pause"            # Space
-    COMMAND_PALETTE = "ui.command_palette"        # Ctrl+K
-    RIPPLE_DELETE = "timeline.ripple_delete"      # Shift+Delete / Shift+R
+    PLAY_PAUSE = "playback.play_pause"  # Space
+    COMMAND_PALETTE = "ui.command_palette"  # Ctrl+K
+    RIPPLE_DELETE = "timeline.ripple_delete"  # Shift+Delete / Shift+R
 
 
 class KeyboardShortcut(NamedTuple):

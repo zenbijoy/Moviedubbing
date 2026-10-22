@@ -81,7 +81,7 @@ class ShortcutEditor:
         profile = CustomShortcutProfile(
             name=profile_name,
             base_nle_profile=self._manager.profile,
-            bindings={k: v for k, v in self._manager._map.items()},
+            bindings=dict(self._manager._map),
         )
         path = Path(file_path)
         path.parent.mkdir(parents=True, exist_ok=True)

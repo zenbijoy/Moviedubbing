@@ -11,8 +11,10 @@ Features:
 from __future__ import annotations
 
 import logging
+import math
 from enum import StrEnum
 
+import numpy as np
 from pydantic import Field
 
 from aidub.contracts.base import ContractModel
@@ -47,9 +49,7 @@ class SidechainDucker:
         self.settings = settings or DuckingSettings()
         self._current_reduction_db: float = 0.0
 
-    def compute_ducking_gain(
-        self, dialogue_peak_dbfs: float
-    ) -> float:
+    def compute_ducking_gain(self, dialogue_peak_dbfs: float) -> float:
         """
         Calculate ducking linear gain factor (0.0 to 1.0) based on dialogue level.
         """
@@ -62,11 +62,38 @@ class SidechainDucker:
             target_reduction = s.duck_reduction_db
             self._current_reduction_db = max(self._current_reduction_db, target_reduction)
         else:
-            # Release reduction
-            self._current_reduction_db = max(0.0, self._current_reduction_db - 1.0)
+            # Release reduction with exponential decay factor
+            decay = math.exp(-30.0 / max(10.0, s.release_ms))
+            self._current_reduction_db = max(0.0, self._current_reduction_db * decay)
 
         linear_gain = 10.0 ** (-self._current_reduction_db / 20.0)
         return round(linear_gain, 4)
+
+    def duck_buffers(
+        self,
+        music_samples: np.ndarray,
+        vocal_samples: np.ndarray,
+        sample_rate: int = 44100,
+    ) -> np.ndarray:
+        """
+        Vectorized audio buffer ducking applying exponential attack/release envelope.
+        """
+        s = self.settings
+        if not s.enabled or music_samples.size == 0 or vocal_samples.size == 0:
+            return music_samples.copy()
+
+        from aidub.media.dsp_engine import VectorizedDspEngine
+
+        dsp = VectorizedDspEngine()
+        return dsp.process_dynamic_ducking(
+            music_samples=music_samples,
+            vocal_samples=vocal_samples,
+            threshold_db=s.threshold_dbfs,
+            duck_db=s.duck_reduction_db,
+            attack_ms=s.attack_ms,
+            release_ms=s.release_ms,
+            sample_rate=sample_rate,
+        )
 
 
 class MasterBusRouter(ContractModel):

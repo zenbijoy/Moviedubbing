@@ -15,7 +15,9 @@ from aidub.speech.runtime import RecognitionRuntime
 logger = logging.getLogger(__name__)
 
 
-def run_lipsync_render(parameters: dict[str, Any], runtime: RecognitionRuntime | None = None) -> dict[str, Any]:
+def run_lipsync_render(
+    parameters: dict[str, Any], runtime: RecognitionRuntime | None = None
+) -> dict[str, Any]:
     """
     Execute AI lip-sync synthesis for a shot video segment.
 
@@ -41,7 +43,7 @@ def run_lipsync_render(parameters: dict[str, Any], runtime: RecognitionRuntime |
     options = LipSyncOptions(quality_tier=quality_tier)
 
     if quality_tier == LipSyncQualityTier.CINEMA_QUALITY:
-        engine = LatentSyncLipSyncEngine()
+        engine: LatentSyncLipSyncEngine | MuseTalkLipSyncEngine = LatentSyncLipSyncEngine()
     else:
         engine = MuseTalkLipSyncEngine()
 

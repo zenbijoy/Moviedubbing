@@ -25,11 +25,11 @@ class DesktopApplication:
         locale: str | None = None,
     ) -> None:
         require_pyside6()
-        from PySide6.QtCore import QCoreApplication  # noqa: PLC0415
-        from PySide6.QtGui import QFont  # noqa: PLC0415
-        from PySide6.QtWidgets import QApplication  # noqa: PLC0415
+        from PySide6.QtCore import QCoreApplication
+        from PySide6.QtGui import QFont
+        from PySide6.QtWidgets import QApplication
 
-        from .studio_window import AIDubStudioWindow  # noqa: PLC0415
+        from .studio_window import AIDubStudioWindow
 
         existing = QApplication.instance()
         self.application = existing or QApplication(list(argv) if argv is not None else sys.argv)

@@ -11,8 +11,9 @@ Features:
 
 from __future__ import annotations
 
-import re
 import logging
+import re
+
 from aidub.subtitles.models import DialogueSegment
 from aidub.subtitles.parser_base import SubtitleParser
 
@@ -25,7 +26,9 @@ _SRT_TIMESTAMP_RE = re.compile(
 )
 
 # Stutter / Hesitation regex patterns
-_STUTTER_RE = re.compile(r"\b(\w+)[…\.]{1,3}\s*\1\b|\b\w{1,3}[…\.]{1,3}\s*\w{1,3}[…\.]{1,3}", re.IGNORECASE | re.UNICODE)
+_STUTTER_RE = re.compile(
+    r"\b(\w+)[…\.]{1,3}\s*\1\b|\b\w{1,3}[…\.]{1,3}\s*\w{1,3}[…\.]{1,3}", re.IGNORECASE | re.UNICODE
+)
 _HESITATION_RE = re.compile(r"[…\.]{2,}|uh|um|er|ah|ha…|ha\.\.\.", re.IGNORECASE | re.UNICODE)
 
 # Multi-speaker line prefix regex (hyphens / dashes)
@@ -59,8 +62,7 @@ def ms_to_srt_timestamp(ms: int) -> str:
     Example:
         ms_to_srt_timestamp(80500) -> "00:01:20,500"
     """
-    if ms < 0:
-        ms = 0
+    ms = max(ms, 0)
     total_seconds, milliseconds = divmod(ms, 1000)
     minutes, seconds = divmod(total_seconds, 60)
     hours, minutes = divmod(minutes, 60)
@@ -117,8 +119,18 @@ class SRTParser(SubtitleParser):
                 logger.warning("Failed to parse SRT timestamp line: '%s'", ts_line)
                 continue
 
-            h, m, s, ms_val = int(match.group("h")), int(match.group("m")), int(match.group("s")), int(match.group("ms"))
-            eh, em, es, ems_val = int(match.group("eh")), int(match.group("em_")), int(match.group("es")), int(match.group("ems"))
+            h, m, s, ms_val = (
+                int(match.group("h")),
+                int(match.group("m")),
+                int(match.group("s")),
+                int(match.group("ms")),
+            )
+            eh, em, es, ems_val = (
+                int(match.group("eh")),
+                int(match.group("em_")),
+                int(match.group("es")),
+                int(match.group("ems")),
+            )
 
             start_ms = (h * 3600 + m * 60 + s) * 1000 + ms_val
             end_ms = (eh * 3600 + em * 60 + es) * 1000 + ems_val
@@ -134,12 +146,21 @@ class SRTParser(SubtitleParser):
                 continue
 
             # Stutter & hesitation detection
-            has_hesitation = bool(_STUTTER_RE.search(clean_text) or _HESITATION_RE.search(clean_text))
-            speech_style = "stutter" if _STUTTER_RE.search(clean_text) else ("hesitation" if has_hesitation else None)
+            has_hesitation = bool(
+                _STUTTER_RE.search(clean_text) or _HESITATION_RE.search(clean_text)
+            )
+            speech_style = (
+                "stutter"
+                if _STUTTER_RE.search(clean_text)
+                else ("hesitation" if has_hesitation else None)
+            )
 
             # Multi-speaker hyphen detection
             hyphen_matches = _MULTI_SPEAKER_RE.findall(raw_text)
-            possible_multi_speaker = len(hyphen_matches) >= 2 or (len(text_lines) >= 2 and any(l.startswith("-") or l.startswith("–") or l.startswith("—") for l in text_lines))
+            possible_multi_speaker = len(hyphen_matches) >= 2 or (
+                len(text_lines) >= 2
+                and any(line.startswith(("-", "–", "—")) for line in text_lines)
+            )
             speaker_count_est = max(1, len(hyphen_matches)) if possible_multi_speaker else 1
 
             segment = DialogueSegment(
@@ -161,4 +182,4 @@ class SRTParser(SubtitleParser):
         return segments
 
 
-__all__ = ["SRTParser", "srt_timestamp_to_ms", "ms_to_srt_timestamp"]
+__all__ = ["SRTParser", "ms_to_srt_timestamp", "srt_timestamp_to_ms"]

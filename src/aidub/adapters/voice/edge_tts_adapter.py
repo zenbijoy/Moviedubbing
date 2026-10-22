@@ -11,14 +11,14 @@ from aidub.adapters.voice_base import (
     SynthesisResult,
     VoiceEngineKind,
 )
-from aidub.media.ffmpeg_ops import _run, duration
+from aidub.media.ffmpeg_ops import _ffmpeg_exe, _run, duration
 
 logger = logging.getLogger(__name__)
 
 # Bengali Neural Voices
 BENGALI_VOICES = {
     "female_bd": "bn-BD-NabanitaNeural",
-    "male_bd":   "bn-BD-PradeepNeural",
+    "male_bd": "bn-BD-PradeepNeural",
     "female_in": "bn-IN-TanishaaNeural",
 }
 
@@ -33,6 +33,27 @@ _LANGUAGE_VOICES = {
     "de": "de-DE-KatjaNeural",
     "ja": "ja-JP-NanamiNeural",
 }
+
+
+def default_voice_for_language(language: str) -> str:
+    """Return a supported Edge voice for a language or fail instead of guessing."""
+    language_code = language.split("-", maxsplit=1)[0].split("_", maxsplit=1)[0].lower()
+    try:
+        return _LANGUAGE_VOICES[language_code]
+    except KeyError as exc:
+        supported = ", ".join(sorted(_LANGUAGE_VOICES))
+        raise ValueError(
+            f"No default Edge voice is configured for {language!r}. Supported language codes: "
+            f"{supported}."
+        ) from exc
+
+
+def available_voices_for_language(language: str) -> tuple[str, ...]:
+    """List configured voices for a language without inventing a fallback."""
+    language_code = language.split("-", maxsplit=1)[0].split("_", maxsplit=1)[0].lower()
+    if language_code == "bn":
+        return tuple(BENGALI_VOICES.values())
+    return (default_voice_for_language(language_code),)
 
 
 class EdgeTTSAdapter:
@@ -73,23 +94,39 @@ class EdgeTTSAdapter:
         out_p.parent.mkdir(parents=True, exist_ok=True)
         v = voice or self.voice_name
 
-        try:
-            import edge_tts  # type: ignore[import-not-found]
+        import edge_tts  # type: ignore[import-not-found]
+        import time
 
-            async def _run_synth() -> None:
-                communicate = edge_tts.Communicate(text, v, rate=rate, pitch=pitch)
-                await communicate.save(str(out_p))
+        max_retries = 4
+        last_exc: Exception | None = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                async def _run_synth() -> None:
+                    communicate = edge_tts.Communicate(text, v, rate=rate, pitch=pitch)
+                    await communicate.save(str(out_p))
 
-            asyncio.run(_run_synth())
-            if not out_p.is_file() or out_p.stat().st_size == 0:
-                raise RuntimeError("Edge TTS returned no audio")
-            return out_p
-        except Exception as exc:
-            out_p.unlink(missing_ok=True)
-            logger.exception("Edge TTS synthesis failed")
-            raise RuntimeError(
-                "Edge TTS synthesis failed; install edge-tts and verify network access"
-            ) from exc
+                asyncio.run(_run_synth())
+                if out_p.is_file() and out_p.stat().st_size > 0:
+                    return out_p
+                raise RuntimeError("Edge TTS returned empty audio")
+            except Exception as exc:
+                last_exc = exc
+                out_p.unlink(missing_ok=True)
+                if attempt < max_retries:
+                    logger.warning(
+                        "Edge TTS synthesis attempt %d failed (%s); retrying in %.1fs...",
+                        attempt,
+                        exc,
+                        attempt * 1.5,
+                    )
+                    time.sleep(attempt * 1.5)
+                else:
+                    logger.exception("Edge TTS synthesis failed after %d attempts", max_retries)
+                    raise RuntimeError(
+                        f"Edge TTS synthesis failed after {max_retries} attempts ({last_exc}); verify network access"
+                    ) from last_exc
+
+        return out_p
 
 
 class EdgeTTSVoiceEngine:
@@ -103,7 +140,7 @@ class EdgeTTSVoiceEngine:
         output_root = Path(output_dir)
         output_root.mkdir(parents=True, exist_ok=True)
         language = str(request.language).split("-", maxsplit=1)[0].lower()
-        voice = _LANGUAGE_VOICES.get(language, "en-US-JennyNeural")
+        voice = default_voice_for_language(language)
         mp3_path = output_root / f"{request.utterance_id}_{request.seed}.mp3"
         wav_path = output_root / f"{request.utterance_id}_{request.seed}.wav"
         rate_percent = round((request.pace_multiplier - 1.0) * 100)
@@ -117,7 +154,7 @@ class EdgeTTSVoiceEngine:
         try:
             _run(
                 [
-                    "ffmpeg",
+                    _ffmpeg_exe(),
                     "-y",
                     "-i",
                     str(mp3_path),
@@ -146,4 +183,6 @@ __all__ = [
     "DEFAULT_BENGALI_VOICE",
     "EdgeTTSAdapter",
     "EdgeTTSVoiceEngine",
+    "available_voices_for_language",
+    "default_voice_for_language",
 ]

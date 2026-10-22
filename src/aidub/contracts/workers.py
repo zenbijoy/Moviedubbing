@@ -9,6 +9,17 @@ from pydantic import Field
 
 from .base import ContractModel, HealthState, Identifier, utc_now
 
+__all__ = [
+    "ContractModel",
+    "HealthState",
+    "Identifier",
+    "ProtocolVersion",
+    "WorkerCapability",
+    "WorkerHandshake",
+    "WorkerHeartbeat",
+    "utc_now",
+]
+
 
 class WorkerCapability(StrEnum):
     MEDIA_PROBE = "media_probe"

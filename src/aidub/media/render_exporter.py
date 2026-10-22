@@ -160,7 +160,10 @@ class MasterMediaExporter:
             else:
                 args.extend(["-c:s", "srt"])
 
-        out_path = Path(options.output_directory) / f"{options.output_filename}.{options.container_format.value}"
+        out_path = (
+            Path(options.output_directory)
+            / f"{options.output_filename}.{options.container_format.value}"
+        )
         args.append(str(out_path))
 
         return args
@@ -177,7 +180,10 @@ class MasterMediaExporter:
         pid = Identifier(project_id)
         cmd_args = self.build_ffmpeg_args(source_video_path, options)
 
-        out_path = Path(options.output_directory) / f"{options.output_filename}.{options.container_format.value}"
+        out_path = (
+            Path(options.output_directory)
+            / f"{options.output_filename}.{options.container_format.value}"
+        )
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
         required_inputs = [Path(source_video_path)]

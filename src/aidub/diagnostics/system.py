@@ -181,7 +181,7 @@ def _media_runtime_diagnostic(
 ) -> MediaRuntimeDiagnostic:
     try:
         info = runtime.inspect(timeout_seconds=5.0)
-    except Exception as error:  # noqa: BLE001 - diagnostics must survive native process failures.
+    except Exception as error:
         return MediaRuntimeDiagnostic(
             operational=False,
             ffmpeg=_located_binary("ffmpeg", finder),
@@ -200,7 +200,7 @@ def _media_runtime_diagnostic(
 def _localization_diagnostic(repository: CatalogInspector) -> LocalizationDiagnostic:
     try:
         locales = repository.available_locales()
-    except Exception as error:  # noqa: BLE001 - a malformed resource must not break doctor.
+    except Exception as error:
         return LocalizationDiagnostic(
             available=False,
             directory=str(repository.directory),
@@ -220,7 +220,7 @@ def _desktop_diagnostic(
     version_resolver: Callable[[str], str],
 ) -> DesktopDiagnostic:
     if available is None:
-        from aidub.ui.qt_support import (  # noqa: PLC0415 - optional native dependency boundary.
+        from aidub.ui.qt_support import (
             PYSIDE6_AVAILABLE,
             desktop_dependency_message,
         )
@@ -234,7 +234,7 @@ def _desktop_diagnostic(
         version = version_resolver("PySide6")
     except importlib.metadata.PackageNotFoundError:
         version = None
-    except Exception as resolver_error:  # noqa: BLE001 - package metadata can be vendor-provided.
+    except Exception as resolver_error:
         version = None
         if error is None:
             error = _safe_error(resolver_error)

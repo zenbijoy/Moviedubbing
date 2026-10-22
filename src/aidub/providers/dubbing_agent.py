@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class DubbingAgent:
     """
     Autonomous agentic dubbing coordinator.
-    
+
     Loops over dialogue segments, planning tool usage (translation, QC, fitting,
     glossary extraction), observing execution output, and refining results until
     quality thresholds are met.
@@ -82,7 +82,11 @@ class DubbingAgent:
 
         for iteration in range(self._max_iterations):
             if state.all_segments_pass(self._quality_threshold):
-                logger.info("Dubbing Agent achieved quality threshold (%.2f) at iteration %d", state.pass_rate, iteration)
+                logger.info(
+                    "Dubbing Agent achieved quality threshold (%.2f) at iteration %d",
+                    state.pass_rate,
+                    iteration,
+                )
                 break
 
             system_prompt = self._build_system_prompt()
@@ -112,28 +116,31 @@ class DubbingAgent:
 
             try:
                 result = self._tools.execute(tool_name, tool_args)
-                state.iteration_history.append({
-                    "iteration": iteration,
-                    "action": tool_name,
-                    "args": tool_args,
-                    "result_summary": str(result)[:300],
-                })
+                state.iteration_history.append(
+                    {
+                        "iteration": iteration,
+                        "action": tool_name,
+                        "args": tool_args,
+                        "result_summary": str(result)[:300],
+                    }
+                )
                 self._apply_tool_result_to_state(state, tool_name, tool_args, result)
             except Exception as exc:
                 logger.error("Agent tool execution error (%s): %s", tool_name, exc)
-                state.iteration_history.append({
-                    "iteration": iteration,
-                    "action": tool_name,
-                    "error": str(exc),
-                })
+                state.iteration_history.append(
+                    {
+                        "iteration": iteration,
+                        "action": tool_name,
+                        "error": str(exc),
+                    }
+                )
 
         return state
 
     def _build_system_prompt(self) -> str:
         tools_schema = self._tools.get_tools_schema_openai()
         tools_desc = "\n".join(
-            f"- {t['function']['name']}: {t['function']['description']}"
-            for t in tools_schema
+            f"- {t['function']['name']}: {t['function']['description']}" for t in tools_schema
         )
         return (
             "You are an AI Dubbing Agent producing a high-quality localized film dubbing.\n"
@@ -148,7 +155,7 @@ class DubbingAgent:
     def _build_user_prompt(self, state: AgentState, iteration: int) -> str:
         untranslated = [s for s in state.segments if not s.target_text]
         unverified = [s for s in state.segments if s.target_text and not s.passed_qc]
-        
+
         status_summary = (
             f"Iteration {iteration}/{self._max_iterations}\n"
             f"Total Segments: {state.total_segments}\n"

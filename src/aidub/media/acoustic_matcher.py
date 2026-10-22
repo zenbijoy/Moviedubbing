@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 from enum import StrEnum
+from typing import Any
 
 from pydantic import Field
 
@@ -40,7 +41,7 @@ class AcousticSceneProfile(ContractModel):
 
 # ── Room Preset Definitions ───────────────────────────────────────────────────
 
-_ROOM_PRESETS: dict[RoomPreset, dict] = {
+_ROOM_PRESETS: dict[RoomPreset, dict[str, Any]] = {
     RoomPreset.STUDIO_CLEAN: {
         "noise_floor_dbfs": -70.0,
         "rt60_seconds": 0.15,
@@ -119,7 +120,7 @@ class AcousticMatcher:
             filters.append("highpass=f=300,lowpass=f=3400")
         elif profile.preset == RoomPreset.LARGE_HALL:
             # Multi-tap echo for hall reverberation
-            filters.append(f"aecho=0.8:0.88:{delay}|{delay*2}:{decay}|{decay*0.5}")
+            filters.append(f"aecho=0.8:0.88:{delay}|{delay * 2}:{decay}|{decay * 0.5}")
         elif decay > 0.05:
             filters.append(f"aecho=0.8:0.88:{delay}:{decay}")
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Sequence
+from typing import Any
 
 from pydantic import Field
 
@@ -71,7 +72,9 @@ class FaceBoundingBox(ContractModel):
             return 0.0
         if len(self.feature_embedding) != len(other.feature_embedding):
             return 0.0
-        dot = sum(a * b for a, b in zip(self.feature_embedding, other.feature_embedding))
+        dot = sum(
+            a * b for a, b in zip(self.feature_embedding, other.feature_embedding, strict=True)
+        )
         norm_a = math.sqrt(sum(a * a for a in self.feature_embedding))
         norm_b = math.sqrt(sum(b * b for b in other.feature_embedding))
         if norm_a == 0.0 or norm_b == 0.0:
@@ -192,7 +195,9 @@ class FaceTracker:
 
                     # Include ReID embedding score if available
                     reid_score = face.embedding_similarity(last_box)
-                    composite_score = 0.7 * iou_val + 0.3 * reid_score if reid_score > 0 else iou_val
+                    composite_score = (
+                        0.7 * iou_val + 0.3 * reid_score if reid_score > 0 else iou_val
+                    )
 
                     if composite_score > best_score:
                         best_score = composite_score
@@ -229,6 +234,38 @@ class FaceTracker:
         tracks = list(active_tracks.values())
         logger.info("face_tracker: created %d face tracks for shot %s", len(tracks), shot_id)
         return tracks
+
+    def track_faces_with_shot_boundaries(
+        self,
+        shot_boundaries: Sequence[Any],
+        frame_detections: Sequence[FrameFaceDetection],
+    ) -> list[FaceTrack]:
+        """
+        Shot-aware multi-face tracker.
+        Segments frame detections across camera shot cuts, resetting Kalman prediction
+        and trajectory smoothing at each cut point to eliminate visual warping across scene cuts.
+        """
+        if not shot_boundaries:
+            return self.track_faces_in_shot("shot_001", frame_detections)
+
+        # Index detections by frame
+        det_map: dict[int, FrameFaceDetection] = {fd.frame_index: fd for fd in frame_detections}
+        all_tracks: list[FaceTrack] = []
+
+        for shot in shot_boundaries:
+            s_id = getattr(shot, "shot_id", "shot_unknown")
+            s_start = getattr(shot, "start_frame", 0)
+            s_end = getattr(shot, "end_frame", 0)
+
+            shot_dets = [
+                det_map[f] for f in range(s_start, s_end + 1) if f in det_map
+            ]
+            if shot_dets:
+                # Isolate Kalman filtering exclusively within this shot
+                shot_tracks = self.track_faces_in_shot(str(s_id), shot_dets)
+                all_tracks.extend(shot_tracks)
+
+        return all_tracks
 
 
 __all__ = [

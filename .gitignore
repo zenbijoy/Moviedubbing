@@ -42,3 +42,11 @@ opensourcemoviedubbing/
 *.flac
 *.aac
 *.db
+.env
+.env.*
+!.env.example
+*.credential
+keys.json
+*.keys.json
+/work/
+mypy_output.txt

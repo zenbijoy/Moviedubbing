@@ -71,11 +71,11 @@ class OpenAIAdapter:
         messages = _build_messages(request)
 
         kwargs: dict[str, Any] = {
-            "model":       self._model,
-            "messages":    messages,
+            "model": self._model,
+            "messages": messages,
             "temperature": request.temperature,
-            "max_tokens":  request.max_tokens,
-            "timeout":     self._timeout_s,
+            "max_tokens": request.max_tokens,
+            "timeout": self._timeout_s,
         }
         if request.json_mode:
             kwargs["response_format"] = {"type": "json_object"}
@@ -97,7 +97,7 @@ class OpenAIAdapter:
         logger.debug(
             "openai: model=%s tokens=%s/%s latency=%.0fms",
             self._model,
-            resp.usage.prompt_tokens     if resp.usage else "?",
+            resp.usage.prompt_tokens if resp.usage else "?",
             resp.usage.completion_tokens if resp.usage else "?",
             latency_ms,
         )
@@ -107,7 +107,7 @@ class OpenAIAdapter:
             provider_kind=LlmProviderKind.OPENAI,
             model_name=self._model,
             content=content,
-            input_tokens=resp.usage.prompt_tokens     if resp.usage else 0,
+            input_tokens=resp.usage.prompt_tokens if resp.usage else 0,
             output_tokens=resp.usage.completion_tokens if resp.usage else 0,
             latency_ms=round(latency_ms, 1),
         )
@@ -134,6 +134,7 @@ class OpenAIAdapter:
 
 # ── Module helpers ────────────────────────────────────────────────────────────
 
+
 def _build_messages(request: LlmRequest) -> list[dict[str, str]]:
     msgs: list[dict[str, str]] = []
     if request.system_prompt:
@@ -151,4 +152,4 @@ def _is_retryable(exc: Exception) -> bool:
     return True
 
 
-__all__ = ["OpenAIAdapter", "DEFAULT_MODEL", "OFFICIAL_BASE_URL"]
+__all__ = ["DEFAULT_MODEL", "OFFICIAL_BASE_URL", "OpenAIAdapter"]

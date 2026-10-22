@@ -30,7 +30,9 @@ class AcousticIRConvolutionEngine:
     Convolves dialogue audio bytes with room impulse responses.
     """
 
-    def apply_convolution_reverb(self, audio_bytes: bytes, profile: ImpulseResponseProfile) -> bytes:
+    def apply_convolution_reverb(
+        self, audio_bytes: bytes, profile: ImpulseResponseProfile
+    ) -> bytes:
         """
         Apply room IR convolution reverb.
         """

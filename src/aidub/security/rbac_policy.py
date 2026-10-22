@@ -34,7 +34,11 @@ class RBACPolicyEngine:
         if "director" in token.roles:
             return  # Director has full permissions
 
-        if action == PermissionAction.EXPORT_MASTER_DCP and "editor" not in token.roles and "director" not in token.roles:
+        if (
+            action == PermissionAction.EXPORT_MASTER_DCP
+            and "editor" not in token.roles
+            and "director" not in token.roles
+        ):
             raise PermissionError(f"User {token.user_id} lacks privilege for action {action}")
 
         logger.info("rbac_policy: authorized action %s for user %s", action, token.user_id)

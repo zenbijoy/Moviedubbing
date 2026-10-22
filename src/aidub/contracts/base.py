@@ -53,7 +53,9 @@ class LocaleCode(str):
     ) -> core_schema.CoreSchema:
         return core_schema.no_info_after_validator_function(
             cls,
-            core_schema.str_schema(pattern=r"^[a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-[A-Z]{2}|-[0-9]{3})?$"),
+            core_schema.str_schema(
+                pattern=r"^[a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-[A-Z]{2}|-[0-9]{3})?$"
+            ),
         )
 
 

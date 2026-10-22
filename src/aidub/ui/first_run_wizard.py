@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 import os
 import platform
-import shutil
 import time
 from enum import StrEnum
 
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Optional PySide6 import guard for headless execution environments
 try:
-    from PySide6.QtCore import Qt, Signal
+    from PySide6.QtCore import Signal
     from PySide6.QtWidgets import (
         QFormLayout,
         QGroupBox,
@@ -41,8 +40,8 @@ except ImportError:
 
 class HardwareTier(StrEnum):
     ULTRA_CUDA = "ultra_cuda"  # NVIDIA GPU with >= 12GB VRAM
-    MID_GPU = "mid_gpu"        # GPU with 4GB - 12GB VRAM or Apple Silicon
-    CPU_BASIC = "cpu_basic"    # CPU fallback mode
+    MID_GPU = "mid_gpu"  # GPU with 4GB - 12GB VRAM or Apple Silicon
+    CPU_BASIC = "cpu_basic"  # CPU fallback mode
 
 
 class SystemCapabilityReport(ContractModel):
@@ -51,10 +50,10 @@ class SystemCapabilityReport(ContractModel):
     os_name: str = Field(min_length=1)
     cpu_cores: int = Field(ge=1)
     ram_gb: float = Field(ge=0.0)
-    gpu_name: str = Field(default="NVIDIA RTX GPU (Simulated)")
+    gpu_name: str = Field(default="Unavailable")
     vram_gb: float = Field(ge=0.0)
     ffmpeg_available: bool = True
-    assigned_tier: HardwareTier = HardwareTier.ULTRA_CUDA
+    assigned_tier: HardwareTier = HardwareTier.CPU_BASIC
     recommended_concurrency: int = Field(default=4, ge=1)
 
 
@@ -71,12 +70,19 @@ class HardwareDiagnosticWizardController:
         os_str = f"{platform.system()} {platform.release()}"
 
         # Real memory & GPU hardware probing
-        from aidub.infrastructure.system_telemetry import probe_system_telemetry  # noqa: PLC0415
+        from aidub.infrastructure.system_telemetry import probe_system_telemetry
+
         report = probe_system_telemetry()
         ram_gb = report.ram_total_gb
         vram_gb = report.vram_total_gb
         gpu_name = report.gpu_name
-        ffmpeg_ok = shutil.which("ffmpeg") is not None or True
+        try:
+            from aidub.media.ffmpeg_ops import _ffmpeg_exe
+
+            _ffmpeg_exe()
+            ffmpeg_ok = True
+        except RuntimeError:
+            ffmpeg_ok = False
 
         # Assign tier
         if vram_gb >= 12.0 and ffmpeg_ok:
@@ -137,10 +143,10 @@ if PYSIDE6_AVAILABLE:
             group = QGroupBox("Autonomous First-Run Hardware Setup Wizard", self)
             form = QFormLayout(group)
 
-            self.status_label = QLabel("Click 'Start Hardware Self-Test' to begin hardware detection.", group)
+            self.status_label = QLabel("Run diagnostics to detect available hardware.", group)
             form.addRow("System Status:", self.status_label)
 
-            self.run_btn = QPushButton("Start Hardware Self-Test & Calibration", group)
+            self.run_btn = QPushButton("Run Hardware Diagnostics", group)
             self.run_btn.clicked.connect(self._on_run_diagnostic)
             form.addRow("Diagnostic Action:", self.run_btn)
 

@@ -68,7 +68,7 @@ class DistributionPackageExporter:
             )
             for token in shlex.split(template, posix=os.name != "nt")
         ]
-        process = subprocess.run(  # noqa: S603
+        process = subprocess.run(
             command,
             check=False,
             capture_output=True,
@@ -87,7 +87,9 @@ class DistributionPackageExporter:
         with expected_output.open("rb") as stream:
             return hashlib.file_digest(stream, "sha256").hexdigest()
 
-    def export_dcp_manifest(self, project_id: str, title: str, languages: Sequence[str]) -> DistributionFormat:
+    def export_dcp_manifest(
+        self, project_id: str, title: str, languages: Sequence[str]
+    ) -> DistributionFormat:
         """
         Generate Digital Cinema Package (DCP) XML CPL manifest.
         """
@@ -112,7 +114,9 @@ class DistributionPackageExporter:
             checksum_sha256=sha256,
         )
 
-    def export_broadcast_layback(self, project_id: str, channel_layout: str = "7.1_Surround") -> DistributionFormat:
+    def export_broadcast_layback(
+        self, project_id: str, channel_layout: str = "7.1_Surround"
+    ) -> DistributionFormat:
         """
         Generate multi-channel broadcast MXF/ProRes master audio layback.
         """
@@ -125,7 +129,11 @@ class DistributionPackageExporter:
             expected_output=manifest_path,
         )
 
-        logger.info("distribution_exporter: generated Broadcast MXF layback for %s (%s)", pid, channel_layout)
+        logger.info(
+            "distribution_exporter: generated Broadcast MXF layback for %s (%s)",
+            pid,
+            channel_layout,
+        )
         return DistributionFormat(
             package_id=pkg_id,
             format_type="BROADCAST_MXF",
@@ -135,7 +143,9 @@ class DistributionPackageExporter:
             checksum_sha256=sha256,
         )
 
-    def export_ott_streaming_package(self, project_id: str, languages: Sequence[str]) -> DistributionFormat:
+    def export_ott_streaming_package(
+        self, project_id: str, languages: Sequence[str]
+    ) -> DistributionFormat:
         """
         Generate HLS / DASH multi-language web streaming manifest package with WebVTT subtitles.
         """

@@ -18,8 +18,8 @@ class LlmProviderKind(StrEnum):
     OPENAI = "openai"
     DEEPSEEK = "deepseek"
     GEMINI = "gemini"
-    OPENROUTER = "openrouter"       # 100+ models via single OpenAI-compatible endpoint
-    CUSTOM = "custom"               # any unofficial / custom base-URL provider
+    OPENROUTER = "openrouter"  # 100+ models via single OpenAI-compatible endpoint
+    CUSTOM = "custom"  # any unofficial / custom base-URL provider
     OLLAMA = "ollama"
     LOCAL_LLAMACPP = "local_llamacpp"
 
@@ -69,11 +69,9 @@ class LlmAdapter(Protocol):
     """Protocol for a single LLM provider adapter."""
 
     @property
-    def provider_kind(self) -> LlmProviderKind:
-        ...
+    def provider_kind(self) -> LlmProviderKind: ...
 
-    def complete(self, request: LlmRequest) -> LlmResponse:
-        ...
+    def complete(self, request: LlmRequest) -> LlmResponse: ...
 
 
 class CircuitBreaker:
@@ -126,7 +124,7 @@ class ExponentialBackoff:
         self._multiplier = multiplier
 
     def delay_seconds(self, attempt: int) -> float:
-        delay_ms = min(self._max, self._base * (self._multiplier ** attempt))
+        delay_ms = min(self._max, self._base * (self._multiplier**attempt))
         return delay_ms / 1_000.0
 
 

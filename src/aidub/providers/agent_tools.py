@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class AgentTool:
 class DubbingAgentToolRegistry:
     """
     Registry of tools accessible by the Dubbing Agent.
-    
+
     Provides schema formatting for LLM function calling and safe tool invocation.
     """
 

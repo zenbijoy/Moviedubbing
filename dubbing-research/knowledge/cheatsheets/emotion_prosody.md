@@ -24,7 +24,7 @@ import numpy as np
 
 sound = parselmouth.Sound("source_actor_line.wav")
 pitch = sound.to_pitch(time_step=0.01)
-f0_values = pitch.selected_array['frequency']
+f0_values = pitch.selected_array["frequency"]
 
 # Intensity / Energy envelope
 intensity = sound.to_intensity(time_step=0.01)

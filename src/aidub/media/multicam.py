@@ -6,14 +6,15 @@ Provides multicam angle synchronization, nested timeline sequences, and adjustme
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Sequence
 
 from pydantic import Field
 
 from aidub.contracts.base import ContractModel, Identifier
 
-logger = logging.getLogger(__name__)
+
+class MulticamSyncUnavailableError(RuntimeError):
+    """Raised because no audio waveform synchronizer is configured."""
 
 
 class MulticamAngle(ContractModel):
@@ -31,14 +32,17 @@ class MulticamEngine:
 
     def sync_camera_angles(self, angles: Sequence[MulticamAngle]) -> dict[str, int]:
         """
-        Synchronize multicam camera angles by audio waveform alignment.
+        Reject synchronization when only angle descriptors, without audio, are supplied.
         """
-        offsets = {str(a.angle_id): 0 for a in angles}
-        logger.info("multicam: synchronized %d camera angles", len(angles))
-        return offsets
+        del angles
+        raise MulticamSyncUnavailableError(
+            "Multicam synchronization is unavailable: no audio waveform alignment backend is "
+            "configured. No zero-offset sync result was generated."
+        )
 
 
 __all__ = [
     "MulticamAngle",
     "MulticamEngine",
+    "MulticamSyncUnavailableError",
 ]

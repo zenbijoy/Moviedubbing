@@ -2,7 +2,7 @@
 Generator for Track 2 (Bangla Dubbing Atlas), Track 3 (Engineering Playbooks),
 and Synthesis (Decision Guides, Open Questions, Unverified Leads, Verification Log, BRAIN.md).
 """
-import os
+
 from pathlib import Path
 
 BASE_DIR = Path(r"c:\Users\24030\moviedubbing\Moviedubbing\dubbing-research")
@@ -12,7 +12,7 @@ KNOWLEDGE_DIR.mkdir(parents=True, exist_ok=True)
 # ---------------------------------------------------------------------------
 # Track 2: bangla_dubbing_atlas.md
 # ---------------------------------------------------------------------------
-ATLAS_MD = """# Bangla Movie Dubbing Atlas: ASR, Models, Datasets & Post-Production
+ATLAS_MD = r"""# Bangla Movie Dubbing Atlas: ASR, Models, Datasets & Post-Production
 **Date:** 2026-10-19 | **Status:** Verified Comprehensive Research Atlas  
 **Target:** AI Bengali Movie Dubbing (DubForge / Moviedubbing)
 
@@ -697,6 +697,7 @@ BRAIN_MD = """# BRAIN.md: AI Bengali Movie Dubbing Knowledge Base
 - **NEVER** deploy an automated movie dub without human-in-the-loop review of character honorifics.
 """
 
+
 def main():
     files_to_write = {
         KNOWLEDGE_DIR / "bangla_dubbing_atlas.md": ATLAS_MD,
@@ -713,7 +714,7 @@ def main():
         KNOWLEDGE_DIR / "verification_log.md": VERIFICATION_LOG_MD,
         BASE_DIR / "BRAIN.md": BRAIN_MD,
     }
-    
+
     # Also write BRAIN.md to .agents/rules/BRAIN.md and workspace root
     rules_dir = Path(r"c:\Users\24030\moviedubbing\Moviedubbing\.agents\rules")
     rules_dir.mkdir(parents=True, exist_ok=True)
@@ -725,6 +726,7 @@ def main():
         print(f"Wrote: {path}")
 
     print("\nAll Track 2, Track 3, Synthesis and BRAIN.md files generated successfully!")
+
 
 if __name__ == "__main__":
     main()

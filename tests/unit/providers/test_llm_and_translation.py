@@ -129,13 +129,15 @@ def test_validator_valid_json() -> None:
     adapter = _SyntheticLlmAdapter()
     validator = LlmResponseValidator(adapter)
 
-    valid_json = json.dumps({
-        "source_text": "Hello",
-        "translated_text": "হ্যালো",
-        "target_language": "bn-BD",
-        "duration_estimate_ms": 800,
-        "confidence": 0.95,
-    })
+    valid_json = json.dumps(
+        {
+            "source_text": "Hello",
+            "translated_text": "হ্যালো",
+            "target_language": "bn-BD",
+            "duration_estimate_ms": 800,
+            "confidence": 0.95,
+        }
+    )
 
     result = validator.validate_or_repair(
         valid_json, TranslationResult, request_id=Identifier("req-003")
@@ -201,9 +203,7 @@ def test_translation_pipeline_single_pass() -> None:
     router = LlmProviderRouter([adapter])
     pipeline = TranslationPipeline(
         router,
-        config=TranslationPipelineConfig(
-            enabled_passes=[TranslationPass.SEMANTIC_DRAFT]
-        ),
+        config=TranslationPipelineConfig(enabled_passes=[TranslationPass.SEMANTIC_DRAFT]),
     )
 
     line = DialogueLine(

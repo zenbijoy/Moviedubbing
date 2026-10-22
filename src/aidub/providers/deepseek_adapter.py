@@ -70,11 +70,11 @@ class DeepSeekAdapter:
         messages = _build_messages(request)
 
         kwargs: dict[str, Any] = {
-            "model":       self._model,
-            "messages":    messages,
+            "model": self._model,
+            "messages": messages,
             "temperature": request.temperature,
-            "max_tokens":  request.max_tokens,
-            "timeout":     self._timeout_s,
+            "max_tokens": request.max_tokens,
+            "timeout": self._timeout_s,
         }
 
         # DeepSeek supports json_object format for chat model
@@ -135,6 +135,7 @@ class DeepSeekAdapter:
 
 # ── Module helpers ────────────────────────────────────────────────────────────
 
+
 def _build_messages(request: LlmRequest) -> list[dict[str, str]]:
     msgs: list[dict[str, str]] = []
     if request.system_prompt:
@@ -152,4 +153,4 @@ def _is_retryable(exc: Exception) -> bool:
     return True
 
 
-__all__ = ["DeepSeekAdapter", "DEFAULT_MODEL", "OFFICIAL_BASE_URL"]
+__all__ = ["DEFAULT_MODEL", "OFFICIAL_BASE_URL", "DeepSeekAdapter"]

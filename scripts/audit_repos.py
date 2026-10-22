@@ -2,9 +2,9 @@
 
 import json
 import os
-import urllib.request
-import urllib.error
 import time
+import urllib.error
+import urllib.request
 
 REPOS = [
     # A1. Pipelines & apps
@@ -78,7 +78,9 @@ for repo in REPOS:
             repo_info["stars"] = data.get("stargazers_count", 0)
             repo_info["updated_at"] = data.get("updated_at", "")
             repo_info["pushed_at"] = data.get("pushed_at", "")
-            repo_info["license"] = data.get("license", {}).get("spdx_id") if data.get("license") else "None"
+            repo_info["license"] = (
+                data.get("license", {}).get("spdx_id") if data.get("license") else "None"
+            )
             repo_info["archived"] = data.get("archived", False)
             repo_info["open_issues"] = data.get("open_issues_count", 0)
             repo_info["description"] = data.get("description", "")

@@ -26,7 +26,9 @@ class ShotBoundary(ContractModel):
     end_frame: int = Field(ge=0)
     start_ms: int = Field(ge=0)
     end_ms: int = Field(ge=0)
-    cut_type: str = Field(default="hard_cut", max_length=32)  # "hard_cut", "dissolve", "fade_in_out"
+    cut_type: str = Field(
+        default="hard_cut", max_length=32
+    )  # "hard_cut", "dissolve", "fade_in_out"
     cut_confidence: float = Field(default=0.95, ge=0.0, le=1.0)
     transition_duration_ms: int = Field(default=0, ge=0)
 
@@ -72,7 +74,7 @@ class ShotDetector:
         """
         if not hist_a or not hist_b or len(hist_a) != len(hist_b):
             return 0.0
-        sum_diff = sum(abs(a - b) for a, b in zip(hist_a, hist_b))
+        sum_diff = sum(abs(a - b) for a, b in zip(hist_a, hist_b, strict=True))
         sum_total = sum(hist_a) + sum(hist_b)
         if sum_total == 0.0:
             return 0.0
@@ -140,7 +142,7 @@ class ShotDetector:
 
             shots.append(
                 ShotBoundary(
-                    shot_id=Identifier(f"shot_{i+1:04d}"),
+                    shot_id=Identifier(f"shot_{i + 1:04d}"),
                     start_frame=s_frame,
                     end_frame=e_frame,
                     start_ms=s_ms,

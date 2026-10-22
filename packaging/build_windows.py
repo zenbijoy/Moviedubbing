@@ -11,8 +11,6 @@ Automates the assembly of a standalone Windows distribution directory, bundling:
 from __future__ import annotations
 
 import logging
-import os
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 

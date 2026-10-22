@@ -7,24 +7,24 @@ a signed General Availability (GA) Release Certificate.
 
 from __future__ import annotations
 
-import logging
-
 from pydantic import Field
 
 from aidub.contracts.base import ContractModel, Identifier
 
-logger = logging.getLogger(__name__)
+
+class GACertificationUnavailableError(RuntimeError):
+    """Raised when no verified release report and signing key are configured."""
 
 
 class StudioGAReleaseCertificate(ContractModel):
     """General Availability (GA) Release Certificate container."""
 
     certificate_id: Identifier
-    system_version: str = Field(default="v2.0-GA")
-    phases_verified: int = Field(default=20, ge=20)
-    total_unit_tests_passed: int = Field(ge=650)
-    signature_sha256: str = Field(min_length=64, max_length=64)
-    status: str = Field(default="CERTIFIED_PRODUCTION_GA")
+    system_version: str = Field(min_length=1)
+    phases_verified: int = Field(ge=0)
+    total_unit_tests_passed: int = Field(ge=0)
+    report_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    status: str = Field(default="NOT_CERTIFIED")
 
 
 class StudioGACertifier:
@@ -32,17 +32,18 @@ class StudioGACertifier:
     Studio GA Certification engine.
     """
 
-    def generate_ga_certificate(self, tests_passed: int = 665) -> StudioGAReleaseCertificate:
+    def generate_ga_certificate(self) -> StudioGAReleaseCertificate:
         """
-        Generate Studio GA Release Certificate.
+        Refuse to fabricate a certificate without a signed, verified test report.
         """
-        cid = Identifier("ga_cert_v2.0")
-        sig = "0" * 64
-        logger.info("ga_certifier: GENERATED PRODUCTION GA RELEASE CERTIFICATE (Tests Passed: %d)", tests_passed)
-        return StudioGAReleaseCertificate(certificate_id=cid, total_unit_tests_passed=tests_passed, signature_sha256=sig)
+        raise GACertificationUnavailableError(
+            "GA certification is unavailable: no verified phase test report or signing key is "
+            "configured. A test count alone cannot certify a release."
+        )
 
 
 __all__ = [
+    "GACertificationUnavailableError",
     "StudioGACertifier",
     "StudioGAReleaseCertificate",
 ]

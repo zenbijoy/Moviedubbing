@@ -19,7 +19,9 @@ def make_asr_job(job_id: str) -> JobDescriptor:
         request_id=f"req_{job_id}",
         project_id=ProjectId("prj_asr_worker"),
         media_asset_id=MediaAssetId("med_audio_worker"),
-        source_audio_sha256=Sha256("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+        source_audio_sha256=Sha256(
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        ),
         language=LanguageTag("en-US"),
         full_audio_range=audio_range,
         audio_range=audio_range,

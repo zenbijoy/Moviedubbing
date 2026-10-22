@@ -17,10 +17,10 @@ from aidub.domain.speaker_embedding import SpeakerEmbedding
 
 class ReferenceQualityTier(StrEnum):
     EXCELLENT_REFERENCE = "excellent_reference"  # Score >= 90
-    GOOD_REFERENCE = "good_reference"            # Score 80 - 89
+    GOOD_REFERENCE = "good_reference"  # Score 80 - 89
     USABLE_WITH_WARNING = "usable_with_warning"  # Score 65 - 79
-    POOR_REFERENCE = "poor_reference"            # Score 50 - 64
-    REJECTED = "rejected"                        # Score < 50
+    POOR_REFERENCE = "poor_reference"  # Score 50 - 64
+    REJECTED = "rejected"  # Score < 50
 
 
 class ReferenceQualityReport(ContractModel):
@@ -43,7 +43,9 @@ class ReferenceSample(ContractModel):
 
     sample_id: Identifier
     character_id: Identifier
-    emotion_category: str = Field(default="neutral", max_length=32)  # "neutral", "angry", "sad", "whisper", "shout"
+    emotion_category: str = Field(
+        default="neutral", max_length=32
+    )  # "neutral", "angry", "sad", "whisper", "shout"
     audio_file_path: str = Field(min_length=1)
     duration_s: float = Field(gt=0.0)
     quality_report: ReferenceQualityReport
@@ -59,7 +61,9 @@ class ReferenceBank(ContractModel):
 
     def get_best_reference(self) -> ReferenceSample | None:
         """Return highest scoring non-rejected reference sample."""
-        valid = [r for r in self.references if r.quality_report.tier != ReferenceQualityTier.REJECTED]
+        valid = [
+            r for r in self.references if r.quality_report.tier != ReferenceQualityTier.REJECTED
+        ]
         if not valid:
             return None
         valid.sort(key=lambda r: r.quality_report.quality_score, reverse=True)
@@ -74,7 +78,9 @@ class CharacterVoiceProfile(ContractModel):
     display_name: str = Field(min_length=1)
     consent_authorized: bool = False
     core_embedding: SpeakerEmbedding | None = None
-    reference_banks: dict[str, ReferenceBank] = Field(default_factory=dict)  # "neutral", "angry", "sad", etc.
+    reference_banks: dict[str, ReferenceBank] = Field(
+        default_factory=dict
+    )  # "neutral", "angry", "sad", etc.
 
 
 __all__ = [

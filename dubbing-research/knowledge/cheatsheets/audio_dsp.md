@@ -26,7 +26,7 @@ import pyloudnorm as pyln
 
 # 1. High-quality time-stretch (clamped to ±8%)
 speech, sr = sf.read("dubbed_line.wav")
-target_duration = 3.2 # seconds
+target_duration = 3.2  # seconds
 stretch_factor = len(speech) / (target_duration * sr)
 clamped_factor = max(0.92, min(1.08, stretch_factor))
 

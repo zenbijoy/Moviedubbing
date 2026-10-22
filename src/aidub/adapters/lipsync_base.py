@@ -8,6 +8,7 @@ import abc
 import os
 import shlex
 import subprocess
+from collections import defaultdict
 from enum import StrEnum
 from fractions import Fraction
 from pathlib import Path
@@ -20,7 +21,7 @@ from aidub.speech.runtime import RecognitionRuntime
 
 
 class LipSyncQualityTier(StrEnum):
-    PREVIEW_FAST = "preview_fast"      # Tier 1 (e.g. MuseTalk) for rapid NLE timeline preview
+    PREVIEW_FAST = "preview_fast"  # Tier 1 (e.g. MuseTalk) for rapid NLE timeline preview
     CINEMA_QUALITY = "cinema_quality"  # Tier 2 (e.g. LatentSync) for final high-res delivery
 
 
@@ -32,7 +33,9 @@ class LipSyncOptions(ContractModel):
     device: str = Field(default="cuda", max_length=32)
     face_padding: int = Field(default=10, ge=0, le=50)
     feather_margin_px: int = Field(default=12, ge=0, le=64)
-    color_match_mode: str = Field(default="histogram", max_length=32)  # "none", "histogram", "mean_std"
+    color_match_mode: str = Field(
+        default="histogram", max_length=32
+    )  # "none", "histogram", "mean_std"
     poisson_blending: bool = True
     anti_flicker_alpha: float = Field(default=0.85, ge=0.0, le=1.0)
 
@@ -72,6 +75,7 @@ def run_configured_lipsync(
     source_video_path: str,
     target_audio_path: str,
     output_path: Path,
+    options: LipSyncOptions | None = None,
 ) -> tuple[int, int]:
     """Run a configured real model command and return measured frames/duration."""
 
@@ -85,20 +89,53 @@ def run_configured_lipsync(
     if not command_template:
         raise RuntimeError(
             f"{command_environment_variable} is not configured; set it to the installed "
-            "model command using {video}, {audio}, and {output} placeholders"
+            "model command using {video}, {audio}, and {output} placeholders. "
+            "No lip-sync output was created."
         )
+
+    opts = options or LipSyncOptions()
+    format_vars = {
+        "video": str(source_video.resolve()),
+        "audio": str(target_audio.resolve()),
+        "output": str(output_path.resolve()),
+        "fps": str(opts.fps),
+        "device": str(opts.device),
+        "face_padding": str(opts.face_padding),
+        "feather_margin_px": str(opts.feather_margin_px),
+        "color_match_mode": str(opts.color_match_mode),
+        "quality_tier": str(opts.quality_tier.value),
+        "anti_flicker_alpha": str(opts.anti_flicker_alpha),
+    }
+
+    tokens = shlex.split(command_template, posix=os.name != "nt")
+    try:
+        safe_dict = defaultdict(lambda: "", format_vars)
+        command = [token.format_map(safe_dict) for token in tokens]
+    except Exception:
+        command = []
+        for token in tokens:
+            t = token
+            for k, v in format_vars.items():
+                t = t.replace(f"{{{k}}}", v)
+            command.append(t)
+
+    # Strip enclosing quotes if shlex left them intact on Windows to prevent double-escaping
     command = [
-        token.format(
-            video=str(source_video.resolve()),
-            audio=str(target_audio.resolve()),
-            output=str(output_path.resolve()),
+        (
+            t[1:-1]
+            if (
+                len(t) >= 2
+                and ((t[0] == '"' and t[-1] == '"') or (t[0] == "'" and t[-1] == "'"))
+            )
+            else t
         )
-        for token in shlex.split(command_template, posix=os.name != "nt")
+        for t in command
     ]
+
     if not command:
         raise RuntimeError(f"{command_environment_variable} resolved to an empty command")
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    process = subprocess.run(  # noqa: S603
+    process = subprocess.run(
         command,
         check=False,
         capture_output=True,
@@ -107,9 +144,7 @@ def run_configured_lipsync(
     )
     if process.returncode != 0:
         details = (process.stderr or process.stdout)[-2_000:]
-        raise RuntimeError(
-            f"lip-sync model failed with exit code {process.returncode}: {details}"
-        )
+        raise RuntimeError(f"lip-sync model failed with exit code {process.returncode}: {details}")
     if not output_path.is_file() or output_path.stat().st_size == 0:
         raise RuntimeError("lip-sync model completed without producing a video")
 
@@ -121,8 +156,27 @@ def run_configured_lipsync(
     )
     if format_duration <= 0 or video_stream is None:
         raise RuntimeError("lip-sync output is not a valid timed video")
-    frame_rate = Fraction(str(video_stream.get("avg_frame_rate") or "0/1"))
-    rendered_frames = round(format_duration * float(frame_rate))
+
+    fps_val = opts.fps
+    for key in ("avg_frame_rate", "r_frame_rate"):
+        raw = str(video_stream.get(key) or "").strip()
+        if raw and raw not in {"0/0", "0/1", "N/A"}:
+            try:
+                frac = Fraction(raw)
+                if float(frac) > 0:
+                    fps_val = float(frac)
+                    break
+            except (ZeroDivisionError, ValueError):
+                pass
+    if fps_val <= 0:
+        raw_fps = video_stream.get("fps")
+        try:
+            if raw_fps and float(raw_fps) > 0:
+                fps_val = float(raw_fps)
+        except (ValueError, TypeError):
+            fps_val = opts.fps
+
+    rendered_frames = round(format_duration * fps_val)
     return max(1, rendered_frames), round(format_duration * 1_000)
 
 

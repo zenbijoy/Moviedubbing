@@ -31,6 +31,22 @@ class MediaRuntime:
         if binary is None:
             found = shutil.which(default_name)
             if not found:
+                candidate = (
+                    Path.home()
+                    / ".local"
+                    / "bin"
+                    / (f"{default_name}.exe" if subprocess.os.name == "nt" else default_name)
+                )
+                if candidate.is_file():
+                    found = str(candidate)
+            if not found and default_name == "ffmpeg":
+                try:
+                    import imageio_ffmpeg
+
+                    found = imageio_ffmpeg.get_ffmpeg_exe()
+                except Exception:
+                    pass
+            if not found:
                 raise FileNotFoundError(
                     f"{default_name} was not found; install or configure a supported runtime"
                 )
@@ -47,7 +63,7 @@ class MediaRuntime:
         ffprobe = self._resolve(self._ffprobe, "ffprobe")
         # The executable is resolved to an existing local file and arguments
         # are passed as a sequence; no shell parsing is involved.
-        process = subprocess.run(  # noqa: S603
+        process = subprocess.run(
             [str(ffmpeg), "-version"],
             check=False,
             capture_output=True,

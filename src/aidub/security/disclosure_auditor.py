@@ -35,7 +35,11 @@ class DataDisclosureAuditor:
         Audit disclosure records for compliance.
         """
         compliant = all(not r.retained_by_provider for r in records)
-        logger.info("disclosure_auditor: audited %d disclosure records (Compliant: %s)", len(records), compliant)
+        logger.info(
+            "disclosure_auditor: audited %d disclosure records (Compliant: %s)",
+            len(records),
+            compliant,
+        )
         return compliant
 
 

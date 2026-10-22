@@ -39,9 +39,9 @@ results = [{"start": s.start, "end": s.end, "text": s.text} for s in segments]
 
 # 2. Force Align Word Timestamps with WhisperX
 align_model, align_metadata = whisperx.load_align_model(
-    language_code="bn", 
+    language_code="bn",
     device=device,
-    model_name="ai4bharat/indicwav2vec-hindi" # or bengali phoneme model
+    model_name="ai4bharat/indicwav2vec-hindi",  # or bengali phoneme model
 )
 aligned_result = whisperx.align(results, align_model, align_metadata, audio_file, device)
 

@@ -38,6 +38,7 @@ class SubtitleParser(ABC):
             (segments, detected_encoding_name)
         """
         from aidub.subtitles.encoding import detect_and_read_subtitle_file
+
         text, encoding = detect_and_read_subtitle_file(file_path)
         segments = self.parse_text(text)
         return segments, encoding

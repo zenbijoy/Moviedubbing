@@ -157,8 +157,7 @@ class AgenticStudioState(DomainModel):
     @property
     def is_complete(self) -> bool:
         return all(
-            item.status in {StageStatus.SUCCEEDED, StageStatus.SKIPPED}
-            for item in self.stages
+            item.status in {StageStatus.SUCCEEDED, StageStatus.SKIPPED} for item in self.stages
         )
 
     def stage(self, stage: AutomationStage) -> AutomationStageState:
@@ -205,9 +204,7 @@ class AgenticStudioState(DomainModel):
             update={
                 "status": status,
                 "progress": (
-                    100
-                    if status in {StageStatus.SUCCEEDED, StageStatus.SKIPPED}
-                    else progress
+                    100 if status in {StageStatus.SUCCEEDED, StageStatus.SKIPPED} else progress
                 ),
                 "detail": detail,
                 "started_at": started_at,

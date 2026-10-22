@@ -34,7 +34,11 @@ class AcousticPresetProcessor:
         """
         Process audio with environment preset.
         """
-        logger.info("acoustic_presets: applied environment preset '%s' (%d bytes input)", preset, len(audio_bytes))
+        logger.info(
+            "acoustic_presets: applied environment preset '%s' (%d bytes input)",
+            preset,
+            len(audio_bytes),
+        )
         return audio_bytes + f"_{preset.value.upper()}".encode()
 
 

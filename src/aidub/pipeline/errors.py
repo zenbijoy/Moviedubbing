@@ -8,10 +8,10 @@ from enum import StrEnum
 class ErrorKind(StrEnum):
     """Classification of pipeline error severity and retryability."""
 
-    USAGE = "usage"            # Invalid arguments or missing files (non-retryable)
-    RETRYABLE = "retryable"    # Temporary rate limits, API timeout, GPU OOM (retryable)
+    USAGE = "usage"  # Invalid arguments or missing files (non-retryable)
+    RETRYABLE = "retryable"  # Temporary rate limits, API timeout, GPU OOM (retryable)
     DEPENDENCY = "dependency"  # Missing system dependencies (ffmpeg, demucs)
-    INTERNAL = "internal"      # Code bug or assertion error
+    INTERNAL = "internal"  # Code bug or assertion error
 
 
 class PipelineError(Exception):

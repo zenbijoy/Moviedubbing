@@ -9,13 +9,24 @@ and issues automated Release Readiness Certificates.
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from enum import StrEnum
+from uuid import uuid4
 
-from pydantic import Field
+from pydantic import Field, computed_field
 
 from aidub.contracts.base import ContractModel, Identifier
 
 logger = logging.getLogger(__name__)
+
+
+class BenchmarkMeasurementsUnavailableError(RuntimeError):
+    """Raised when no real benchmark measurements were supplied."""
+
+
+class MetricDirection(StrEnum):
+    LOWER_IS_BETTER = "lower_is_better"
+    HIGHER_IS_BETTER = "higher_is_better"
 
 
 class BenchmarkMetricScore(ContractModel):
@@ -24,7 +35,14 @@ class BenchmarkMetricScore(ContractModel):
     metric_name: str = Field(min_length=1)
     score_value: float = Field(ge=0.0)
     target_threshold: float = Field(ge=0.0)
-    passed: bool = True
+    direction: MetricDirection
+
+    @computed_field
+    @property
+    def passed(self) -> bool:
+        if self.direction == MetricDirection.LOWER_IS_BETTER:
+            return self.score_value <= self.target_threshold
+        return self.score_value >= self.target_threshold
 
 
 class ReleaseReadinessCertificate(ContractModel):
@@ -34,35 +52,44 @@ class ReleaseReadinessCertificate(ContractModel):
     app_version: str = Field(default="1.0.0", min_length=1)
     target_languages: list[str] = Field(default_factory=list)
     overall_quality_score: float = Field(ge=0.0, le=1.0)
-    is_approved_for_release: bool = True
+    is_approved_for_release: bool = False
     metric_details: dict[str, BenchmarkMetricScore] = Field(default_factory=dict)
     summary: str = Field(min_length=1)
 
 
 class AutonomousBenchmarkHarness:
     """
-    Automated continuous evaluation and release readiness certification harness.
+    Aggregates measured benchmark results into a release readiness certificate.
+
+    Actual ASR, translation, TTS, lip-sync, and loudness benchmark runners must
+    provide their measurements. This class does not invent benchmark scores.
     """
 
     def run_benchmark_suite(
         self,
         app_version: str = "1.0.0",
         languages: Sequence[str] = ("en-US", "bn-BD", "hi-IN"),
+        *,
+        measured_metrics: Mapping[str, BenchmarkMetricScore],
     ) -> ReleaseReadinessCertificate:
         """
-        Execute golden dataset benchmarks and calculate release metrics.
+        Evaluate real measurements collected by configured benchmark runners.
         """
-        metrics = {
-            "asr_wer": BenchmarkMetricScore(metric_name="ASR Word Error Rate (WER)", score_value=0.04, target_threshold=0.10, passed=True),
-            "translation_bleu": BenchmarkMetricScore(metric_name="Translation BLEU Score", score_value=38.5, target_threshold=30.0, passed=True),
-            "tts_mos": BenchmarkMetricScore(metric_name="TTS Voice Quality MOS", score_value=4.4, target_threshold=4.0, passed=True),
-            "lipsync_ssim": BenchmarkMetricScore(metric_name="Visual Lip-Sync SSIM", score_value=0.91, target_threshold=0.85, passed=True),
-            "audio_lufs": BenchmarkMetricScore(metric_name="Audio Loudness EBU R128 (-24 LUFS)", score_value=24.0, target_threshold=24.0, passed=True),
-        }
+        if not measured_metrics:
+            raise BenchmarkMeasurementsUnavailableError(
+                "Release certification is unavailable: no measured benchmark results were supplied."
+            )
+        metrics = dict(measured_metrics)
 
         all_passed = all(m.passed for m in metrics.values())
         overall = round(sum(1.0 if m.passed else 0.0 for m in metrics.values()) / len(metrics), 2)
-        cid = Identifier(f"cert_{app_version}_{int(sum(m.score_value for m in metrics.values()))}")
+        cid = Identifier(f"cert_{uuid4().hex}")
+        failed_metrics = [name for name, metric in metrics.items() if not metric.passed]
+        result_summary = (
+            "All supplied benchmark measurements passed their thresholds."
+            if all_passed
+            else f"Measurements failed thresholds: {', '.join(failed_metrics)}."
+        )
 
         cert = ReleaseReadinessCertificate(
             certificate_id=cid,
@@ -71,15 +98,24 @@ class AutonomousBenchmarkHarness:
             overall_quality_score=overall,
             is_approved_for_release=all_passed,
             metric_details=metrics,
-            summary=f"Automated benchmark harness completed for {len(languages)} languages. All quality standards met.",
+            summary=(
+                f"Evaluated {len(metrics)} measured metrics for {len(languages)} languages. "
+                f"{result_summary}"
+            ),
         )
 
-        logger.info("autonomous_harness: generated Release Readiness Certificate %s (Approved: %s)", cid, all_passed)
+        logger.info(
+            "autonomous_harness: generated Release Readiness Certificate %s (Approved: %s)",
+            cid,
+            all_passed,
+        )
         return cert
 
 
 __all__ = [
     "AutonomousBenchmarkHarness",
+    "BenchmarkMeasurementsUnavailableError",
     "BenchmarkMetricScore",
+    "MetricDirection",
     "ReleaseReadinessCertificate",
 ]

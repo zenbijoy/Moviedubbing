@@ -39,7 +39,7 @@ def test_write_bilingual_srt(tmp_path: Path) -> None:
     out_bi_bot = tmp_path / "bi_bot.srt"
     write_bilingual_srt(segs, out_bi_bot, mode=LineMode.BILINGUAL_TARGET_BOTTOM)
     content_bot = out_bi_bot.read_text(encoding="utf-8")
-    lines_bot = [l.strip() for l in content_bot.splitlines() if l.strip()]
+    lines_bot = [line.strip() for line in content_bot.splitlines() if line.strip()]
     # Expected order: index, timestamp, source text, target text
     assert lines_bot[2] == "Hello world"
     assert lines_bot[3] == "হ্যালো বিশ্ব"
@@ -47,7 +47,7 @@ def test_write_bilingual_srt(tmp_path: Path) -> None:
     out_bi_top = tmp_path / "bi_top.srt"
     write_bilingual_srt(segs, out_bi_top, mode=LineMode.BILINGUAL_TARGET_TOP)
     content_top = out_bi_top.read_text(encoding="utf-8")
-    lines_top = [l.strip() for l in content_top.splitlines() if l.strip()]
+    lines_top = [line.strip() for line in content_top.splitlines() if line.strip()]
     # Expected order: index, timestamp, target text, source text
     assert lines_top[2] == "হ্যালো বিশ্ব"
     assert lines_top[3] == "Hello world"

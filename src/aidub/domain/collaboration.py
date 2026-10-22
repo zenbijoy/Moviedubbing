@@ -40,7 +40,9 @@ class EditorSession(ContractModel):
     client_id: Identifier
     user_id: Identifier
     display_name: str = Field(min_length=1)
-    role: str = Field(default="editor", max_length=32)  # "director", "editor", "audio_engineer", "auditor"
+    role: str = Field(
+        default="editor", max_length=32
+    )  # "director", "editor", "audio_engineer", "auditor"
     active_cursor_ms: int = Field(default=0, ge=0)
     connected: bool = True
 

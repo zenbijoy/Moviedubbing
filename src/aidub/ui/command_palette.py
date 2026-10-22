@@ -26,7 +26,7 @@ if PYSIDE6_AVAILABLE:
             QVBoxLayout,
             QWidget,
         )
-    except Exception as _caught_qt_error:  # noqa: BLE001 - catches native Qt load errors.
+    except Exception as _caught_qt_error:
         _QT_WIDGETS_AVAILABLE = False
         _QT_WIDGETS_IMPORT_ERROR: Exception | None = _caught_qt_error
     else:

@@ -23,10 +23,14 @@ class ProsodyProfile(ContractModel):
     duration_s: float = Field(gt=0.0)
     f0_median_hz: float = Field(ge=0.0)
     f0_range_hz: float = Field(ge=0.0)
-    f0_normalized_contour: list[float] = Field(default_factory=list)  # Normalized 100-point pitch curve
-    energy_envelope: list[float] = Field(default_factory=list)        # Normalized 100-point energy curve
+    f0_normalized_contour: list[float] = Field(
+        default_factory=list
+    )  # Normalized 100-point pitch curve
+    energy_envelope: list[float] = Field(default_factory=list)  # Normalized 100-point energy curve
     speech_rate_syllables_per_sec: float = Field(ge=0.0)
-    pause_locations_ratio: list[float] = Field(default_factory=list)  # Relative pause positions (0.0 to 1.0)
+    pause_locations_ratio: list[float] = Field(
+        default_factory=list
+    )  # Relative pause positions (0.0 to 1.0)
     pause_durations_ms: list[int] = Field(default_factory=list)
 
 

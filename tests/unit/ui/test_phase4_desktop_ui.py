@@ -40,9 +40,15 @@ def test_timeline_default_9_tracks() -> None:
     assert len(tracks) == 9
     track_ids = [t.track_id for t in tracks]
     assert track_ids == [
-        TrackId.V1, TrackId.V2,
-        TrackId.A1, TrackId.A2, TrackId.A3, TrackId.A4, TrackId.A5,
-        TrackId.S1, TrackId.S2,
+        TrackId.V1,
+        TrackId.V2,
+        TrackId.A1,
+        TrackId.A2,
+        TrackId.A3,
+        TrackId.A4,
+        TrackId.A5,
+        TrackId.S1,
+        TrackId.S2,
     ]
 
 
@@ -62,10 +68,18 @@ def test_timeline_layout_engine_visible_clips_culling() -> None:
 
     # Add 2 clips to A1 track: one visible (start 0ms), one offscreen (start 10000ms = 1000px)
     clip_visible = TimelineClip(
-        clip_id=Identifier("c-001"), track_id=TrackId.A1, start_ms=0, duration_ms=2000, label="Visible"
+        clip_id=Identifier("c-001"),
+        track_id=TrackId.A1,
+        start_ms=0,
+        duration_ms=2000,
+        label="Visible",
     )
     clip_offscreen = TimelineClip(
-        clip_id=Identifier("c-002"), track_id=TrackId.A1, start_ms=10000, duration_ms=2000, label="Culled"
+        clip_id=Identifier("c-002"),
+        track_id=TrackId.A1,
+        start_ms=10000,
+        duration_ms=2000,
+        label="Culled",
     )
     tracks[2].clips.extend([clip_visible, clip_offscreen])
 
@@ -81,7 +95,11 @@ def test_timeline_layout_engine_visible_clips_culling() -> None:
 
 def test_editorial_blade_split() -> None:
     clip = TimelineClip(
-        clip_id=Identifier("c-orig"), track_id=TrackId.A1, start_ms=1000, duration_ms=4000, label="Take"
+        clip_id=Identifier("c-orig"),
+        track_id=TrackId.A1,
+        start_ms=1000,
+        duration_ms=4000,
+        label="Take",
     )
     left, right = EditorialCommandEngine.blade_split(clip, 2500)
 
@@ -104,12 +122,20 @@ def test_editorial_blade_split_outside_bounds_raises() -> None:
 
 def test_editorial_ripple_delete() -> None:
     track = TimelineTrack(
-        track_id=TrackId.A1, display_name="A1", kind=TrackKind.AUDIO,
+        track_id=TrackId.A1,
+        display_name="A1",
+        kind=TrackKind.AUDIO,
         clips=[
-            TimelineClip(clip_id=Identifier("c1"), track_id=TrackId.A1, start_ms=0, duration_ms=1000),
-            TimelineClip(clip_id=Identifier("c2"), track_id=TrackId.A1, start_ms=1000, duration_ms=2000),
-            TimelineClip(clip_id=Identifier("c3"), track_id=TrackId.A1, start_ms=3000, duration_ms=1000),
-        ]
+            TimelineClip(
+                clip_id=Identifier("c1"), track_id=TrackId.A1, start_ms=0, duration_ms=1000
+            ),
+            TimelineClip(
+                clip_id=Identifier("c2"), track_id=TrackId.A1, start_ms=1000, duration_ms=2000
+            ),
+            TimelineClip(
+                clip_id=Identifier("c3"), track_id=TrackId.A1, start_ms=3000, duration_ms=1000
+            ),
+        ],
     )
 
     # Ripple delete c2 (duration 2000ms)

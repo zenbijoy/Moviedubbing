@@ -178,6 +178,27 @@ def test_latentsync_cinema_engine(tmp_path) -> None:
         )
 
 
+def test_lipsync_requires_real_model_command(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from aidub.adapters.lipsync_base import run_configured_lipsync
+
+    source = tmp_path / "source.mp4"
+    audio = tmp_path / "target.wav"
+    source.write_bytes(b"source fixture")
+    audio.write_bytes(b"audio fixture")
+    monkeypatch.delenv("AIDUB_MUSETALK_COMMAND", raising=False)
+    monkeypatch.setenv("AIDUB_ALLOW_LIPSYNC_FALLBACK", "1")
+
+    with pytest.raises(RuntimeError, match="No lip-sync output was created"):
+        run_configured_lipsync(
+            "AIDUB_MUSETALK_COMMAND",
+            source_video_path=str(source),
+            target_audio_path=str(audio),
+            output_path=tmp_path / "lipsynced.mp4",
+        )
+
+    assert not (tmp_path / "lipsynced.mp4").exists()
+
+
 def test_lipsync_worker_registered_handler(tmp_path) -> None:
     import queue
 
@@ -209,20 +230,24 @@ def test_lipsync_worker_registered_handler(tmp_path) -> None:
 # ── Task 6.4 & 6.5: Visual Quality Control & NLE Panel Controller Tests ─────
 
 
-def test_visual_qc_evaluator_pass_and_fallback() -> None:
+def test_visual_qc_classifies_only_supplied_measurements(tmp_path) -> None:
     evaluator = VisualQcEvaluator(pass_threshold=0.70)
 
-    # Good scores pass QC
-    good_res = evaluator.evaluate_shot_video("shot_001", "vid.mp4", (0.95, 0.90, 0.95))
+    good_res = evaluator.evaluate_shot("shot_001", 0.95)
     assert good_res.passed_qc is True
     assert good_res.should_fallback_to_original is False
+    assert good_res.seam_artifact_score is None
 
-    # Low scores fail QC -> fallback to original video with recommendations
-    bad_res = evaluator.evaluate_shot_video("shot_002", "vid.mp4", (0.40, 0.30, 0.50))
+    bad_res = evaluator.evaluate_shot("shot_002", 0.40)
     assert bad_res.passed_qc is False
     assert bad_res.should_fallback_to_original is True
-    assert "Falling back to original video" in bad_res.rejection_reason
+    assert "below the configured threshold" in bad_res.rejection_reason
     assert len(bad_res.diagnostic_recommendations) > 0
+
+    shot = tmp_path / "rendered.mp4"
+    shot.write_bytes(b"video fixture")
+    with pytest.raises(RuntimeError, match="No visual lip-sync QC model is configured"):
+        evaluator.evaluate_shot_video("shot_003", str(shot))
 
 
 def test_lipsync_control_panel_controller() -> None:
@@ -233,6 +258,5 @@ def test_lipsync_control_panel_controller() -> None:
     ctrl.set_override(UserOverrideMode.FORCE_ELIGIBLE)
     assert ctrl.config.user_override == UserOverrideMode.FORCE_ELIGIBLE
 
-    eligibility, qc_result = ctrl.inspect_shot(simulated_qc_scores=(0.95, 0.95, 0.95))
-    assert eligibility.is_eligible_for_rendering is True
-    assert qc_result.passed_qc is True
+    with pytest.raises(RuntimeError, match="Provide a real rendered shot video"):
+        ctrl.inspect_shot()

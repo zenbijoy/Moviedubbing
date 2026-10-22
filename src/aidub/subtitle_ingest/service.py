@@ -117,11 +117,15 @@ def ingest_source_subtitle(
 def _load_source(source: Path | str, request: SubtitleIngestionRequest) -> _LoadedSubtitle:
     original = Path(source).expanduser()
     if _is_link_or_reparse(original):
-        raise UnsafeSubtitleSourceError(f"subtitle source cannot be a link/reparse point: {original}")
+        raise UnsafeSubtitleSourceError(
+            f"subtitle source cannot be a link/reparse point: {original}"
+        )
     try:
         path = original.resolve(strict=True)
     except (OSError, RuntimeError) as error:
-        raise UnsafeSubtitleSourceError(f"subtitle source cannot be resolved: {original}") from error
+        raise UnsafeSubtitleSourceError(
+            f"subtitle source cannot be resolved: {original}"
+        ) from error
     if not path.is_file():
         raise UnsafeSubtitleSourceError(f"subtitle source is not a regular file: {path}")
 
@@ -198,7 +202,9 @@ def _parse_document(
             maximum_text_characters=request.maximum_text_characters,
         )
     except SubtitleCodecError as error:
-        raise SubtitleIngestionError(f"invalid {loaded.provenance.format.value} subtitle: {error}") from error
+        raise SubtitleIngestionError(
+            f"invalid {loaded.provenance.format.value} subtitle: {error}"
+        ) from error
 
 
 def _validate_timing(
@@ -232,7 +238,10 @@ def _validate_timing(
         ):
             furthest_active_cue = (cue_number, cue)
 
-        if request.media_duration is not None and source_range.end_exclusive > request.media_duration:
+        if (
+            request.media_duration is not None
+            and source_range.end_exclusive > request.media_duration
+        ):
             conflicts.append(
                 SubtitleTimingConflict(
                     code=SubtitleTimingConflictCode.OUTSIDE_MEDIA_DURATION,

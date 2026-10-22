@@ -30,12 +30,17 @@ class StudioPolicyEvaluator:
     Evaluates studio policy rules.
     """
 
-    def validate_operation_compliance(self, policy: StudioGovernancePolicy, is_commercial_model: bool) -> bool:
+    def validate_operation_compliance(
+        self, policy: StudioGovernancePolicy, is_commercial_model: bool
+    ) -> bool:
         """
         Validate model license compliance under active policy.
         """
         if policy.enforce_commercial_license_only and not is_commercial_model:
-            logger.warning("studio_policy: BLOCKED non-commercial model under strict policy %s", policy.policy_id)
+            logger.warning(
+                "studio_policy: BLOCKED non-commercial model under strict policy %s",
+                policy.policy_id,
+            )
             return False
         return True
 

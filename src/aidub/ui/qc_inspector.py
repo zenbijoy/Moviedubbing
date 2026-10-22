@@ -24,13 +24,11 @@ logger = logging.getLogger(__name__)
 
 # Optional PySide6 import guard for headless execution environments
 try:
-    from PySide6.QtCore import Qt, Signal
+    from PySide6.QtCore import Signal
     from PySide6.QtWidgets import (
         QComboBox,
         QFormLayout,
         QGroupBox,
-        QHBoxLayout,
-        QLabel,
         QListWidget,
         QListWidgetItem,
         QProgressBar,
@@ -48,8 +46,12 @@ except ImportError:
 class QcFilterOptions(ContractModel):
     """Filter criteria for the QC Inspector UI view."""
 
-    severity_filter: str = Field(default="all", max_length=32)  # "all", "pass_green", "warning_amber", "blocking_red"
-    category_filter: str = Field(default="all", max_length=32)  # "all", "audio", "video", "subtitles", "timing"
+    severity_filter: str = Field(
+        default="all", max_length=32
+    )  # "all", "pass_green", "warning_amber", "blocking_red"
+    category_filter: str = Field(
+        default="all", max_length=32
+    )  # "all", "audio", "video", "subtitles", "timing"
     min_score: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
@@ -95,13 +97,33 @@ class QcInspectorController:
 
         cf = self.filter_options.category_filter
         if cf == "audio":
-            reports = [r for r in reports if r.dimension_scores.get("loudness", None) and r.dimension_scores["loudness"].score < 0.85]
+            reports = [
+                r
+                for r in reports
+                if r.dimension_scores.get("loudness", None)
+                and r.dimension_scores["loudness"].score < 0.85
+            ]
         elif cf == "video":
-            reports = [r for r in reports if r.dimension_scores.get("lipsync", None) and r.dimension_scores["lipsync"].score < 0.85]
+            reports = [
+                r
+                for r in reports
+                if r.dimension_scores.get("lipsync", None)
+                and r.dimension_scores["lipsync"].score < 0.85
+            ]
         elif cf == "subtitles":
-            reports = [r for r in reports if r.dimension_scores.get("subtitle_speed", None) and r.dimension_scores["subtitle_speed"].score < 0.85]
+            reports = [
+                r
+                for r in reports
+                if r.dimension_scores.get("subtitle_speed", None)
+                and r.dimension_scores["subtitle_speed"].score < 0.85
+            ]
         elif cf == "timing":
-            reports = [r for r in reports if r.dimension_scores.get("timing", None) and r.dimension_scores["timing"].score < 0.85]
+            reports = [
+                r
+                for r in reports
+                if r.dimension_scores.get("timing", None)
+                and r.dimension_scores["timing"].score < 0.85
+            ]
 
         return reports
 
@@ -129,8 +151,7 @@ class QcInspectorController:
 
         # Update report in heatmap
         new_reports = [
-            measured_result if r.utterance_id == utterance_id else r
-            for r in self.heatmap.reports
+            measured_result if r.utterance_id == utterance_id else r for r in self.heatmap.reports
         ]
         self.heatmap = self.evaluator.generate_heatmap(self.project_id, new_reports)
 
@@ -218,7 +239,9 @@ if PYSIDE6_AVAILABLE:
             self.list_widget.clear()
             reports = self.controller.get_filtered_reports()
             for r in reports:
-                item = QListWidgetItem(f"[{r.severity.value.upper()}] {r.utterance_id} — Score: {r.overall_score:.2f}")
+                item = QListWidgetItem(
+                    f"[{r.severity.value.upper()}] {r.utterance_id} — Score: {r.overall_score:.2f}"
+                )
                 self.list_widget.addItem(item)
 
 

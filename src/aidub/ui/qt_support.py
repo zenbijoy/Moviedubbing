@@ -4,7 +4,7 @@ from __future__ import annotations
 
 try:
     import PySide6  # noqa: F401
-except Exception as _error:  # noqa: BLE001 - native DLL failures use varied exceptions.
+except Exception as _error:
     _PYSIDE6_IMPORT_ERROR: Exception | None = _error
 else:
     _PYSIDE6_IMPORT_ERROR = None

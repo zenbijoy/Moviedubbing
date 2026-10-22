@@ -342,7 +342,7 @@ class ArtifactStore:
                 f"existing object at {path} failed validation: {validation.state.value}"
             )
 
-    def validate(  # noqa: PLR0911 - every failure mode returns a typed diagnostic
+    def validate(
         self,
         digest: str,
         *,

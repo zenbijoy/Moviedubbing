@@ -26,9 +26,7 @@
 from audio_separator.separator import Separator
 
 separator = Separator(
-    output_dir="./stems",
-    output_format="WAV",
-    model_file_dir="./models/separation"
+    output_dir="./stems", output_format="WAV", model_file_dir="./models/separation"
 )
 
 # Load SOTA Mel-Band Roformer checkpoint

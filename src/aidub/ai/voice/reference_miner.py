@@ -66,6 +66,7 @@ class ReferenceVoiceMiner:
 
             # Basic quality heuristic from segment metadata
             from aidub.ai.voice.reference_quality import ReferenceVoiceQualityEngine
+
             evaluator = ReferenceVoiceQualityEngine()
 
             report = evaluator.evaluate_sample_quality(

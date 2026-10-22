@@ -9,9 +9,15 @@ from aidub.cli import (
     EXIT_OK,
     EXIT_RUNTIME_UNAVAILABLE,
     CliDependencies,
+    build_parser,
     main,
 )
-from aidub.diagnostics import SystemDiagnosticReport, collect_system_diagnostics
+from aidub.diagnostics import (
+    DubbingCheckResult,
+    DubbingDiagnosticReport,
+    SystemDiagnosticReport,
+    collect_system_diagnostics,
+)
 from aidub.media import ContainerInfo, MediaRuntimeInfo
 
 
@@ -70,6 +76,39 @@ def test_doctor_is_machine_readable_and_runtime_requirement_controls_exit() -> N
         stdout=required_output,
         stderr=StringIO(),
     )
+    assert result == EXIT_RUNTIME_UNAVAILABLE
+
+
+def test_doctor_dubbing_reports_readiness_and_supports_json() -> None:
+    mock_report = DubbingDiagnosticReport(
+        checks=[
+            DubbingCheckResult(name="ffmpeg/ffprobe", ok=True, detail="ffmpeg v7.1"),
+            DubbingCheckResult(name="faster-whisper", ok=True, detail="v1.2.1 installed"),
+            DubbingCheckResult(name="pyannote token", ok=False, detail="token missing", fix="Set PYANNOTE_TOKEN"),
+            DubbingCheckResult(name="demucs", ok=True, detail="v4.1.0 installed"),
+            DubbingCheckResult(name="edge-tts reachability", ok=True, detail="reachable"),
+            DubbingCheckResult(name="llm provider", ok=True, detail="Gemini configured"),
+        ]
+    )
+    dependencies = CliDependencies(dubbing_diagnostics_collector=lambda: mock_report)
+    output = StringIO()
+
+    result = main(["doctor", "--dubbing", "--json"], dependencies=dependencies, stdout=output, stderr=StringIO())
+    assert result == EXIT_OK
+    data = json.loads(output.getvalue())
+    assert data["all_passed"] is False
+    assert data["passed_count"] == 5
+    assert data["total_count"] == 6
+    assert any(c["name"] == "pyannote token" and c["ok"] is False for c in data["checks"])
+
+    human_output = StringIO()
+    result = main(["doctor", "--dubbing"], dependencies=dependencies, stdout=human_output, stderr=StringIO())
+    assert result == EXIT_OK
+    assert "=== aidub dubbing pipeline readiness ===" in human_output.getvalue()
+    assert "Set PYANNOTE_TOKEN" in human_output.getvalue()
+
+    required_output = StringIO()
+    result = main(["doctor", "--dubbing", "--require-runtime"], dependencies=dependencies, stdout=required_output, stderr=StringIO())
     assert result == EXIT_RUNTIME_UNAVAILABLE
 
 
@@ -209,3 +248,31 @@ def test_media_probe_and_gui_use_injected_boundaries(tmp_path: Path) -> None:
     )
     assert result == 7
     assert desktop_calls == [(["-platform", "offscreen"], "bn-BD")]
+
+
+def test_dub_cli_exposes_real_pipeline_options(tmp_path: Path) -> None:
+    arguments = build_parser().parse_args(
+        [
+            "dub",
+            "--input",
+            str(tmp_path / "source.mp4"),
+            "--output",
+            str(tmp_path / "dubbed.mp4"),
+            "--source-lang",
+            "en-US",
+            "--target-lang",
+            "bn",
+            "--asr-model",
+            "small",
+            "--voice-name",
+            "bn-BD-NabanitaNeural",
+            "--no-music",
+            "--no-diarization",
+        ]
+    )
+    assert arguments.source_lang == "en-US"
+    assert arguments.target_lang == "bn"
+    assert arguments.asr_model == "small"
+    assert arguments.voice_name == "bn-BD-NabanitaNeural"
+    assert arguments.keep_music is False
+    assert arguments.diarize is False

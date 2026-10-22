@@ -26,7 +26,7 @@ def build_router_from_config(
 ) -> LlmProviderRouter:
     """
     Constructs an LlmProviderRouter with active LLM adapters based on configuration.
-    
+
     Adapters are instantiated and ordered according to ``config.provider_priority``.
     A configured, real provider is mandatory.  Missing credentials are surfaced
     as a configuration error instead of returning fabricated translations.
@@ -36,50 +36,75 @@ def build_router_from_config(
 
     for name in cfg.provider_priority:
         name_lower = name.lower().strip()
-        
-        if name_lower == "openrouter" and cfg.openrouter_api_key:
-            adapters.append(OpenRouterAdapter(
-                api_key=cfg.openrouter_api_key,
-                model=cfg.openrouter_model,
-                site_url=cfg.openrouter_site_url,
-                app_name=cfg.openrouter_app_name,
-            ))
-            logger.info("LLM Router: Registered OpenRouter (%s)", cfg.openrouter_model)
 
-        elif name_lower == "gemini" and cfg.gemini_api_key:
-            adapters.append(GeminiAdapter(
-                api_key=cfg.gemini_api_key,
-                model=cfg.gemini_model,
-            ))
-            logger.info("LLM Router: Registered Gemini API (%s)", cfg.gemini_model)
+        if name_lower == "openrouter" and (cfg.openrouter_api_key or cfg.openrouter_api_keys):
+            adapters.append(
+                OpenRouterAdapter(
+                    api_key=cfg.openrouter_api_key,
+                    api_keys=cfg.openrouter_api_keys,
+                    model=cfg.openrouter_model,
+                    site_url=cfg.openrouter_site_url,
+                    app_name=cfg.openrouter_app_name,
+                )
+            )
+            logger.info(
+                "LLM Router: Registered OpenRouter (%s, %d keys)",
+                cfg.openrouter_model,
+                len(cfg.openrouter_api_keys or [cfg.openrouter_api_key]),
+            )
+
+        elif name_lower == "gemini" and (cfg.gemini_api_key or cfg.gemini_api_keys):
+            adapters.append(
+                GeminiAdapter(
+                    api_key=cfg.gemini_api_key,
+                    api_keys=cfg.gemini_api_keys,
+                    model=cfg.gemini_model,
+                )
+            )
+            logger.info(
+                "LLM Router: Registered Gemini API (%s, %d keys)",
+                cfg.gemini_model,
+                len(cfg.gemini_api_keys or [cfg.gemini_api_key]),
+            )
 
         elif name_lower == "openai" and cfg.openai_api_key:
-            adapters.append(OpenAIAdapter(
-                api_key=cfg.openai_api_key,
-                model=cfg.openai_model,
-                base_url=cfg.openai_base_url,
-            ))
+            adapters.append(
+                OpenAIAdapter(
+                    api_key=cfg.openai_api_key,
+                    model=cfg.openai_model,
+                    base_url=cfg.openai_base_url,
+                )
+            )
             logger.info("LLM Router: Registered OpenAI API (%s)", cfg.openai_model)
 
         elif name_lower == "deepseek" and cfg.deepseek_api_key:
-            adapters.append(DeepSeekAdapter(
-                api_key=cfg.deepseek_api_key,
-                model=cfg.deepseek_model,
-                base_url=cfg.deepseek_base_url,
-            ))
+            adapters.append(
+                DeepSeekAdapter(
+                    api_key=cfg.deepseek_api_key,
+                    model=cfg.deepseek_model,
+                    base_url=cfg.deepseek_base_url,
+                )
+            )
             logger.info("LLM Router: Registered DeepSeek API (%s)", cfg.deepseek_model)
 
         elif name_lower == "unofficial" and cfg.unofficial_configs:
             for uc in cfg.unofficial_configs:
                 if uc.base_url:
-                    adapters.append(CustomUrlAdapter(
-                        api_key=uc.api_key,
-                        model=uc.model,
-                        base_url=uc.base_url,
-                        extra_headers=uc.extra_headers,
-                        name=uc.name,
-                    ))
-                    logger.info("LLM Router: Registered Custom API '%s' (%s at %s)", uc.name, uc.model, uc.base_url)
+                    adapters.append(
+                        CustomUrlAdapter(
+                            api_key=uc.api_key,
+                            model=uc.model,
+                            base_url=uc.base_url,
+                            extra_headers=uc.extra_headers,
+                            name=uc.name,
+                        )
+                    )
+                    logger.info(
+                        "LLM Router: Registered Custom API '%s' (%s at %s)",
+                        uc.name,
+                        uc.model,
+                        uc.base_url,
+                    )
 
     if not adapters:
         raise LlmProviderError(

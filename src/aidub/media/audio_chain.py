@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 from enum import StrEnum
+from typing import Any
 
 from pydantic import Field
 
@@ -27,8 +28,10 @@ logger = logging.getLogger(__name__)
 
 # ── Band EQ ──────────────────────────────────────────────────────────────────
 
+
 class EqBand(ContractModel):
     """A single parametric EQ band."""
+
     frequency_hz: float = Field(ge=20.0, le=20_000.0)
     gain_db: float = Field(ge=-24.0, le=24.0)
     q_factor: float = Field(default=1.0, ge=0.1, le=20.0)
@@ -36,14 +39,17 @@ class EqBand(ContractModel):
 
 class ParametricEq(ContractModel):
     """4-band corrective parametric EQ."""
+
     bands: list[EqBand] = Field(default_factory=list, max_length=4)
     enabled: bool = True
 
 
 # ── Noise Gate ────────────────────────────────────────────────────────────────
 
+
 class NoiseGate(ContractModel):
     """Noise gate / de-noise parameters."""
+
     threshold_db: float = Field(default=-40.0, ge=-80.0, le=0.0)
     attack_ms: float = Field(default=5.0, ge=0.1, le=100.0)
     release_ms: float = Field(default=50.0, ge=1.0, le=1_000.0)
@@ -52,8 +58,10 @@ class NoiseGate(ContractModel):
 
 # ── Compressor ───────────────────────────────────────────────────────────────
 
+
 class Compressor(ContractModel):
     """Dynamic compressor parameters."""
+
     threshold_db: float = Field(default=-18.0, ge=-60.0, le=0.0)
     ratio: float = Field(default=3.0, ge=1.0, le=20.0)
     attack_ms: float = Field(default=10.0, ge=0.1, le=200.0)
@@ -64,8 +72,10 @@ class Compressor(ContractModel):
 
 # ── De-esser ─────────────────────────────────────────────────────────────────
 
+
 class Deesser(ContractModel):
     """De-esser targeting sibilant frequencies."""
+
     frequency_hz: float = Field(default=6_000.0, ge=2_000.0, le=16_000.0)
     threshold_db: float = Field(default=-12.0, ge=-40.0, le=0.0)
     reduction_db: float = Field(default=6.0, ge=0.0, le=20.0)
@@ -74,14 +84,17 @@ class Deesser(ContractModel):
 
 # ── Spatial Pan ───────────────────────────────────────────────────────────────
 
+
 class SpatialPan(ContractModel):
     """Stereo/surround panning parameters (-1.0=hard left, 0=center, +1.0=hard right)."""
+
     pan: float = Field(default=0.0, ge=-1.0, le=1.0)
     width: float = Field(default=1.0, ge=0.0, le=2.0)
     enabled: bool = True
 
 
 # ── DSP Chain Presets ─────────────────────────────────────────────────────────
+
 
 class DspPreset(StrEnum):
     FLAT = "flat"
@@ -90,30 +103,75 @@ class DspPreset(StrEnum):
     BROADCAST = "broadcast"
 
 
-_PRESETS: dict[DspPreset, dict] = {
+_PRESETS: dict[DspPreset, dict[str, Any]] = {
     DspPreset.FLAT: {},
     DspPreset.DIALOGUE_CLEAN: {
-        "noise_gate": {"threshold_db": -42.0, "attack_ms": 3.0, "release_ms": 40.0, "enabled": True},
-        "eq": {"bands": [{"frequency_hz": 80.0, "gain_db": -6.0, "q_factor": 0.7},
-                          {"frequency_hz": 200.0, "gain_db": -2.0, "q_factor": 1.0},
-                          {"frequency_hz": 3_000.0, "gain_db": 2.0, "q_factor": 1.5},
-                          {"frequency_hz": 10_000.0, "gain_db": 1.5, "q_factor": 0.9}], "enabled": True},
-        "compressor": {"threshold_db": -20.0, "ratio": 3.5, "attack_ms": 8.0, "release_ms": 120.0, "makeup_gain_db": 2.0, "enabled": True},
-        "deesser": {"frequency_hz": 6_500.0, "threshold_db": -14.0, "reduction_db": 5.0, "enabled": True},
+        "noise_gate": {
+            "threshold_db": -42.0,
+            "attack_ms": 3.0,
+            "release_ms": 40.0,
+            "enabled": True,
+        },
+        "eq": {
+            "bands": [
+                {"frequency_hz": 80.0, "gain_db": -6.0, "q_factor": 0.7},
+                {"frequency_hz": 200.0, "gain_db": -2.0, "q_factor": 1.0},
+                {"frequency_hz": 3_000.0, "gain_db": 2.0, "q_factor": 1.5},
+                {"frequency_hz": 10_000.0, "gain_db": 1.5, "q_factor": 0.9},
+            ],
+            "enabled": True,
+        },
+        "compressor": {
+            "threshold_db": -20.0,
+            "ratio": 3.5,
+            "attack_ms": 8.0,
+            "release_ms": 120.0,
+            "makeup_gain_db": 2.0,
+            "enabled": True,
+        },
+        "deesser": {
+            "frequency_hz": 6_500.0,
+            "threshold_db": -14.0,
+            "reduction_db": 5.0,
+            "enabled": True,
+        },
     },
     DspPreset.BROADCAST: {
-        "noise_gate": {"threshold_db": -38.0, "attack_ms": 2.0, "release_ms": 30.0, "enabled": True},
-        "eq": {"bands": [{"frequency_hz": 100.0, "gain_db": -4.0, "q_factor": 0.7},
-                          {"frequency_hz": 300.0, "gain_db": -1.5, "q_factor": 1.0},
-                          {"frequency_hz": 2_500.0, "gain_db": 3.0, "q_factor": 1.2},
-                          {"frequency_hz": 8_000.0, "gain_db": 2.0, "q_factor": 0.9}], "enabled": True},
-        "compressor": {"threshold_db": -16.0, "ratio": 4.0, "attack_ms": 5.0, "release_ms": 80.0, "makeup_gain_db": 3.0, "enabled": True},
-        "deesser": {"frequency_hz": 7_000.0, "threshold_db": -10.0, "reduction_db": 7.0, "enabled": True},
+        "noise_gate": {
+            "threshold_db": -38.0,
+            "attack_ms": 2.0,
+            "release_ms": 30.0,
+            "enabled": True,
+        },
+        "eq": {
+            "bands": [
+                {"frequency_hz": 100.0, "gain_db": -4.0, "q_factor": 0.7},
+                {"frequency_hz": 300.0, "gain_db": -1.5, "q_factor": 1.0},
+                {"frequency_hz": 2_500.0, "gain_db": 3.0, "q_factor": 1.2},
+                {"frequency_hz": 8_000.0, "gain_db": 2.0, "q_factor": 0.9},
+            ],
+            "enabled": True,
+        },
+        "compressor": {
+            "threshold_db": -16.0,
+            "ratio": 4.0,
+            "attack_ms": 5.0,
+            "release_ms": 80.0,
+            "makeup_gain_db": 3.0,
+            "enabled": True,
+        },
+        "deesser": {
+            "frequency_hz": 7_000.0,
+            "threshold_db": -10.0,
+            "reduction_db": 7.0,
+            "enabled": True,
+        },
     },
 }
 
 
 # ── Main Chain ────────────────────────────────────────────────────────────────
+
 
 class AudioDspChain(ContractModel):
     """
@@ -135,7 +193,7 @@ class AudioDspChain(ContractModel):
     def from_preset(cls, utterance_id: str, preset: DspPreset) -> AudioDspChain:
         """Create a chain from a named preset."""
         preset_data = _PRESETS.get(preset, {})
-        kwargs: dict = {"utterance_id": Identifier(utterance_id)}
+        kwargs: dict[str, Any] = {"utterance_id": Identifier(utterance_id)}
         if "noise_gate" in preset_data:
             kwargs["noise_gate"] = NoiseGate.model_validate(preset_data["noise_gate"])
         if "eq" in preset_data:

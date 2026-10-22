@@ -87,4 +87,4 @@ if __name__ == "__main__":
     packager = WindowsPackager()
     dist_path = packager.assemble_distribution()
     valid = packager.verify_distribution()
-    print(f"Distribution built at: {dist_path} (Valid: {valid})")
+    logger.info("Distribution built at: %s (Valid: %s)", dist_path, valid)

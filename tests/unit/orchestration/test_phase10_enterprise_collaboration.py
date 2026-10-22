@@ -15,7 +15,11 @@ from aidub.collaboration.session_sync import CollaborativeSessionSync
 from aidub.contracts.base import Identifier
 from aidub.domain.collaboration import DeltaOperation, OperationType
 from aidub.export.distribution_exporter import DistributionPackageExporter
-from aidub.orchestration.render_orchestrator import MultiEngineRenderOrchestrator, RenderNodeStatus
+from aidub.orchestration.render_orchestrator import (
+    MultiEngineRenderOrchestrator,
+    RenderExecutionUnavailableError,
+    RenderNodeStatus,
+)
 from aidub.security.audit_logger import CryptographicAuditLogger
 from aidub.ui.collaboration.controller import CollaborationStudioController
 
@@ -26,16 +30,15 @@ def test_multi_engine_render_orchestrator() -> None:
     assert len(plan.nodes) == 6
     assert plan.overall_progress == 0.0
 
-    executed = orchestrator.execute_render_plan(plan)
-    assert executed.overall_progress == 100.0
-    assert executed.nodes["node_tts"].status == RenderNodeStatus.COMPLETED
-    assert executed.nodes["node_encode"].status == RenderNodeStatus.COMPLETED
+    with pytest.raises(RenderExecutionUnavailableError, match="no TTS, alignment"):
+        orchestrator.execute_render_plan(plan)
+    assert all(node.status == RenderNodeStatus.PENDING for node in plan.nodes.values())
 
 
 def test_collaborative_session_sync_ot() -> None:
     sync = CollaborativeSessionSync("sess_100", "proj_100")
     ed1 = sync.register_editor("user_alice", "Alice Director", role="director")
-    ed2 = sync.register_editor("user_bob", "Bob Editor", role="editor")
+    sync.register_editor("user_bob", "Bob Editor", role="editor")
 
     assert len(sync.state.active_editors) == 2
 
@@ -97,8 +100,8 @@ def test_collaboration_studio_controller() -> None:
     cid = ctrl.register_editor_session("u1", "Editor User")
     assert "client_u1" in cid
 
-    plan = ctrl.trigger_render_orchestration("job_ui")
-    assert plan.overall_progress == 100.0
+    with pytest.raises(RenderExecutionUnavailableError):
+        ctrl.trigger_render_orchestration("job_ui")
 
     with pytest.raises(RuntimeError, match="AIDUB_DCP_COMMAND is not configured"):
         ctrl.export_distribution_package("proj_ui", "DCP")

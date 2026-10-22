@@ -90,13 +90,12 @@ def configure_secure_logging(
 
 # ── Private Studio Guard ──────────────────────────────────────────────────────
 
+
 class PrivateStudioViolation(PermissionError):
     """Raised when a network operation is attempted in Private Studio (offline) mode."""
 
     def __init__(self, operation: str) -> None:
-        super().__init__(
-            f"Private Studio Mode is active. Network operation blocked: {operation!r}"
-        )
+        super().__init__(f"Private Studio Mode is active. Network operation blocked: {operation!r}")
         self.operation = operation
 
 

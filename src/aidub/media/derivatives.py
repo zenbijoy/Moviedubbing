@@ -156,7 +156,7 @@ class SubprocessCommandRunner:
         self.maximum_stderr_tail_bytes = maximum_stderr_tail_bytes
         self.terminate_grace_seconds = terminate_grace_seconds
 
-    def run(  # noqa: PLR0915 - process lifecycle cleanup has one explicit owner
+    def run(
         self,
         plan: FFmpegCommandPlan,
         *,
@@ -174,7 +174,7 @@ class SubprocessCommandRunner:
         try:
             # The executable is an absolute, validated path and argv is a tuple.
             # No command interpreter is involved.
-            process = subprocess.Popen(  # noqa: S603
+            process = subprocess.Popen(
                 plan.argv,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,

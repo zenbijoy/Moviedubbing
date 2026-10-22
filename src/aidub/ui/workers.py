@@ -7,11 +7,15 @@ LLM Provider Router, and FFmpeg Render Exporter without blocking the main event 
 from __future__ import annotations
 
 import logging
+import re
+import subprocess
+import threading
 from pathlib import Path
 from typing import Any
 
 try:
     from PySide6.QtCore import QThread, Signal
+
     _QT = True
 except ImportError:
     _QT = False
@@ -20,38 +24,151 @@ logger = logging.getLogger(__name__)
 
 if _QT:
 
+    class VideoFrameWorker(QThread):
+        """Decode one real source frame with bundled FFmpeg off the UI thread."""
+
+        frame_decoded = Signal(bytes, float, int)
+        frame_failed = Signal(str, float, int)
+
+        def __init__(
+            self,
+            media_path: str | Path,
+            time_sec: float,
+            request_id: int,
+            parent: Any = None,
+        ) -> None:
+            super().__init__(parent)
+            self.media_path = Path(media_path)
+            self.time_sec = max(0.0, float(time_sec))
+            self.request_id = request_id
+            self._process_lock = threading.Lock()
+            self._process: subprocess.Popen[bytes] | None = None
+
+        def cancel(self) -> None:
+            """Stop an in-flight decoder before its owner window is destroyed."""
+
+            self.requestInterruption()
+            with self._process_lock:
+                process = self._process
+            if process is not None and process.poll() is None:
+                process.kill()
+
+        def run(self) -> None:
+            try:
+                if self.isInterruptionRequested():
+                    return
+                from aidub.media.ffmpeg_ops import _ffmpeg_exe
+
+                cmd = [
+                    _ffmpeg_exe(),
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-nostdin",
+                    "-ss",
+                    f"{self.time_sec:.3f}",
+                    "-i",
+                    str(self.media_path),
+                    "-map",
+                    "0:v:0",
+                    "-frames:v",
+                    "1",
+                    "-f",
+                    "image2pipe",
+                    "-vcodec",
+                    "png",
+                    "pipe:1",
+                ]
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                with self._process_lock:
+                    self._process = process
+                    cancelled = self.isInterruptionRequested()
+                if cancelled:
+                    process.kill()
+                try:
+                    stdout, stderr = process.communicate(timeout=45)
+                except subprocess.TimeoutExpired as exc:
+                    process.kill()
+                    stdout, stderr = process.communicate()
+                    raise RuntimeError("FFmpeg frame decoding timed out") from exc
+                finally:
+                    with self._process_lock:
+                        self._process = None
+                if self.isInterruptionRequested():
+                    return
+                if process.returncode != 0 or not stdout:
+                    message = stderr.decode("utf-8", errors="replace")[-1_000:]
+                    raise RuntimeError(message or "FFmpeg did not return a video frame")
+                self.frame_decoded.emit(stdout, self.time_sec, self.request_id)
+            except Exception as exc:
+                self.frame_failed.emit(str(exc), self.time_sec, self.request_id)
+
     class DubbingEngineWorker(QThread):
         """Worker thread for executing DubbingEngine end-to-end processing."""
 
-        progress_updated = Signal(str, int)  # stage_name, percentage (0-100)
-        dubbing_completed = Signal(dict)    # output metadata
-        dubbing_failed = Signal(str)        # error message
+        progress_updated = Signal(str, int, str)  # pipeline stage, percentage, message
+        dubbing_completed = Signal(dict)  # output metadata
+        dubbing_failed = Signal(str)  # error message
         dubbing_cancelled = Signal()
 
-        def __init__(self, input_path: str | Path, target_lang: str, quality_profile: str, parent: Any = None) -> None:
+        def __init__(
+            self,
+            input_path: str | Path,
+            target_lang: str,
+            quality_profile: str,
+            parent: Any = None,
+            *,
+            output_path: str | Path | None = None,
+            voice_name: str | None = None,
+            character_voices: dict[str, str] | None = None,
+            lipsync: bool = False,
+            lipsync_tier: str = "preview_fast",
+        ) -> None:
             super().__init__(parent)
             self.input_path = Path(input_path)
             self.target_lang = target_lang
             self.quality_profile = quality_profile
+            self.output_path = Path(output_path) if output_path else None
+            self.voice_name = voice_name
+            self.character_voices = dict(character_voices or {})
+            self.lipsync = lipsync
+            self.lipsync_tier = lipsync_tier
+
+        def _available_output_path(self) -> Path:
+            language = re.sub(r"[^A-Za-z0-9_-]", "_", self.target_lang).strip("_-") or "target"
+            base = self.output_path or self.input_path.parent / (
+                f"{self.input_path.stem}_dubbed_{language}.mp4"
+            )
+            if not base.exists():
+                return base
+            for revision in range(2, 10_000):
+                candidate = base.with_name(f"{base.stem}_{revision:02d}{base.suffix}")
+                if not candidate.exists():
+                    return candidate
+            raise RuntimeError(f"No unused output filename is available for {base}")
 
         def run(self) -> None:
             try:
                 from aidub.pipeline.config import PipelineConfig
                 from aidub.pipeline.engine import DubbingEngine, PipelineCancelled
 
-                out_path = self.input_path.parent / f"{self.input_path.stem}_dubbed_{self.target_lang}.mp4"
+                out_path = self._available_output_path()
                 cfg = PipelineConfig(
                     input=self.input_path,
                     output=out_path,
                     tgt_lang=self.target_lang,
                     keep_music=self.quality_profile != "fast",
                     diarize=self.quality_profile != "fast",
+                    lipsync=self.lipsync,
+                    lipsync_tier=self.lipsync_tier,
+                    voice_name=self.voice_name,
+                    character_voices=self.character_voices,
                 )
 
                 engine = DubbingEngine(
                     cfg,
-                    progress_callback=lambda _stage, percent, message: self.progress_updated.emit(
-                        message, percent
+                    progress_callback=lambda stage, percent, message: self.progress_updated.emit(
+                        stage, percent, message
                     ),
                     cancel_requested=self.isInterruptionRequested,
                 )
@@ -67,6 +184,7 @@ if _QT:
                     "srt_file": str(getattr(outputs, "bilingual_srt", "")),
                     "target_srt_file": str(getattr(outputs, "target_srt", "")),
                     "transcript_file": str(getattr(outputs, "transcript_json", "")),
+                    "lipsynced_video": str(getattr(outputs, "lipsynced_video", "")),
                     "work_dir": str(engine.work_dir),
                 }
                 self.dubbing_completed.emit(result)
@@ -80,24 +198,287 @@ if _QT:
             self.requestInterruption()
 
     class CharacterDetectionWorker(QThread):
-        """Worker thread for running speaker diarization and reference audio mining."""
+        """Worker thread for running speaker diarization and movie character recognition."""
 
+        progress_updated = Signal(int, str)  # percentage, status message
+        characters_detected = Signal(list)  # list of MovieCharacter objects
         diarization_completed = Signal(list, int, dict)  # turns, n_speakers, ref_windows
         detection_failed = Signal(str)
+        detection_cancelled = Signal()
 
-        def __init__(self, audio_path: str | Path, parent: Any = None) -> None:
+        def __init__(
+            self,
+            audio_path: str | Path | None = None,
+            parent: Any = None,
+            *,
+            media_path: str | Path | None = None,
+            subtitle_cues: list[Any] | None = None,
+            target_language: str = "bn",
+            work_dir: Path | str | None = None,
+        ) -> None:
             super().__init__(parent)
-            self.audio_path = Path(audio_path)
+            path = media_path or audio_path
+            self.media_path = Path(path) if path else None
+            self.subtitle_cues = list(subtitle_cues or [])
+            self.target_language = target_language
+            self.work_dir = Path(work_dir) if work_dir else None
+
+        def cancel(self) -> None:
+            """Request cancellation of character detection."""
+            self.requestInterruption()
 
         def run(self) -> None:
             try:
-                from aidub.adapters.diarization_pyannote import PyannoteDiarizationAdapter
-                adapter = PyannoteDiarizationAdapter()
-                turns, n_speakers, ref_windows = adapter.turns(str(self.audio_path))
-                self.diarization_completed.emit(turns, n_speakers, ref_windows)
+                from aidub.ai.voice.character_cloning_engine import CharacterDetectionEngine
+
+                if self.isInterruptionRequested():
+                    self.detection_cancelled.emit()
+                    return
+
+                self.progress_updated.emit(10, "Scanning subtitle cues for characters…")
+                engine = CharacterDetectionEngine()
+                cue_chars = (
+                    engine.detect_from_subtitle_cues(self.subtitle_cues, target_language=self.target_language)
+                    if self.subtitle_cues
+                    else []
+                )
+
+                turns: list[tuple[float, float, int]] = []
+                n_speakers = len(cue_chars) if cue_chars else 1
+                ref_windows: dict[int, tuple[float, float]] = {}
+
+                if self.media_path and self.media_path.is_file():
+                    if self.isInterruptionRequested():
+                        self.detection_cancelled.emit()
+                        return
+                    self.progress_updated.emit(35, "Running speaker diarization & acoustic analysis…")
+                    from aidub.adapters.diarization_pyannote import PyannoteDiarizationAdapter
+
+                    adapter = PyannoteDiarizationAdapter()
+                    turns, n_speakers, ref_windows = adapter.turns(str(self.media_path))
+
+                    self.progress_updated.emit(70, "Profiling detected character voices…")
+                    audio_chars, _ = engine.detect_from_media(
+                        self.media_path,
+                        target_language=self.target_language,
+                        work_dir=self.work_dir,
+                    )
+                else:
+                    audio_chars = []
+
+                if self.isInterruptionRequested():
+                    self.detection_cancelled.emit()
+                    return
+
+                # Merge cue characters and audio characters
+                char_map: dict[str, Any] = {}
+                for c in audio_chars:
+                    char_map[c.canonical_name] = c
+                for c in cue_chars:
+                    char_map[c.canonical_name] = c
+
+                all_characters = list(char_map.values())
+                if not all_characters:
+                    all_characters = engine.detect_movie_characters(
+                        [{"speaker": "SPEAKER_00"}, {"speaker": "SPEAKER_01"}],
+                        target_language=self.target_language,
+                    )
+
+                self.progress_updated.emit(100, f"Identified {len(all_characters)} movie characters")
+                self.characters_detected.emit(all_characters)
+                self.diarization_completed.emit(turns, max(1, len(all_characters)), ref_windows)
             except Exception as exc:
                 logger.exception("CharacterDetectionWorker failed: %s", exc)
                 self.detection_failed.emit(str(exc))
+
+    class AudioAnalysisWorker(QThread):
+        """Measure audio features in a worker thread without loading full media in RAM."""
+
+        progress_updated = Signal(float, float)  # analyzed seconds, requested seconds
+        analysis_completed = Signal(dict)
+        analysis_failed = Signal(str)
+        analysis_cancelled = Signal()
+
+        def __init__(
+            self,
+            media_path: str | Path,
+            start_seconds: float = 0.0,
+            duration_seconds: float | None = None,
+            parent: Any = None,
+        ) -> None:
+            super().__init__(parent)
+            self.media_path = Path(media_path)
+            self.start_seconds = float(start_seconds)
+            self.duration_seconds = duration_seconds
+
+        def cancel(self) -> None:
+            """Request cancellation; FFmpeg is stopped at the next streamed chunk."""
+
+            self.requestInterruption()
+
+        def run(self) -> None:
+            try:
+                from aidub.analysis.audio_analyzer import (
+                    AudioAnalysisCancelled,
+                    analyze_audio_file,
+                )
+
+                report = analyze_audio_file(
+                    self.media_path,
+                    start_seconds=self.start_seconds,
+                    duration_seconds=self.duration_seconds,
+                    progress_callback=lambda elapsed, total: self.progress_updated.emit(
+                        elapsed, total
+                    ),
+                    cancel_requested=self.isInterruptionRequested,
+                )
+                self.analysis_completed.emit(report.to_dict())
+            except AudioAnalysisCancelled:
+                self.analysis_cancelled.emit()
+            except Exception as exc:
+                logger.exception("AudioAnalysisWorker failed: %s", exc)
+                self.analysis_failed.emit(str(exc))
+
+    class SpeechTranscriptionWorker(QThread):
+        """Transcribe a selected media interval with the project's local Whisper adapter."""
+
+        stage_updated = Signal(str)
+        transcription_completed = Signal(str)
+        transcription_failed = Signal(str)
+
+        def __init__(
+            self,
+            media_path: str | Path,
+            start_seconds: float,
+            duration_seconds: float,
+            model_size: str = "large-v3",
+            parent: Any = None,
+        ) -> None:
+            super().__init__(parent)
+            self.media_path = Path(media_path)
+            self.start_seconds = float(start_seconds)
+            self.duration_seconds = float(duration_seconds)
+            self.model_size = model_size
+
+        def run(self) -> None:
+            try:
+                from tempfile import TemporaryDirectory
+
+                from aidub.adapters.asr_whisper import FasterWhisperAdapter, FasterWhisperOptions
+                from aidub.media.ffmpeg_ops import trim
+
+                if self.duration_seconds <= 0 or self.duration_seconds > 300:
+                    raise ValueError("Whisper transcription is limited to a 5-minute selection")
+                self.stage_updated.emit("Extracting the selected audio interval...")
+                with TemporaryDirectory(prefix="aidub_transcription_") as temporary_dir:
+                    segment_path = Path(temporary_dir) / "selected_audio.wav"
+                    trim(
+                        self.media_path,
+                        segment_path,
+                        self.start_seconds,
+                        self.start_seconds + self.duration_seconds,
+                        sr=16_000,
+                    )
+                    self.stage_updated.emit(
+                        f"Loading local Faster-Whisper {self.model_size} and transcribing..."
+                    )
+                    adapter = FasterWhisperAdapter(
+                        FasterWhisperOptions(model_size=self.model_size, word_timestamps=False)
+                    )
+                    segments = adapter.transcribe_file(segment_path)
+
+                transcript = "\n".join(
+                    f"[{self.start_seconds + float(item['start']):.2f}s - "
+                    f"{self.start_seconds + float(item['end']):.2f}s] {item['text']}"
+                    for item in segments
+                    if str(item.get("text", "")).strip()
+                )
+                self.transcription_completed.emit(transcript)
+            except Exception as exc:
+                logger.exception("SpeechTranscriptionWorker failed: %s", exc)
+                self.transcription_failed.emit(str(exc))
+
+    class EmotionAnalysisWorker(QThread):
+        """Run the existing acoustic and contextual EmotionEngine on a short interval."""
+
+        stage_updated = Signal(str)
+        emotion_completed = Signal(dict)
+        emotion_failed = Signal(str)
+
+        def __init__(
+            self,
+            media_path: str | Path,
+            start_seconds: float,
+            duration_seconds: float,
+            dialogue_text: str = "",
+            character_name: str = "Character",
+            scene_context: str = "",
+            parent: Any = None,
+        ) -> None:
+            super().__init__(parent)
+            self.media_path = Path(media_path)
+            self.start_seconds = float(start_seconds)
+            self.duration_seconds = float(duration_seconds)
+            self.dialogue_text = dialogue_text
+            self.character_name = character_name
+            self.scene_context = scene_context
+
+        def run(self) -> None:
+            try:
+                from tempfile import TemporaryDirectory
+
+                from aidub.ai.voice.emotion_engine import (
+                    AcousticEmotionDetector,
+                    EmotionEngine,
+                )
+                from aidub.media.ffmpeg_ops import trim
+
+                if self.duration_seconds <= 0 or self.duration_seconds > 60:
+                    raise ValueError("Emotion analysis is limited to a 60-second selection")
+                self.stage_updated.emit("Extracting the selected dialogue interval...")
+                with TemporaryDirectory(prefix="aidub_emotion_") as temporary_dir:
+                    segment_path = Path(temporary_dir) / "selected_audio.wav"
+                    trim(
+                        self.media_path,
+                        segment_path,
+                        self.start_seconds,
+                        self.start_seconds + self.duration_seconds,
+                        sr=16_000,
+                    )
+                    if self.dialogue_text.strip():
+                        self.stage_updated.emit(
+                            "Combining acoustic features with the supplied dialogue context..."
+                        )
+                        result = EmotionEngine().detect_emotion(
+                            utterance_id="audio_segment_analysis",
+                            dialogue_text=self.dialogue_text,
+                            audio_path=segment_path,
+                            character_name=self.character_name or "Character",
+                            scene_context=self.scene_context,
+                        )
+                        payload = result.model_dump(mode="json")
+                    else:
+                        self.stage_updated.emit("Measuring acoustic prosody locally...")
+                        observation = AcousticEmotionDetector().detect_emotion(segment_path)
+                        payload = {
+                            "primary_emotion": observation.dominant_category,
+                            "confidence": observation.confidence,
+                            "valence": observation.valence,
+                            "arousal": observation.arousal,
+                            "dominance": observation.dominance,
+                            "intensity": observation.intensity,
+                            "secondary_emotions": observation.secondary_emotions,
+                            "detection_source": "acoustic_prosody_heuristic",
+                            "synthesis_parameters": EmotionEngine().map_synthesis_parameters(
+                                observation.dominant_category,
+                                intensity=observation.intensity,
+                                arousal=observation.arousal,
+                            ),
+                        }
+                self.emotion_completed.emit(payload)
+            except Exception as exc:
+                logger.exception("EmotionAnalysisWorker failed: %s", exc)
+                self.emotion_failed.emit(str(exc))
 
     class AIAssistantWorker(QThread):
         """Worker thread for sending LLM prompts to LlmProviderRouter."""
@@ -117,7 +498,9 @@ if _QT:
                 from aidub.providers.router import LlmRequest
 
                 router = build_router_from_config()
-                full_prompt = f"{self.system_context}\n{self.prompt}" if self.system_context else self.prompt
+                full_prompt = (
+                    f"{self.system_context}\n{self.prompt}" if self.system_context else self.prompt
+                )
                 try:
                     response = router.complete(
                         LlmRequest(
@@ -144,7 +527,13 @@ if _QT:
         synthesis_completed = Signal(str)  # output wav path
         synthesis_failed = Signal(str)
 
-        def __init__(self, text: str, voice_name: str = "bn-IN-TanishaaNeural", output_file: str | Path = "", parent: Any = None) -> None:
+        def __init__(
+            self,
+            text: str,
+            voice_name: str = "bn-IN-TanishaaNeural",
+            output_file: str | Path = "",
+            parent: Any = None,
+        ) -> None:
             super().__init__(parent)
             self.text = text
             self.voice_name = voice_name
@@ -153,12 +542,48 @@ if _QT:
         def run(self) -> None:
             try:
                 from aidub.adapters.voice.edge_tts_adapter import EdgeTTSAdapter
+
                 adapter = EdgeTTSAdapter(voice_name=self.voice_name)
                 output = adapter.synthesize_to_file(self.text, self.output_file)
                 self.synthesis_completed.emit(str(output))
             except Exception as exc:
                 logger.exception("TTSPreviewWorker failed: %s", exc)
                 self.synthesis_failed.emit(str(exc))
+
+    class TimingFitWorker(QThread):
+        """Fit a selected audio take to a measured dialogue slot in the background."""
+
+        fit_completed = Signal(str, float)
+        fit_failed = Signal(str)
+
+        def __init__(
+            self,
+            input_audio: str | Path,
+            target_duration: float,
+            output_audio: str | Path,
+            parent: Any = None,
+        ) -> None:
+            super().__init__(parent)
+            self.input_audio = Path(input_audio)
+            self.target_duration = target_duration
+            self.output_audio = Path(output_audio)
+
+        def run(self) -> None:
+            try:
+                from aidub.media.assemble import fit_to_slot
+                from aidub.media.ffmpeg_ops import duration
+
+                fit_to_slot(self.input_audio, self.target_duration, self.output_audio)
+                fitted_duration = duration(self.output_audio)
+                if fitted_duration > self.target_duration * 1.02:
+                    raise RuntimeError(
+                        f"Take remains {fitted_duration:.2f}s after fitting into a "
+                        f"{self.target_duration:.2f}s slot; human timing review is required."
+                    )
+                self.fit_completed.emit(str(self.output_audio), fitted_duration)
+            except Exception as exc:
+                logger.exception("TimingFitWorker failed: %s", exc)
+                self.fit_failed.emit(str(exc))
 
     class LipSyncRenderWorker(QThread):
         """Worker thread for running LatentSync / MuseTalk lip-sync render."""
@@ -167,7 +592,14 @@ if _QT:
         lipsync_completed = Signal(str)
         lipsync_failed = Signal(str)
 
-        def __init__(self, video_path: str | Path, audio_path: str | Path, output_file: str | Path, model_name: str = "latentsync", parent: Any = None) -> None:
+        def __init__(
+            self,
+            video_path: str | Path,
+            audio_path: str | Path,
+            output_file: str | Path,
+            model_name: str = "latentsync",
+            parent: Any = None,
+        ) -> None:
             super().__init__(parent)
             self.video_path = Path(video_path)
             self.audio_path = Path(audio_path)
@@ -179,19 +611,34 @@ if _QT:
                 self.lipsync_progress.emit(10, f"Initializing {self.model_name} model...")
                 if "latentsync" in self.model_name.lower():
                     from aidub.adapters.lipsync_latentsync import LatentSyncLipSyncEngine
-                    adapter = LatentSyncLipSyncEngine()
+                    from aidub.adapters.lipsync_musetalk import MuseTalkLipSyncEngine
+
+                    adapter: LatentSyncLipSyncEngine | MuseTalkLipSyncEngine = (
+                        LatentSyncLipSyncEngine()
+                    )
                 else:
                     from aidub.adapters.lipsync_musetalk import MuseTalkLipSyncEngine
+
                     adapter = MuseTalkLipSyncEngine()
-                self.lipsync_progress.emit(40, "Conditioning facial landmarks & warping video frames...")
+                self.lipsync_progress.emit(
+                    40, "Conditioning facial landmarks & warping video frames..."
+                )
                 result = adapter.synthesize_lip_sync(
                     shot_id=self.output_file.stem,
                     source_video_path=str(self.video_path),
                     target_audio_path=str(self.audio_path),
                     output_directory=str(self.output_file.parent),
                 )
+                produced_path = Path(result.output_video_path)
+                if self.output_file != produced_path and produced_path.is_file():
+                    import shutil
+
+                    shutil.copy2(produced_path, self.output_file)
+                    final_path = str(self.output_file)
+                else:
+                    final_path = str(produced_path)
                 self.lipsync_progress.emit(100, "Lip-sync rendering completed!")
-                self.lipsync_completed.emit(result.output_video_path)
+                self.lipsync_completed.emit(final_path)
             except Exception as exc:
                 logger.exception("LipSyncRenderWorker failed: %s", exc)
                 self.lipsync_failed.emit(str(exc))
@@ -200,10 +647,16 @@ if _QT:
         """Worker thread for running FFmpeg render pipeline and distribution export."""
 
         render_progress = Signal(int, str)  # percent, stage message
-        render_completed = Signal(str)      # final export path
+        render_completed = Signal(str)  # final export path
         render_failed = Signal(str)
 
-        def __init__(self, input_video: str | Path, audio_track: str | Path, output_file: str | Path, parent: Any = None) -> None:
+        def __init__(
+            self,
+            input_video: str | Path,
+            audio_track: str | Path,
+            output_file: str | Path,
+            parent: Any = None,
+        ) -> None:
             super().__init__(parent)
             self.input_video = Path(input_video)
             self.audio_track = Path(audio_track)
@@ -212,6 +665,7 @@ if _QT:
         def run(self) -> None:
             try:
                 from aidub.media.ffmpeg_ops import mux
+
                 self.render_progress.emit(20, "Extracting video streams...")
                 self.render_progress.emit(50, "Muxing dubbed audio tracks...")
                 mux(self.input_video, self.audio_track, self.output_file)
@@ -221,11 +675,16 @@ if _QT:
                 logger.exception("RenderExportWorker failed: %s", exc)
                 self.render_failed.emit(str(exc))
 
+
 __all__ = [
-    "DubbingEngineWorker",
-    "CharacterDetectionWorker",
     "AIAssistantWorker",
-    "TTSPreviewWorker",
+    "AudioAnalysisWorker",
+    "CharacterDetectionWorker",
+    "DubbingEngineWorker",
+    "EmotionAnalysisWorker",
     "LipSyncRenderWorker",
     "RenderExportWorker",
+    "SpeechTranscriptionWorker",
+    "TTSPreviewWorker",
+    "TimingFitWorker",
 ]

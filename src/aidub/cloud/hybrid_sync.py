@@ -7,14 +7,13 @@ and secure cloud object storage (S3 / Azure Blob / GCS) synchronization for proj
 
 from __future__ import annotations
 
-import hashlib
-import logging
-
 from pydantic import Field
 
 from aidub.contracts.base import ContractModel, Identifier
 
-logger = logging.getLogger(__name__)
+
+class CloudSyncUnavailableError(RuntimeError):
+    """Raised when no real cloud object-storage adapter has been configured."""
 
 
 class SyncChunk(ContractModel):
@@ -42,35 +41,23 @@ class CloudHybridSyncEngine:
     """
 
     def create_sync_manifest(self, project_id: str, local_version: int = 1) -> CloudSyncManifest:
-        """
-        Build differential sync manifest for project files.
-        """
-        pid = Identifier(project_id)
-        mid = Identifier(f"sync_{project_id}")
-
-        # Simulate 3 differential chunks
-        chunks = []
-        for i in range(3):
-            cid = Identifier(f"chk_{project_id}_{i}")
-            h = hashlib.sha256(f"{project_id}_{i}_{local_version}".encode()).hexdigest()
-            chunks.append(SyncChunk(chunk_id=cid, size_bytes=1024 * 1024 * 2, checksum_sha256=h))
-
-        return CloudSyncManifest(manifest_id=mid, project_id=pid, remote_version=local_version, chunks=chunks)
+        """Reject cloud sync until a storage provider and local project source exist."""
+        raise CloudSyncUnavailableError(
+            "Cloud sync is unavailable: configure an S3, Azure Blob, or GCS storage adapter "
+            "before creating a remote manifest. No upload was attempted."
+        )
 
     def synchronize_project(self, manifest: CloudSyncManifest) -> CloudSyncManifest:
-        """
-        Execute differential chunk upload to cloud storage.
-        """
-        updated_chunks = []
-        for chk in manifest.chunks:
-            logger.info("hybrid_sync: uploaded chunk %s (%d bytes) [SHA-256: %s...]", chk.chunk_id, chk.size_bytes, chk.checksum_sha256[:10])
-            updated_chunks.append(chk.model_copy(update={"uploaded": True}))
-
-        return manifest.model_copy(update={"chunks": updated_chunks})
+        """Reject upload rather than marking local chunks as remotely uploaded."""
+        raise CloudSyncUnavailableError(
+            "Cloud sync is unavailable: no cloud storage adapter is configured. "
+            "The manifest was not uploaded."
+        )
 
 
 __all__ = [
     "CloudHybridSyncEngine",
     "CloudSyncManifest",
+    "CloudSyncUnavailableError",
     "SyncChunk",
 ]

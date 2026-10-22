@@ -47,7 +47,7 @@ def worker_process_main(job_queue: Any, control_queue: Any, result_queue: Any) -
         # Worker handlers are an isolation boundary: convert every ordinary
         # handler failure into a typed, redacted result. Process-ending
         # BaseException subclasses still escape and exercise crash recovery.
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             result = JobResult(
                 job_id=job.job_id,
                 succeeded=False,

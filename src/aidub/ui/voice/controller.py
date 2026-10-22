@@ -7,7 +7,6 @@ and take evaluation preview triggers for the QML / Qt Quick presentation layer.
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Sequence
 
 from aidub.application.voice.consent_guard import VoiceConsentGuard
@@ -15,7 +14,13 @@ from aidub.application.voice.profile_builder import CharacterVoiceProfileBuilder
 from aidub.application.voice.take_evaluator import VoiceTakeEvaluator, VoiceTakeQcReport
 from aidub.domain.voice_profile import CharacterVoiceProfile, ReferenceSample
 
-logger = logging.getLogger(__name__)
+
+class VoicePreviewUnavailableError(RuntimeError):
+    """Raised when this controller cannot produce a real synthesized preview."""
+
+
+class ConsentAuthorizationUnavailableError(RuntimeError):
+    """Raised when consent has not been verified through the rights ledger."""
 
 
 class VoiceCloningStudioController:
@@ -34,29 +39,27 @@ class VoiceCloningStudioController:
         character_id: str,
         display_name: str,
         mined_references: Sequence[ReferenceSample],
-        consent_authorized: bool = False,
     ) -> CharacterVoiceProfile:
         """
         Load or assemble character profile.
         """
         self.active_profile = self.profile_builder.build_character_profile(
-            character_id, display_name, mined_references, consent_authorized
+            character_id, display_name, mined_references, consent_authorized=False
         )
         return self.active_profile
 
     def authorize_consent(self) -> bool:
         """
-        Grant consent authorization for active character profile.
+        Refuse local consent toggles; authorization must be verified by VoiceRightsService.
         """
-        if not self.active_profile:
-            return False
-        self.active_profile = self.active_profile.model_copy(update={"consent_authorized": True})
-        logger.info("voice_controller: authorized consent for %s", self.active_profile.character_id)
-        return True
+        raise ConsentAuthorizationUnavailableError(
+            "Consent cannot be authorized from this controller. Register a real consent record "
+            "and authorize the profile through VoiceRightsService."
+        )
 
-    def revoke_consent(self) -> bool:
+    def clear_local_authorization(self) -> bool:
         """
-        Revoke consent authorization for active character profile.
+        Clear the local profile's authorization flag without claiming ledger revocation.
         """
         if not self.active_profile:
             return False
@@ -65,23 +68,26 @@ class VoiceCloningStudioController:
 
     def request_synthesis_preview(self, utterance_id: str, target_language: str = "bn-BD") -> str:
         """
-        Check authorization and generate synthesis preview request token.
+        Keep consent gating, but do not return a fake token in place of synthesized audio.
         """
         if not self.active_profile:
             raise ValueError("No active voice profile loaded")
 
-        # Enforce consent guard gate
         self.consent_guard.ensure_synthesis_authorized(self.active_profile)
-
-        preview_token = f"preview_{self.active_profile.character_id}_{utterance_id}_{target_language}"
-        logger.info("voice_controller: generated synthesis preview token %s", preview_token)
-        return preview_token
+        raise VoicePreviewUnavailableError(
+            "This controller has no voice-conversion preview backend. The timeline's real "
+            "Edge TTS preview requires dialogue text and writes an audio file."
+        )
 
     def evaluate_synthesized_take(
         self,
         take_id: str,
         utterance_id: str,
-        speaker_similarity: float = 0.92,
+        *,
+        speaker_similarity: float,
+        naturalness_score: float,
+        emotion_match_score: float,
+        timing_fit_score: float,
     ) -> VoiceTakeQcReport:
         """
         Evaluate quality metrics for a synthesized take.
@@ -90,9 +96,14 @@ class VoiceCloningStudioController:
             take_id=take_id,
             utterance_id=utterance_id,
             speaker_similarity=speaker_similarity,
+            naturalness_score=naturalness_score,
+            emotion_match_score=emotion_match_score,
+            timing_fit_score=timing_fit_score,
         )
 
 
 __all__ = [
+    "ConsentAuthorizationUnavailableError",
     "VoiceCloningStudioController",
+    "VoicePreviewUnavailableError",
 ]

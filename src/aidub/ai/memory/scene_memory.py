@@ -30,14 +30,22 @@ class SceneMemoryEngine:
     Tracks and retrieves narrative context across scenes.
     """
 
-    def analyze_scene_context(self, scene_id: str, scene_number: int, script_summary: str) -> SceneContextState:
+    def analyze_scene_context(
+        self, scene_id: str, scene_number: int, script_summary: str
+    ) -> SceneContextState:
         """
         Build scene context memory item.
         """
         sid = Identifier(scene_id)
-        mood = "dramatic" if "fight" in script_summary.lower() or "confrontation" in script_summary.lower() else "neutral"
+        mood = (
+            "dramatic"
+            if "fight" in script_summary.lower() or "confrontation" in script_summary.lower()
+            else "neutral"
+        )
 
-        logger.info("scene_memory: built scene context state for scene %d (Mood: %s)", scene_number, mood)
+        logger.info(
+            "scene_memory: built scene context state for scene %d (Mood: %s)", scene_number, mood
+        )
         return SceneContextState(
             scene_id=sid,
             scene_number=scene_number,

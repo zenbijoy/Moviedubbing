@@ -42,7 +42,9 @@ class TimelineScrollController:
         if self.mode == AutoScrollMode.OFF:
             return self.engine.scroll_x_ms
 
-        viewport_dur_ms = self.engine.px_to_time(self.engine.viewport_width_px) - self.engine.scroll_x_ms
+        viewport_dur_ms = (
+            self.engine.px_to_time(self.engine.viewport_width_px) - self.engine.scroll_x_ms
+        )
         if viewport_dur_ms <= 0:
             return self.engine.scroll_x_ms
 

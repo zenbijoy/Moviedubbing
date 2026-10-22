@@ -6,6 +6,5 @@ import sys
 
 from aidub.ui.application import run_desktop
 
-
 if __name__ == "__main__":
     sys.exit(run_desktop())

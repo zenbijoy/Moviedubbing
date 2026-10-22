@@ -30,11 +30,13 @@ import asyncio
 import edge_tts
 from rvc_python.infer import RVCInference
 
+
 # Step 1: Synthesize pristine Bengali phonemes using native neural voice
 async def make_base_speech(text, out_wav):
     # 'bn-BD-PradeepNeural' (Male) or 'bn-BD-NabanitaNeural' (Female)
     communicate = edge_tts.Communicate(text, "bn-BD-PradeepNeural", rate="+0%", pitch="+0Hz")
     await communicate.save(out_wav)
+
 
 asyncio.run(make_base_speech("তুমি এখনই বন্দুক নিচে নামাও!", "temp_base.wav"))
 
@@ -45,7 +47,7 @@ rvc.infer_file(
     input_path="temp_base.wav",
     output_path="final_dubbed_actor_bn.wav",
     pitch_shift=0,
-    f0_method="rmvpe" # SOTA pitch tracking
+    f0_method="rmvpe",  # SOTA pitch tracking
 )
 print("Dubbed take synthesized with authentic actor voice timbre!")
 ```

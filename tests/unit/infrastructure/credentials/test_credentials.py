@@ -20,7 +20,7 @@ def test_memory_store_lifecycle() -> None:
 @pytest.mark.skipif(sys.platform != "win32", reason="requires Windows DPAPI")
 def test_dpapi_store_round_trip_and_plaintext_is_not_persisted(tmp_path: Path) -> None:
     store = DpapiFileSecretStore(tmp_path)
-    secret = "high-value-secret-123"  # noqa: S105 - synthetic test credential
+    secret = "high-value-secret-123"
     store.set("provider.openai", secret)
     files = list(tmp_path.glob("*.credential"))
     assert len(files) == 1

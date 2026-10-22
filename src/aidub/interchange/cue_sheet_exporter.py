@@ -22,7 +22,7 @@ class CueSheetItem(ContractModel):
 
     cue_id: Identifier
     character_name: str = Field(min_length=1)
-    timecode_in: str = Field(min_length=8)   # "01:00:05:12"
+    timecode_in: str = Field(min_length=8)  # "01:00:05:12"
     timecode_out: str = Field(min_length=8)  # "01:00:08:20"
     source_text: str = Field(min_length=1)
     target_text: str = Field(min_length=1)
@@ -42,13 +42,25 @@ class CueSheetExporter:
     Exports audio stem packages and ADR cue sheets.
     """
 
-    def generate_cue_sheet(self, project_title: str, target_language: str, items: Sequence[CueSheetItem]) -> CueSheetReport:
+    def generate_cue_sheet(
+        self, project_title: str, target_language: str, items: Sequence[CueSheetItem]
+    ) -> CueSheetReport:
         """
         Build ADR Cue Sheet report.
         """
         rid = Identifier(f"cue_{target_language}")
-        report = CueSheetReport(report_id=rid, project_title=project_title, target_language=target_language, items=list(items))
-        logger.info("cue_sheet_exporter: generated cue sheet for '%s' (%s) with %d items", project_title, target_language, len(items))
+        report = CueSheetReport(
+            report_id=rid,
+            project_title=project_title,
+            target_language=target_language,
+            items=list(items),
+        )
+        logger.info(
+            "cue_sheet_exporter: generated cue sheet for '%s' (%s) with %d items",
+            project_title,
+            target_language,
+            len(items),
+        )
         return report
 
 

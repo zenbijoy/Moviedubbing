@@ -51,7 +51,13 @@ def pick_reference(
 
         ref_text = candidate.get("text", "")
         ref_map[spk] = (ref_wav, ref_text)
-        logger.debug("Picked voice ref for speaker %d: %.2fs-%.2fs (text=%r)", spk, a, end_time, ref_text[:30])
+        logger.debug(
+            "Picked voice ref for speaker %d: %.2fs-%.2fs (text=%r)",
+            spk,
+            a,
+            end_time,
+            ref_text[:30],
+        )
 
     return ref_map
 

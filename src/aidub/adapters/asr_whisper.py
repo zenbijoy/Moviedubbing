@@ -7,6 +7,20 @@ import logging
 from pathlib import Path
 from typing import Any, Self
 
+# Compatibility shim for modern PyAV (v14+/v19+) where metadata_errors was removed from av.open
+try:
+    import av
+
+    _orig_av_open = av.open
+
+    def _compat_av_open(*args: Any, **kwargs: Any) -> Any:
+        kwargs.pop("metadata_errors", None)
+        return _orig_av_open(*args, **kwargs)
+
+    av.open = _compat_av_open
+except (ImportError, AttributeError):
+    pass
+
 from pydantic import Field, model_validator
 
 from aidub.contracts.base import ContractModel, Identifier
@@ -78,11 +92,52 @@ class FasterWhisperAdapter(SpeechRecognizer):
                 "Faster-Whisper is not installed; install the production ASR dependencies"
             ) from exc
         if self._model_instance is None:
-            self._model_instance = faster_whisper.WhisperModel(
-                self.options.model_size,
-                device=self.options.device,
-                compute_type=self.options.compute_type,
-            )
+            device = self.options.device
+            compute_type = self.options.compute_type
+            if device in {"auto", "cuda"}:
+                import ctypes
+                import os
+
+                cuda_ok = False
+                if os.name == "nt":
+                    try:
+                        ctypes.CDLL("cublas64_12.dll")
+                        cuda_ok = True
+                    except Exception:
+                        cuda_ok = False
+                else:
+                    try:
+                        import ctranslate2
+
+                        cuda_ok = ctranslate2.get_cuda_device_count() > 0
+                    except Exception:
+                        cuda_ok = False
+
+                if not cuda_ok:
+                    logger.info("CUDA / cuBLAS 12 not available; using CPU int8 for Faster-Whisper")
+                    device = "cpu"
+                    if compute_type in {"default", "float16", "int8_float16"}:
+                        compute_type = "int8"
+
+            try:
+                self._model_instance = faster_whisper.WhisperModel(
+                    self.options.model_size,
+                    device=device,
+                    compute_type=compute_type,
+                )
+            except RuntimeError as exc:
+                if device != "cpu":
+                    logger.warning(
+                        "CUDA acceleration unavailable for Faster-Whisper (%s). Falling back to CPU int8.",
+                        exc,
+                    )
+                    self._model_instance = faster_whisper.WhisperModel(
+                        self.options.model_size,
+                        device="cpu",
+                        compute_type="int8",
+                    )
+                else:
+                    raise
         return self._model_instance
 
     @property
@@ -138,7 +193,9 @@ class FasterWhisperAdapter(SpeechRecognizer):
                     w_end_sample = chunk_offset + int(w.end * sample_rate)
                     w_count = max(1, w_end_sample - w_start_sample)
                     w_range = AudioSampleRange(
-                        start=AudioSamplePosition(sample_index=w_start_sample, sample_rate=sample_rate),
+                        start=AudioSamplePosition(
+                            sample_index=w_start_sample, sample_rate=sample_rate
+                        ),
                         sample_count=w_count,
                     )
                     w_id = Identifier(f"w_{request.chunk_index}_{seg_idx}_{word_idx}")
@@ -160,9 +217,7 @@ class FasterWhisperAdapter(SpeechRecognizer):
                 sample_count=seg_count,
             )
             seg_id = Identifier(f"seg_{request.chunk_index}_{seg_idx}")
-            seg_confidence = (
-                sum(w.confidence for w in words) / len(words) if words else 0.95
-            )
+            seg_confidence = sum(w.confidence for w in words) / len(words) if words else 0.95
             recognized_segments.append(
                 RecognizedSegment(
                     segment_id=seg_id,
@@ -228,7 +283,7 @@ class FasterWhisperAdapter(SpeechRecognizer):
     ) -> list[dict[str, Any]]:
         """
         Diarize-first ASR path: transcribe each speaker turn separately.
-        
+
         Ensures each segment contains words from ONLY ONE speaker and retains
         the correct speaker_id attribution.
         """
@@ -239,7 +294,7 @@ class FasterWhisperAdapter(SpeechRecognizer):
 def _has_speech(segs: list[dict[str, Any]], total_duration_s: float) -> bool:
     """
     Hallucination guard for Whisper/Parakeet ASR models.
-    
+
     Verifies that recognized text has sufficient word variety (unique/total >= 0.35)
     and audio speech coverage (speech_duration/total_duration >= 0.10) to reject
     hallucinated repeated loops over background music.

@@ -27,7 +27,9 @@ class CrossSceneVoicePersistence:
         Store profile in global project memory.
         """
         self.persistent_profiles[profile.character_id] = profile
-        logger.info("cross_scene_persistence: registered voice profile for %s", profile.character_id)
+        logger.info(
+            "cross_scene_persistence: registered voice profile for %s", profile.character_id
+        )
 
     def find_matching_profile(self, character_id: str) -> CharacterVoiceProfile | None:
         """

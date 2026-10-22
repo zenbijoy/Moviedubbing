@@ -77,7 +77,13 @@ class StemExportManager:
             StemKind.DIALOGUE: [TrackId.A1, TrackId.A2],
             StemKind.MUSIC: [TrackId.A3],
             StemKind.EFFECTS_AMBIENCE: [TrackId.A4, TrackId.A5],
-            StemKind.FULL_PRINT_MASTER: [TrackId.A1, TrackId.A2, TrackId.A3, TrackId.A4, TrackId.A5],
+            StemKind.FULL_PRINT_MASTER: [
+                TrackId.A1,
+                TrackId.A2,
+                TrackId.A3,
+                TrackId.A4,
+                TrackId.A5,
+            ],
         }
 
         for stem in request.selected_stems:

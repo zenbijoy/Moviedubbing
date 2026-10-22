@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 class TakeQcStatus(StrEnum):
-    PASS = "pass"                        # Score >= 0.90
-    PASS_WITH_WARNING = "pass_warning"   # Score 0.80 - 0.89
+    PASS = "pass"  # Score >= 0.90
+    PASS_WITH_WARNING = "pass_warning"  # Score 0.80 - 0.89
     REVIEW_REQUIRED = "review_required"  # Score 0.65 - 0.79
-    BLOCKING_FAILURE = "blocking_fail"   # Score < 0.65
+    BLOCKING_FAILURE = "blocking_fail"  # Score < 0.65
 
 
 class VoiceTakeQcReport(ContractModel):
@@ -38,7 +38,7 @@ class VoiceTakeQcReport(ContractModel):
     emotion_match_score: float = Field(ge=0.0, le=1.0)
     timing_fit_score: float = Field(ge=0.0, le=1.0)
     overall_quality_score: float = Field(ge=0.0, le=1.0)
-    qc_status: TakeQcStatus = TakeQcStatus.PASS
+    qc_status: TakeQcStatus
     recommendations: list[str] = Field(default_factory=list)
 
 
@@ -51,10 +51,11 @@ class VoiceTakeEvaluator:
         self,
         take_id: str,
         utterance_id: str,
-        speaker_similarity: float = 0.92,
-        naturalness_score: float = 0.91,
-        emotion_match_score: float = 0.88,
-        timing_fit_score: float = 0.95,
+        *,
+        speaker_similarity: float,
+        naturalness_score: float,
+        emotion_match_score: float,
+        timing_fit_score: float,
     ) -> VoiceTakeQcReport:
         """
         Evaluate single voice take quality metrics.
@@ -63,7 +64,10 @@ class VoiceTakeEvaluator:
         uid = Identifier(utterance_id)
 
         overall = round(
-            speaker_similarity * 0.35 + naturalness_score * 0.25 + emotion_match_score * 0.20 + timing_fit_score * 0.20,
+            speaker_similarity * 0.35
+            + naturalness_score * 0.25
+            + emotion_match_score * 0.20
+            + timing_fit_score * 0.20,
             2,
         )
 

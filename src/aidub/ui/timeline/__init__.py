@@ -1,4 +1,5 @@
 """Timeline package."""
+
 from .autoscroll import AutoScrollMode, TimelineScrollController
 from .customization import (
     PRESET_PROFILES,

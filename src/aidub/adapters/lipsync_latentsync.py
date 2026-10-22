@@ -50,6 +50,7 @@ class LatentSyncLipSyncEngine(LipSyncEngine):
             source_video_path=source_video_path,
             target_audio_path=target_audio_path,
             output_path=output_path,
+            options=opts,
         )
 
         logger.info(

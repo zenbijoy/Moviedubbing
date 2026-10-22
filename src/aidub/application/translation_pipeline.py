@@ -49,9 +49,7 @@ class TranslationContext(ContractModel):
 class TranslationPipelineConfig(ContractModel):
     """Configuration for the 5-pass translation pipeline."""
 
-    enabled_passes: list[TranslationPass] = Field(
-        default_factory=lambda: list(TranslationPass)
-    )
+    enabled_passes: list[TranslationPass] = Field(default_factory=lambda: list(TranslationPass))
     max_duration_delta_pct: float = Field(default=0.08, ge=0.0, le=0.5)
 
 
@@ -120,7 +118,9 @@ class TranslationPipeline:
                 current_text = result.translated_text
                 passes_done.append(pass_kind.value)
             except Exception as exc:
-                logger.warning("translation pass %s failed: %s — using previous text", pass_kind.value, exc)
+                logger.warning(
+                    "translation pass %s failed: %s — using previous text", pass_kind.value, exc
+                )
                 passes_done.append(f"{pass_kind.value}(failed)")
 
         # Estimate spoken duration (rough 200ms/word heuristic)
@@ -148,7 +148,7 @@ class TranslationPipeline:
     ) -> list[TranslatedLine]:
         """
         Translate a batch of dialogue lines in 40-line chunked LLM calls.
-        
+
         Translates dialogue lines maintaining full conversational context across turns,
         making it significantly faster than per-line calls while preserving scene coherence.
         """
@@ -156,7 +156,7 @@ class TranslationPipeline:
 
         for i in range(0, len(lines), chunk_size):
             chunk = lines[i : i + chunk_size]
-            numbered = "\n".join(f"{j+1}. {line.text}" for j, line in enumerate(chunk))
+            numbered = "\n".join(f"{j + 1}. {line.text}" for j, line in enumerate(chunk))
 
             prompt = (
                 f"You are localizing a movie transcript from {context.source_language} to {context.target_language}.\n"
@@ -177,6 +177,7 @@ class TranslationPipeline:
             try:
                 response = self._router.complete(request)
                 import json
+
                 data = json.loads(response.content)
                 translated_texts = data.get("translations", [])
 
@@ -199,7 +200,9 @@ class TranslationPipeline:
                         )
                     )
             except Exception as exc:
-                logger.warning("Batch translation chunk %d failed: %s — falling back to per-line", i, exc)
+                logger.warning(
+                    "Batch translation chunk %d failed: %s — falling back to per-line", i, exc
+                )
                 for line in chunk:
                     results.append(self.translate(line, context))
 
@@ -249,7 +252,7 @@ class TranslationPipeline:
             ),
             TranslationPass.DURATION_BUDGETING: (
                 f"The original speech duration is {line.duration_ms}ms. "
-                f"Adjust the translation to fit within {ctx.duration_tolerance_pct*100:.0f}% of this duration.\n\n"
+                f"Adjust the translation to fit within {ctx.duration_tolerance_pct * 100:.0f}% of this duration.\n\n"
                 f"{context_block}"
                 f"{response_contract}"
             ),

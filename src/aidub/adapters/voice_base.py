@@ -75,11 +75,9 @@ class VoiceEngine(Protocol):
     """Protocol for all TTS voice engine adapters."""
 
     @property
-    def engine_kind(self) -> VoiceEngineKind:
-        ...
+    def engine_kind(self) -> VoiceEngineKind: ...
 
-    def synthesize(self, request: SynthesisRequest, output_dir: str) -> SynthesisResult:
-        ...
+    def synthesize(self, request: SynthesisRequest, output_dir: str) -> SynthesisResult: ...
 
 
 class SyntheticVoiceEngine:
@@ -104,9 +102,7 @@ class SyntheticVoiceEngine:
         stub_duration_ms = max(500, word_count * 200)
         out_path.write_bytes(self._STUB_HEADER + b"\x00" * (stub_duration_ms * 2))
 
-        logger.debug(
-            "synthetic_voice: wrote %s (%dms)", out_path.name, stub_duration_ms
-        )
+        logger.debug("synthetic_voice: wrote %s (%dms)", out_path.name, stub_duration_ms)
         return SynthesisResult(
             request_id=request.request_id,
             utterance_id=request.utterance_id,

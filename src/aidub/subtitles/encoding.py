@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+
 from aidub.subtitles.exceptions import SubtitleEncodingError
 
 logger = logging.getLogger(__name__)
@@ -23,8 +24,8 @@ SUPPORTED_ENCODINGS = [
     "utf-16",
     "utf-16-le",
     "utf-16-be",
-    "cp1252",     # Windows-1252
-    "iso-8859-1", # Latin-1
+    "cp1252",  # Windows-1252
+    "iso-8859-1",  # Latin-1
 ]
 
 
@@ -54,7 +55,7 @@ def detect_and_read_subtitle_file(file_path: Path | str) -> tuple[str, str]:
             pass
 
     # Check UTF-16 BOM
-    if raw_bytes.startswith(b"\xff\xfe") or raw_bytes.startswith(b"\xfe\xff"):
+    if raw_bytes.startswith((b"\xff\xfe", b"\xfe\xff")):
         try:
             return raw_bytes.decode("utf-16"), "UTF-16"
         except Exception:
@@ -74,6 +75,7 @@ def detect_and_read_subtitle_file(file_path: Path | str) -> tuple[str, str]:
     # Final chardet fallback if chardet library is installed
     try:
         import chardet  # type: ignore[import-not-found]
+
         detected = chardet.detect(raw_bytes)
         enc_name = detected.get("encoding")
         if enc_name:
@@ -89,4 +91,4 @@ def detect_and_read_subtitle_file(file_path: Path | str) -> tuple[str, str]:
         raise SubtitleEncodingError(f"Failed to decode subtitle file '{path.name}': {e}") from e
 
 
-__all__ = ["detect_and_read_subtitle_file", "SUPPORTED_ENCODINGS"]
+__all__ = ["SUPPORTED_ENCODINGS", "detect_and_read_subtitle_file"]

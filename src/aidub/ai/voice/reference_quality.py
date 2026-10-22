@@ -55,7 +55,9 @@ class ReferenceVoiceQualityEngine:
         reverb_penalty = reverb_score * 0.2
         clipping_penalty = clipping_ratio * 0.5
 
-        raw_score = (dur_score * 0.3 + snr_score * 0.4 + 0.3) - (overlap_penalty + music_penalty + reverb_penalty + clipping_penalty)
+        raw_score = (dur_score * 0.3 + snr_score * 0.4 + 0.3) - (
+            overlap_penalty + music_penalty + reverb_penalty + clipping_penalty
+        )
         final_score = round(max(0.0, min(100.0, raw_score * 100.0)), 1)
 
         # Classify Tier

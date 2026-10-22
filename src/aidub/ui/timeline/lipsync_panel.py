@@ -26,13 +26,12 @@ logger = logging.getLogger(__name__)
 
 # Optional PySide6 import guard for headless execution environments
 try:
-    from PySide6.QtCore import Qt, Signal
+    from PySide6.QtCore import Signal
     from PySide6.QtWidgets import (
         QComboBox,
         QFormLayout,
         QGroupBox,
         QLabel,
-        QSlider,
         QVBoxLayout,
         QWidget,
     )
@@ -83,9 +82,12 @@ class LipSyncControlPanelController:
         face_track: Any = None,
         is_off_screen: bool = False,
         is_occluded: bool = False,
-        simulated_qc_scores: tuple[float, float, float] | None = None,
+        *,
+        video_path: str | None = None,
+        measured_sync_confidence: float | None = None,
+        measured_seam_artifact_score: float | None = None,
     ) -> tuple[EligibilityScore, VisualQcResult]:
-        """Perform combined visual eligibility and QC assessment for currently selected shot."""
+        """Assess eligibility and classify QC only when real measurements are supplied."""
         eligibility = self.eligibility_evaluator.evaluate_eligibility(
             shot_id=self.config.selected_shot_id,
             face_track=face_track,
@@ -94,10 +96,13 @@ class LipSyncControlPanelController:
             user_override=self.config.user_override,
         )
 
+        if video_path is None:
+            raise RuntimeError("Provide a real rendered shot video before running visual QC.")
         qc_result = self.qc_evaluator.evaluate_shot_video(
             shot_id=self.config.selected_shot_id,
-            video_path=f"shots/{self.config.selected_shot_id}.mp4",
-            simulated_scores=simulated_qc_scores,
+            video_path=video_path,
+            measured_sync_confidence=measured_sync_confidence,
+            measured_seam_artifact_score=measured_seam_artifact_score,
         )
 
         return eligibility, qc_result

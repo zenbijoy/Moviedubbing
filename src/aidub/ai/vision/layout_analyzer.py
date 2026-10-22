@@ -82,7 +82,8 @@ def analyze_layout(
         return hit / len(distinct)
 
     sub_lines = [
-        b for b in bands
+        b
+        for b in bands
         if _cy(b) >= lower_from * frame_height
         and _distinct_texts(bands[b]) >= 3
         and _spoken_frac(bands[b]) >= 0.5
@@ -95,7 +96,8 @@ def analyze_layout(
     richest_band = max(sub_lines, key=lambda b: _distinct_texts(bands[b]))
     sub_y = int(_cy(richest_band))
 
-    on_sub_line = lambda r: any(abs((r[2] + r[4] / 2.0) - c) <= 0.7 * band_h for c in centers)
+    def on_sub_line(r: tuple[Any, ...]) -> bool:
+        return any(abs((r[2] + r[4] / 2.0) - c) <= 0.7 * band_h for c in centers)
 
     caption_boxes = [
         (r[1], r[2], r[3], r[4], r[5], (r[6] if len(r) > 6 else r[5]))

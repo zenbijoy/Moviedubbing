@@ -13,9 +13,7 @@ import logging
 import time
 from typing import Any
 
-from aidub.contracts.base import Identifier
 from aidub.providers.router import (
-    LlmAdapter,
     LlmProviderError,
     LlmProviderKind,
     LlmRequest,
@@ -58,16 +56,28 @@ class OpenRouterAdapter:
         api_key: str,
         model: str = DEFAULT_MODEL,
         *,
+        api_keys: list[str] | None = None,
         site_url: str = "",
         app_name: str = "aidub",
         timeout_s: float = 120.0,
     ) -> None:
-        self._api_key = api_key
+        self._api_keys: list[str] = list(api_keys) if api_keys else ([api_key] if api_key else [])
+        self._key_index = 0
+        self._api_key = self._api_keys[0] if self._api_keys else api_key
         self._model = model
         self._site_url = site_url
         self._app_name = app_name
         self._timeout_s = timeout_s
         self._client: Any | None = None  # lazy-init
+
+    def _rotate_key(self) -> bool:
+        if len(self._api_keys) <= 1:
+            return False
+        self._key_index = (self._key_index + 1) % len(self._api_keys)
+        self._api_key = self._api_keys[self._key_index]
+        self._client = None
+        logger.info("OpenRouter: Rotated to key %d of %d", self._key_index + 1, len(self._api_keys))
+        return True
 
     # ── LlmAdapter protocol ───────────────────────────────────────────────────
 
@@ -76,37 +86,50 @@ class OpenRouterAdapter:
         return LlmProviderKind.OPENROUTER
 
     def complete(self, request: LlmRequest) -> LlmResponse:
-        """Send a chat-completion request through OpenRouter."""
-        client = self._get_client()
-        messages = _build_messages(request)
+        """Send a chat-completion request through OpenRouter with automatic key pool rotation."""
+        max_attempts = max(1, len(self._api_keys))
+        last_exc: Exception | None = None
 
-        extra: dict[str, Any] = {}
-        if request.json_mode:
-            extra["response_format"] = {"type": "json_object"}
+        for attempt in range(max_attempts):
+            client = self._get_client()
+            messages = _build_messages(request)
 
-        t0 = time.monotonic()
-        try:
-            resp = client.chat.completions.create(
-                model=self._model,
-                messages=messages,
-                temperature=request.temperature,
-                max_tokens=request.max_tokens,
-                timeout=self._timeout_s,
-                **extra,
-            )
-        except Exception as exc:
-            raise LlmProviderError(
-                "openrouter", f"HTTP error: {exc}", retryable=_is_retryable(exc)
-            ) from exc
+            extra: dict[str, Any] = {}
+            if request.json_mode:
+                extra["response_format"] = {"type": "json_object"}
+
+            t0 = time.monotonic()
+            try:
+                resp = client.chat.completions.create(
+                    model=self._model,
+                    messages=messages,
+                    temperature=request.temperature,
+                    max_tokens=request.max_tokens,
+                    timeout=self._timeout_s,
+                    **extra,
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+                if attempt < max_attempts - 1 and self._rotate_key():
+                    logger.warning(
+                        "OpenRouter attempt %d failed (%s), rotating to next API key...",
+                        attempt + 1,
+                        exc,
+                    )
+                    continue
+                raise LlmProviderError(
+                    "openrouter", f"HTTP error: {exc}", retryable=_is_retryable(exc)
+                ) from exc
+        else:
+            raise LlmProviderError("openrouter", f"All API keys failed: {last_exc}", retryable=True)
 
         latency_ms = (time.monotonic() - t0) * 1_000
         choice = resp.choices[0]
         content = (choice.message.content or "").strip()
 
         if not content:
-            raise LlmProviderError(
-                "openrouter", "empty response content", retryable=True
-            )
+            raise LlmProviderError("openrouter", "empty response content", retryable=True)
 
         logger.debug(
             "openrouter: model=%s tokens=%s/%s latency=%.0fms",
@@ -156,19 +179,20 @@ class OpenRouterAdapter:
 
     def list_models(self) -> list[str]:
         """Return all model slugs available on OpenRouter (for UI pickers)."""
-        import urllib.request
         import json as _json
+        import urllib.request
 
         req = urllib.request.Request(
             "https://openrouter.ai/api/v1/models",
             headers={"Authorization": f"Bearer {self._api_key}"},
         )
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310
             data = _json.loads(resp.read())
         return [m["id"] for m in data.get("data", [])]
 
 
 # ── Module helpers ────────────────────────────────────────────────────────────
+
 
 def _build_messages(request: LlmRequest) -> list[dict[str, str]]:
     msgs: list[dict[str, str]] = []
@@ -190,4 +214,4 @@ def _is_retryable(exc: Exception) -> bool:
     return True  # default: retry unknown errors
 
 
-__all__ = ["OpenRouterAdapter", "DEFAULT_MODEL"]
+__all__ = ["DEFAULT_MODEL", "OpenRouterAdapter"]

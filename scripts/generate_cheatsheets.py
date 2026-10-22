@@ -481,7 +481,7 @@ with open(os.path.join(CHEATSHEETS_DIR, "evaluation.md"), "w", encoding="utf-8")
 | **TTS Intelligibility** | Synthetic ASR-WER | Back-transcribe via Faster-Whisper | Synthetic WER < 8% |
 | **Speaker Similarity** | Cosine Similarity of ECAPA-TDNN | `speechbrain` / `torchaudio` | Cosine Sim > 0.84 |
 | **Acoustic Naturalness** | UTMOS / DNSMOS | `UTMOS` neural MOS predictor | MOS > 4.0 / 5.0 |
-| **Isochrony Fit** | Duration Delta % | $|T_{target} - T_{orig}| / T_{orig}$ | Delta $\\le \\pm 5\%$ |
+| **Isochrony Fit** | Duration Delta % | $|T_{target} - T_{orig}| / T_{orig}$ | Delta $\\le \\pm 5\\%$ |
 | **Lip-Sync Accuracy** | LSE-C / LSE-D | SyncNet | LSE-C > 6.5, LSE-D < 7.5 |
 """)
 

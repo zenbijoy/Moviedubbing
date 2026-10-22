@@ -59,7 +59,7 @@ def _child_environment() -> dict[str, str]:
 
 
 def _spawn_child(script: str, *arguments: Path) -> subprocess.Popen[str]:
-    return subprocess.Popen(  # noqa: S603 - interpreter and inline test program are trusted
+    return subprocess.Popen(
         [sys.executable, "-c", script, *(str(argument) for argument in arguments)],
         env=_child_environment(),
         stdout=subprocess.DEVNULL,

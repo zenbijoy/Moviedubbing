@@ -49,7 +49,9 @@ class UtteranceStore:
 
         json_data = json.dumps(payload, ensure_ascii=False, indent=2)
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8", dir=self.output_directory) as tmp:
+        with tempfile.NamedTemporaryFile(
+            mode="w", delete=False, encoding="utf-8", dir=self.output_directory
+        ) as tmp:
             tmp.write(json_data)
             tmp.flush()
             os.fsync(tmp.fileno())
@@ -57,7 +59,7 @@ class UtteranceStore:
 
         shutil.copyfile(tmp_name, str(target_path))
         try:
-            os.remove(tmp_name)
+            Path(tmp_name).unlink(missing_ok=True)
         except Exception:
             pass
 
@@ -70,14 +72,16 @@ class UtteranceStore:
         if not target_path.exists():
             return [], {}
 
-        with open(target_path, "r", encoding="utf-8") as f:
+        with target_path.open(encoding="utf-8") as f:
             data = json.load(f)
             return data.get("utterances", []), data.get("metadata", {})
 
-    def get_modified_utterances(self, current_utterances: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def get_modified_utterances(
+        self, current_utterances: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """
         Compare current utterance states against stored hashes.
-        
+
         Returns only utterances that have been edited by user or pipeline modifications.
         """
         modified: list[dict[str, Any]] = []
@@ -95,7 +99,9 @@ class UtteranceStore:
             if curr_hash != stored_hash:
                 modified.append(u)
 
-        logger.info("UtteranceStore: %d of %d utterances modified", len(modified), len(current_utterances))
+        logger.info(
+            "UtteranceStore: %d of %d utterances modified", len(modified), len(current_utterances)
+        )
         return modified
 
     def _hash_utterances(self, utterances: list[dict[str, Any]]) -> list[dict[str, Any]]:

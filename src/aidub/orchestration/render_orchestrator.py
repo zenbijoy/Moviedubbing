@@ -14,14 +14,15 @@ Provides node failure recovery, partial DAG re-execution, and adaptive VRAM thro
 
 from __future__ import annotations
 
-import logging
 from enum import StrEnum
 
 from pydantic import Field
 
 from aidub.contracts.base import ContractModel, Identifier
 
-logger = logging.getLogger(__name__)
+
+class RenderExecutionUnavailableError(RuntimeError):
+    """Raised when render-stage workers have not been configured."""
 
 
 class RenderStage(StrEnum):
@@ -75,10 +76,26 @@ class MultiEngineRenderOrchestrator:
         pid = Identifier(f"plan_{job_id}")
 
         n_tts = RenderNode(node_id=Identifier("node_tts"), stage=RenderStage.TTS_SYNTHESIS)
-        n_align = RenderNode(node_id=Identifier("node_align"), stage=RenderStage.FORCED_ALIGNMENT, dependencies=[Identifier("node_tts")])
-        n_stem = RenderNode(node_id=Identifier("node_stem"), stage=RenderStage.STEM_MIXING, dependencies=[Identifier("node_align")])
-        n_spatial = RenderNode(node_id=Identifier("node_spatial"), stage=RenderStage.SPATIAL_MASTERING, dependencies=[Identifier("node_stem")])
-        n_lipsync = RenderNode(node_id=Identifier("node_lipsync"), stage=RenderStage.LIP_SYNC_RENDER, dependencies=[Identifier("node_align")])
+        n_align = RenderNode(
+            node_id=Identifier("node_align"),
+            stage=RenderStage.FORCED_ALIGNMENT,
+            dependencies=[Identifier("node_tts")],
+        )
+        n_stem = RenderNode(
+            node_id=Identifier("node_stem"),
+            stage=RenderStage.STEM_MIXING,
+            dependencies=[Identifier("node_align")],
+        )
+        n_spatial = RenderNode(
+            node_id=Identifier("node_spatial"),
+            stage=RenderStage.SPATIAL_MASTERING,
+            dependencies=[Identifier("node_stem")],
+        )
+        n_lipsync = RenderNode(
+            node_id=Identifier("node_lipsync"),
+            stage=RenderStage.LIP_SYNC_RENDER,
+            dependencies=[Identifier("node_align")],
+        )
         n_encode = RenderNode(
             node_id=Identifier("node_encode"),
             stage=RenderStage.VIDEO_ENCODING,
@@ -98,37 +115,18 @@ class MultiEngineRenderOrchestrator:
 
     def execute_render_plan(self, plan: RenderPlan) -> RenderPlan:
         """
-        Execute nodes in dependency order.
+        Refuse to mark planned stages complete without real render workers.
         """
-        updated_nodes = dict(plan.nodes)
-        completed_count = 0
-        total_nodes = len(updated_nodes)
-
-        for nid, node in updated_nodes.items():
-            # Check dependencies
-            deps_ok = all(
-                updated_nodes[dep].status == RenderNodeStatus.COMPLETED for dep in node.dependencies if dep in updated_nodes
-            )
-
-            if deps_ok:
-                logger.info("render_orchestrator: executing node %s (Stage: %s)", nid, node.stage)
-                updated_nodes[nid] = node.model_copy(
-                    update={
-                        "status": RenderNodeStatus.COMPLETED,
-                        "output_artifact_path": f"renders/{plan.job_id}/{nid}.out",
-                    }
-                )
-                completed_count += 1
-            else:
-                logger.warning("render_orchestrator: skipped node %s due to incomplete dependencies", nid)
-                updated_nodes[nid] = node.model_copy(update={"status": RenderNodeStatus.SKIPPED})
-
-        progress = round((completed_count / total_nodes) * 100.0, 1) if total_nodes > 0 else 100.0
-        return plan.model_copy(update={"nodes": updated_nodes, "overall_progress": progress})
+        del plan
+        raise RenderExecutionUnavailableError(
+            "Render execution is unavailable: no TTS, alignment, mixing, lip-sync, or encoding "
+            "workers are registered. The plan remains pending and no output was created."
+        )
 
 
 __all__ = [
     "MultiEngineRenderOrchestrator",
+    "RenderExecutionUnavailableError",
     "RenderNode",
     "RenderNodeStatus",
     "RenderPlan",

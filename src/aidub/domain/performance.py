@@ -31,9 +31,9 @@ class PerformanceIntent(ContractModel):
 
     primary_emotion: str = Field(default="neutral", max_length=32)
     emotion_intensity: float = Field(default=0.5, ge=0.0, le=1.0)
-    valence: float = Field(default=0.0, ge=-1.0, le=1.0)       # Positive vs Negative
-    arousal: float = Field(default=0.0, ge=-1.0, le=1.0)       # Calm vs Excited
-    dominance: float = Field(default=0.0, ge=-1.0, le=1.0)     # Submissive vs Dominant
+    valence: float = Field(default=0.0, ge=-1.0, le=1.0)  # Positive vs Negative
+    arousal: float = Field(default=0.0, ge=-1.0, le=1.0)  # Calm vs Excited
+    dominance: float = Field(default=0.0, ge=-1.0, le=1.0)  # Submissive vs Dominant
     speaking_rate: float = Field(default=1.0, ge=0.5, le=2.0)
     pitch_scale: float = Field(default=1.0, ge=0.5, le=2.0)
     energy_scale: float = Field(default=1.0, ge=0.5, le=2.0)

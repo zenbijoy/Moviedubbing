@@ -27,9 +27,13 @@ class SpeakerLayout(StrEnum):
 class Spatial3DPosition(ContractModel):
     """3D sound source position coordinates in spherical system."""
 
-    azimuth_deg: float = Field(default=0.0, ge=-180.0, le=180.0, description="0=front, -90=left, +90=right")
+    azimuth_deg: float = Field(
+        default=0.0, ge=-180.0, le=180.0, description="0=front, -90=left, +90=right"
+    )
     elevation_deg: float = Field(default=0.0, ge=-90.0, le=90.0, description="0=level, +90=above")
-    distance_m: float = Field(default=1.0, ge=0.1, le=100.0, description="Distance from listener in meters")
+    distance_m: float = Field(
+        default=1.0, ge=0.1, le=100.0, description="Distance from listener in meters"
+    )
     air_absorption: bool = True
 
     @property
@@ -41,12 +45,12 @@ class Spatial3DPosition(ContractModel):
 class Surround51Gains(ContractModel):
     """Channel gain coefficients for 5.1 Surround output."""
 
-    fl: float = Field(default=0.707, ge=0.0, le=1.0)   # Front Left
-    fr: float = Field(default=0.707, ge=0.0, le=1.0)   # Front Right
-    fc: float = Field(default=0.0, ge=0.0, le=1.0)     # Center
-    lfe: float = Field(default=0.0, ge=0.0, le=1.0)    # Subwoofer LFE
-    sl: float = Field(default=0.0, ge=0.0, le=1.0)     # Surround Left
-    sr: float = Field(default=0.0, ge=0.0, le=1.0)     # Surround Right
+    fl: float = Field(default=0.707, ge=0.0, le=1.0)  # Front Left
+    fr: float = Field(default=0.707, ge=0.0, le=1.0)  # Front Right
+    fc: float = Field(default=0.0, ge=0.0, le=1.0)  # Center
+    lfe: float = Field(default=0.0, ge=0.0, le=1.0)  # Subwoofer LFE
+    sl: float = Field(default=0.0, ge=0.0, le=1.0)  # Surround Left
+    sr: float = Field(default=0.0, ge=0.0, le=1.0)  # Surround Right
 
 
 class SpatialPanner:

@@ -31,7 +31,9 @@ class EDLFCPXMLAdapter:
         edit_num = 1
         for track in timeline.tracks:
             for clip in track.clips:
-                lines.append(f"{edit_num:03d}  AX       A    C        00:00:00:00 00:00:05:00 00:00:00:00 00:00:05:00")
+                lines.append(
+                    f"{edit_num:03d}  AX       A    C        00:00:00:00 00:00:05:00 00:00:00:00 00:00:05:00"
+                )
                 lines.append(f"* FROM CLIP: {clip.name}")
                 edit_num += 1
 
@@ -44,20 +46,20 @@ class EDLFCPXMLAdapter:
         """
         xml = [
             '<?xml version="1.0" encoding="UTF-8"?>',
-            '<!DOCTYPE fcpxml>',
+            "<!DOCTYPE fcpxml>",
             '<fcpxml version="1.10">',
             f'  <library name="{timeline.name}">',
             '    <event name="Dubbing Event">',
             f'      <project name="{timeline.name}">',
             '        <sequence frameDuration="1/24s">',
-            '          <spine>',
-            '            <!-- Audio/Video clips -->',
-            '          </spine>',
-            '        </sequence>',
-            '      </project>',
-            '    </event>',
-            '  </library>',
-            '</fcpxml>',
+            "          <spine>",
+            "            <!-- Audio/Video clips -->",
+            "          </spine>",
+            "        </sequence>",
+            "      </project>",
+            "    </event>",
+            "  </library>",
+            "</fcpxml>",
         ]
         logger.info("edl_fcpxml_adapter: generated FCPXML for '%s'", timeline.name)
         return "\n".join(xml)

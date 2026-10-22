@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from aidub.adapters.voice.edge_tts_adapter import EdgeTTSVoiceEngine
 from aidub.adapters.voice_base import SynthesisRequest, VoiceEngine
@@ -18,7 +19,9 @@ class TtsSynthesisJob(ContractModel):
     output_directory: str
 
 
-def run_tts_synthesis(payload: dict, *, engine: VoiceEngine | None = None) -> dict:
+def run_tts_synthesis(
+    payload: dict[str, Any], *, engine: VoiceEngine | None = None
+) -> dict[str, Any]:
     """
     Worker handler for 'voice.synthesize' job type.
 

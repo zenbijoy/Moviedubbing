@@ -50,12 +50,14 @@ from aidub.subtitles.qc import (
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _time_range(start_s: float = 0.0, end_s: float = 2.0) -> TimeRange:
     from aidub.domain.time import RationalRate, RationalTime
-    RATE = RationalRate(numerator=1_000)
+
+    rate = RationalRate(numerator=1_000)
     return TimeRange.from_start_end(
-        RationalTime(ticks=int(start_s * 1_000), rate=RATE),
-        RationalTime(ticks=int(end_s * 1_000), rate=RATE),
+        RationalTime(ticks=int(start_s * 1_000), rate=rate),
+        RationalTime(ticks=int(end_s * 1_000), rate=rate),
     )
 
 
@@ -153,7 +155,7 @@ def test_voice_rights_blocks_wrong_language() -> None:
         svc.authorize(
             voice_profile_id="vcp_001",
             project_id="prj_001",
-            language="fr-FR",           # not in consent languages
+            language="fr-FR",  # not in consent languages
             territory="WORLDWIDE",
             use=VoiceUse.DUBBING,
         )
@@ -164,7 +166,7 @@ def test_voice_rights_blocks_wrong_language() -> None:
 
 def test_voice_rights_ledger_is_append_only() -> None:
     svc = VoiceRightsService()
-    profile = _voice_profile(VoiceOrigin.SYNTHETIC_STOCK)
+    _profile = _voice_profile(VoiceOrigin.SYNTHETIC_STOCK)
     profile_stock = VoiceProfile(
         voice_profile_id=VoiceProfileId("vcp_stock"),
         project_id=ProjectId("prj_001"),
@@ -308,8 +310,15 @@ def test_timing_fitter_rate_control() -> None:
     fitter = TimingFitter(TimingFitterConfig(tolerance_ms=50))
     # 3000ms take into 2900ms slot — 3.4% compression after rate: within range
     result = fitter.fit(utterance_id="utt-003", synthesized_ms=3_000, slot_ms=2_900)
-    assert result.strategy_used in (FitStrategy.RATE_CONTROL, FitStrategy.TIME_STRETCH, FitStrategy.EXACT_FIT)
-    assert result.within_tolerance or result.strategy_used in (FitStrategy.RATE_CONTROL, FitStrategy.TIME_STRETCH)
+    assert result.strategy_used in (
+        FitStrategy.RATE_CONTROL,
+        FitStrategy.TIME_STRETCH,
+        FitStrategy.EXACT_FIT,
+    )
+    assert result.within_tolerance or result.strategy_used in (
+        FitStrategy.RATE_CONTROL,
+        FitStrategy.TIME_STRETCH,
+    )
 
 
 def test_timing_fitter_time_stretch_within_bounds() -> None:
@@ -323,7 +332,11 @@ def test_timing_fitter_time_stretch_within_bounds() -> None:
     fitter = TimingFitter(cfg)
     # 3000ms take into 3200ms slot — 6.7% stretch (under 8% limit)
     result = fitter.fit(utterance_id="utt-004", synthesized_ms=3_000, slot_ms=3_200)
-    assert result.strategy_used in (FitStrategy.TIME_STRETCH, FitStrategy.EXACT_FIT, FitStrategy.RATE_CONTROL)
+    assert result.strategy_used in (
+        FitStrategy.TIME_STRETCH,
+        FitStrategy.EXACT_FIT,
+        FitStrategy.RATE_CONTROL,
+    )
 
 
 def test_timing_fitter_flags_for_review_when_over_limit() -> None:
@@ -426,6 +439,7 @@ def test_take_manager_render_priority() -> None:
 
 def test_take_manager_enforces_limit() -> None:
     from aidub.application.take_manager import MAX_TAKES_PER_UTTERANCE
+
     mgr = TakeManager()
     for i in range(1, MAX_TAKES_PER_UTTERANCE + 1):
         mgr.add_take(_make_take("utt-001", i, f"take-{i:03d}"))
@@ -455,6 +469,7 @@ def test_audio_dsp_chain_from_dialogue_preset() -> None:
 
 def test_audio_dsp_chain_ffmpeg_filter_contains_all_stages() -> None:
     from aidub.media.audio_chain import Compressor, Deesser, NoiseGate, SpatialPan
+
     chain = AudioDspChain(
         utterance_id=Identifier("utt-001"),
         noise_gate=NoiseGate(threshold_db=-40.0, enabled=True),
@@ -477,6 +492,7 @@ def test_audio_dsp_chain_ffmpeg_filter_contains_all_stages() -> None:
 
 def test_audio_dsp_chain_disabled_stages_excluded() -> None:
     from aidub.media.audio_chain import NoiseGate
+
     chain = AudioDspChain(
         utterance_id=Identifier("utt-002"),
         noise_gate=NoiseGate(enabled=False),
@@ -493,7 +509,7 @@ def test_loudness_bus_ebu_r128_normalization() -> None:
     meas = LoudnessMeasurement(
         integrated_lufs=-30.0,
         loudness_range_lu=8.0,
-        true_peak_dbtp=-10.0,   # headroom: +7dB gain pushes peak to -3dBTP (safe)
+        true_peak_dbtp=-10.0,  # headroom: +7dB gain pushes peak to -3dBTP (safe)
         short_term_max_lufs=-25.0,
     )
     result = bus.compute_normalization("utt-001", meas)
@@ -510,7 +526,7 @@ def test_loudness_bus_true_peak_limiter_engages() -> None:
     meas = LoudnessMeasurement(
         integrated_lufs=-30.0,
         loudness_range_lu=5.0,
-        true_peak_dbtp=-2.0,   # +7dB gain would push peak to +5dBTP — must be limited
+        true_peak_dbtp=-2.0,  # +7dB gain would push peak to +5dBTP — must be limited
         short_term_max_lufs=-25.0,
     )
     result = bus.compute_normalization("utt-001", meas)
@@ -551,8 +567,12 @@ def test_subtitle_qc_clean_track_passes() -> None:
 def test_subtitle_qc_line_too_long() -> None:
     engine = SubtitleQcEngine(SubtitleQcConfig(max_chars_per_line=37))
     cues = [
-        SubtitleCue(cue_id="1", start_ms=0, end_ms=5_000,
-                    text="This is a very long subtitle line that exceeds the maximum character limit"),
+        SubtitleCue(
+            cue_id="1",
+            start_ms=0,
+            end_ms=5_000,
+            text="This is a very long subtitle line that exceeds the maximum character limit",
+        ),
     ]
     report = engine.check("track-001", cues)
     assert any(v.kind == QcViolationKind.LINE_TOO_LONG for v in report.violations)
@@ -599,8 +619,10 @@ def test_subtitle_qc_reading_speed_exceeded() -> None:
     # 80 chars in 1.5 seconds = ~53 chars/sec
     cues = [
         SubtitleCue(
-            cue_id="1", start_ms=0, end_ms=1_500,
-            text="This is very fast text that nobody can read in this amount of time."
+            cue_id="1",
+            start_ms=0,
+            end_ms=1_500,
+            text="This is very fast text that nobody can read in this amount of time.",
         ),
     ]
     report = engine.check("track-001", cues)

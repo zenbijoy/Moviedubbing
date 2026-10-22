@@ -44,7 +44,9 @@ class UndoManager:
         if len(self._undo_stack) > self._max_levels:
             self._undo_stack.pop(0)
         self._redo_stack.clear()
-        logger.debug("undo_manager: executed %s (stack depth=%d)", command.name, len(self._undo_stack))
+        logger.debug(
+            "undo_manager: executed %s (stack depth=%d)", command.name, len(self._undo_stack)
+        )
 
     def undo(self) -> UndoCommand | None:
         """Pop and return the top command from the undo stack, moving it to redo."""

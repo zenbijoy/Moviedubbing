@@ -64,11 +64,11 @@ class CustomUrlAdapter:
         messages = _build_messages(request)
 
         kwargs: dict[str, Any] = {
-            "model":       self._model,
-            "messages":    messages,
+            "model": self._model,
+            "messages": messages,
             "temperature": request.temperature,
-            "max_tokens":  request.max_tokens,
-            "timeout":     self._timeout_s,
+            "max_tokens": request.max_tokens,
+            "timeout": self._timeout_s,
         }
 
         if request.json_mode:
@@ -79,7 +79,9 @@ class CustomUrlAdapter:
             resp = client.chat.completions.create(**kwargs)
         except Exception as exc:
             raise LlmProviderError(
-                self.name, f"Custom API error ({self._base_url}): {exc}", retryable=_is_retryable(exc)
+                self.name,
+                f"Custom API error ({self._base_url}): {exc}",
+                retryable=_is_retryable(exc),
             ) from exc
 
         latency_ms = (time.monotonic() - t0) * 1_000
@@ -128,6 +130,7 @@ class CustomUrlAdapter:
 
 
 # ── Module helpers ────────────────────────────────────────────────────────────
+
 
 def _build_messages(request: LlmRequest) -> list[dict[str, str]]:
     msgs: list[dict[str, str]] = []

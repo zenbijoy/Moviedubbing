@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 class InterchangeFormat(StrEnum):
-    OTIO = "otio"          # OpenTimelineIO JSON
-    EDL = "edl"            # CMX 3600 Edit Decision List
-    FCPXML = "fcpxml"      # Final Cut Pro XML
-    PREMIERE_XML = "xml"   # Adobe Premiere Pro XML
+    OTIO = "otio"  # OpenTimelineIO JSON
+    EDL = "edl"  # CMX 3600 Edit Decision List
+    FCPXML = "fcpxml"  # Final Cut Pro XML
+    PREMIERE_XML = "xml"  # Adobe Premiere Pro XML
     CUE_SHEET_CSV = "csv"  # CSV Dialogue Cue Sheet
 
 
@@ -99,12 +99,16 @@ class NleInterchangeAdapter:
                                     "duration": {
                                         "OTIO_SCHEMA": "RationalTime.1",
                                         "rate": timeline.fps,
-                                        "value": int((clip.source_duration_ms / 1000.0) * timeline.fps),
+                                        "value": int(
+                                            (clip.source_duration_ms / 1000.0) * timeline.fps
+                                        ),
                                     },
                                     "start_time": {
                                         "OTIO_SCHEMA": "RationalTime.1",
                                         "rate": timeline.fps,
-                                        "value": int((clip.source_start_ms / 1000.0) * timeline.fps),
+                                        "value": int(
+                                            (clip.source_start_ms / 1000.0) * timeline.fps
+                                        ),
                                     },
                                 },
                                 "media_reference": {
@@ -140,7 +144,7 @@ class NleInterchangeAdapter:
         tracks: list[NleTrackItem] = []
         stack = otio_dict.get("tracks", {}).get("children", [])
         for t_idx, trk_dict in enumerate(stack):
-            t_name = trk_dict.get("name", f"Track {t_idx+1}")
+            t_name = trk_dict.get("name", f"Track {t_idx + 1}")
             t_kind = trk_dict.get("kind", "Audio")
             clips: list[NleClipItem] = []
 
@@ -168,7 +172,7 @@ class NleInterchangeAdapter:
 
             tracks.append(
                 NleTrackItem(
-                    track_id=Identifier(f"trk_{t_idx+1}"),
+                    track_id=Identifier(f"trk_{t_idx + 1}"),
                     name=t_name,
                     kind=t_kind,
                     clips=clips,
@@ -230,16 +234,16 @@ class NleInterchangeAdapter:
         """
         xml_lines: list[str] = [
             '<?xml version="1.0" encoding="UTF-8"?>',
-            '<!DOCTYPE fcpxml>',
+            "<!DOCTYPE fcpxml>",
             '<fcpxml version="1.9">',
-            '  <resources>',
+            "  <resources>",
             '    <format id="r1" name="FFVideoFormat1080p24" frameDuration="100/2400s" width="1920" height="1080"/>',
-            '  </resources>',
-            '  <library>',
+            "  </resources>",
+            "  <library>",
             f'    <event name="{timeline.title}">',
             f'      <project name="{timeline.title}">',
             '        <sequence format="r1" duration="1000/24s">',
-            '          <spine>',
+            "          <spine>",
         ]
 
         for track in timeline.tracks:
@@ -250,18 +254,18 @@ class NleInterchangeAdapter:
                     f'            <asset-clip name="{clip.clip_id}" offset="{start_s:.2f}s" duration="{dur_s:.2f}s" ref="r1">'
                 )
                 xml_lines.append(
-                    f'              <note>{clip.character_id}: {clip.translation_text}</note>'
+                    f"              <note>{clip.character_id}: {clip.translation_text}</note>"
                 )
-                xml_lines.append('            </asset-clip>')
+                xml_lines.append("            </asset-clip>")
 
         xml_lines.extend(
             [
-                '          </spine>',
-                '        </sequence>',
-                '      </project>',
-                '    </event>',
-                '  </library>',
-                '</fcpxml>',
+                "          </spine>",
+                "        </sequence>",
+                "      </project>",
+                "    </event>",
+                "  </library>",
+                "</fcpxml>",
             ]
         )
 

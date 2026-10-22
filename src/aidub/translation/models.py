@@ -78,11 +78,15 @@ class TranslationUnit(DomainModel):
 
     @model_validator(mode="after")
     def _validate_history(self) -> Self:
-        translation_ids = tuple(record.translation.translation_version_id for record in self.records)
+        translation_ids = tuple(
+            record.translation.translation_version_id for record in self.records
+        )
         require_unique(translation_ids, field_name="translation_version_ids")
         versions = tuple(record.translation.version for record in self.records)
         if versions != tuple(range(1, len(self.records) + 1)):
-            raise ValueError("translation record versions must be a contiguous sequence starting at one")
+            raise ValueError(
+                "translation record versions must be a contiguous sequence starting at one"
+            )
         for record in self.records:
             if record.translation.utterance_id != self.utterance_id:
                 raise ValueError("translation record utterance does not match its translation unit")

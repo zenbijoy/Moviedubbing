@@ -103,7 +103,8 @@ class InvalidationGraph:
         roots = [
             key
             for key, node in self._nodes.items()
-            if node.key == track_key or (node.stage == ArtifactStage.STEMS and node.key.endswith("_music"))
+            if node.key == track_key
+            or (node.stage == ArtifactStage.STEMS and node.key.endswith("_music"))
         ]
         affected: set[str] = set(roots)
         for root in roots:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -10,7 +9,7 @@ import pytest
 from aidub.pipeline.config import PipelineConfig
 from aidub.pipeline.engine import DubbingEngine, PipelineCancelled
 from aidub.pipeline.errors import ErrorKind, PipelineError, exit_code_for_error
-from aidub.pipeline.manifest import PipelineManifest, StageStatus
+from aidub.pipeline.manifest import PipelineManifest
 from aidub.pipeline.utterance_store import UtteranceStore
 
 
@@ -24,7 +23,7 @@ def test_pipeline_config_defaults(tmp_path: Path) -> None:
 
 def test_pipeline_manifest_save_and_load(tmp_path: Path) -> None:
     manifest = PipelineManifest.load(tmp_path, task_id="test_task_01")
-    manifest.mark_stage("asr", True, duration_ms=120)
+    manifest.mark_stage("asr", ok=True, duration_ms=120)
     manifest.save()
 
     loaded = PipelineManifest.load(tmp_path)
@@ -101,3 +100,32 @@ def test_dubbing_engine_rejects_missing_source_before_probe(tmp_path: Path) -> N
         DubbingEngine(cfg).run()
 
     assert exc_info.value.code == "input_not_found"
+
+
+def test_dubbing_engine_fails_closed_without_real_translation_provider(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from aidub.diagnostics.dubbing import DubbingCheckResult, DubbingDiagnosticReport
+
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"source fixture")
+    output = tmp_path / "dubbed.mp4"
+    report = DubbingDiagnosticReport(
+        checks=[
+            DubbingCheckResult("ffmpeg", True, "available"),
+            DubbingCheckResult("faster-whisper", True, "available"),
+            DubbingCheckResult("edge-tts", True, "available"),
+            DubbingCheckResult("llm_provider", False, "translation cannot run"),
+            DubbingCheckResult("demucs", True, "available"),
+            DubbingCheckResult("pyannote", True, "available"),
+        ]
+    )
+    monkeypatch.setattr("aidub.diagnostics.dubbing.collect_dubbing_diagnostics", lambda: report)
+    config = PipelineConfig(input=source, output=output, work_dir=tmp_path / "work")
+
+    with pytest.raises(PipelineError) as exc_info:
+        DubbingEngine(config).run()
+
+    assert exc_info.value.code == "dubbing_dependencies_missing"
+    assert "translation cannot run" in str(exc_info.value)
+    assert not output.exists()

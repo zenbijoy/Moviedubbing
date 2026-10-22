@@ -102,7 +102,9 @@ def test_language_is_explicit_and_invalid_encoding_is_rejected(tmp_path: Path) -
         SourceSubtitleIngestionService().ingest(source, _request(source_language="hi-IN"))
 
 
-def test_unsupported_extension_and_size_limit_fail_before_candidate_conversion(tmp_path: Path) -> None:
+def test_unsupported_extension_and_size_limit_fail_before_candidate_conversion(
+    tmp_path: Path,
+) -> None:
     unsupported = tmp_path / "source.ass"
     _write(unsupported, "[Script Info]\n")
     with pytest.raises(SubtitleIngestionError, match="unsupported subtitle extension"):
@@ -160,7 +162,9 @@ def test_outside_media_duration_is_reported_and_blocks_all_candidates(tmp_path: 
         SourceSubtitleIngestionService.require_acceptable(result)
 
 
-def test_nonexact_edit_time_requires_explicit_rounding_and_collapse_is_blocking(tmp_path: Path) -> None:
+def test_nonexact_edit_time_requires_explicit_rounding_and_collapse_is_blocking(
+    tmp_path: Path,
+) -> None:
     source = tmp_path / "fractional.srt"
     _write(source, "1\n00:00:00,001 --> 00:00:00,002\ntiny\n")
 

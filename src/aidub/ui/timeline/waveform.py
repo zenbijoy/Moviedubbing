@@ -49,7 +49,7 @@ class WaveformGenerator:
         max_peaks: list[float] = []
 
         for i in range(0, total_samples, chunk_size):
-            chunk = audio_samples[i:i + chunk_size]
+            chunk = audio_samples[i : i + chunk_size]
             min_peaks.append(round(max(-1.0, min(chunk)), 3))
             max_peaks.append(round(min(1.0, max(chunk)), 3))
 

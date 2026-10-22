@@ -20,7 +20,7 @@ from aidub.contracts.base import ContractModel
 class FadeCurveShape(StrEnum):
     LINEAR = "linear"
     EQUAL_POWER = "equal_power"  # 3dB drop at center (constant energy)
-    EQUAL_GAIN = "equal_gain"    # 6dB drop at center (constant amplitude)
+    EQUAL_GAIN = "equal_gain"  # 6dB drop at center (constant amplitude)
 
 
 class ClipFadeSettings(ContractModel):

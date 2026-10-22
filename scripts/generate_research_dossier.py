@@ -1,9 +1,7 @@
 """Generate comprehensive research artifacts for all 41 primary scope dubbing repositories."""
 
 import csv
-import json
 import os
-import re
 
 DATA_DIR = "dubbing-research/data"
 CARDS_DIR = "dubbing-research/research/cards"
@@ -32,7 +30,7 @@ REPO_PROFILES = {
         "weaknesses": "Heavy VRAM spikes if loading WhisperX + XTTS simultaneously; no video face modification.",
         "license": "AGPL-3.0; 5.6k+ stars, highly active community.",
         "recommendation": "Copy ideas (pipeline task graph and LLM length budgeting prompt).",
-        "confidence": "High (verified from code and README.en.md)."
+        "confidence": "High (verified from code and README.en.md).",
     },
     "kadirb4rut/video-dubbing-translator": {
         "verdict": "Lightweight, inspectable local dubbing pipeline uniquely adopting VoxCPM2 for reference voice cloning with optional LatentSync.",
@@ -51,7 +49,7 @@ REPO_PROFILES = {
         "weaknesses": "Google Translate network dependency; punctuation segmentation can split clauses awkwardly.",
         "license": "MIT; 12 stars, active personal research project.",
         "recommendation": "Copy ideas (LatentSync integration harness and VoxCPM2 48kHz voice conditioning).",
-        "confidence": "High (verified against Video_Translator.py and README)."
+        "confidence": "High (verified against Video_Translator.py and README).",
     },
     "langswap-app/langswap": {
         "verdict": "Self-hosted, modern full-stack dubbing suite leveraging F5-TTS, Qwen LLM, and Gradio for local multi-lingual dubs.",
@@ -70,7 +68,7 @@ REPO_PROFILES = {
         "weaknesses": "F5-TTS official checkpoint is CC-BY-NC (non-commercial); high GPU compute requirement for diffusion flow steps.",
         "license": "GPL-3.0; 250+ stars, active.",
         "recommendation": "Study only (inspect F5-TTS inference loop).",
-        "confidence": "High (verified from app repository)."
+        "confidence": "High (verified from app repository).",
     },
     "jianchang512/pyvideotrans": {
         "verdict": "The most mature, feature-dense desktop GUI video translation and dubbing workstation in the open-source ecosystem.",
@@ -90,7 +88,7 @@ REPO_PROFILES = {
         "weaknesses": "Codebase is monolithic and primarily localized in Chinese; tight coupling in Qt controllers.",
         "license": "GPL-3.0; 12.5k+ stars, extremely high maintenance activity.",
         "recommendation": "Copy ideas (study speed-clamp and translation retry mechanics).",
-        "confidence": "High (verified from codebase and releases)."
+        "confidence": "High (verified from codebase and releases).",
     },
     "zast57/ZastTranslate": {
         "verdict": "Exceptionally well-engineered 1-click local dubbing suite with state-of-the-art 8-stage subtitle stabilization and VoxCPM 2 cloning.",
@@ -109,7 +107,7 @@ REPO_PROFILES = {
         "weaknesses": "Single-voice per video currently (multi-speaker diarization planned in roadmap).",
         "license": "MIT / Polyform; 51 stars, very active.",
         "recommendation": "Copy ideas (steal the 8-stage subtitle stabilization logic directly into our pre-translation pipeline).",
-        "confidence": "High (verified from README and architecture)."
+        "confidence": "High (verified from README and architecture).",
     },
     "DjebrilSVN/Ai-Vedio-Dubbing": {
         "verdict": "Straightforward end-to-end dubbing pipeline combining Whisper, translation, and TTS voice cloning with background preservation.",
@@ -127,7 +125,7 @@ REPO_PROFILES = {
         "weaknesses": "Primitive error handling; naive atempo causes chipmunk artifacts if speed > 1.25x.",
         "license": "MIT; small educational repo.",
         "recommendation": "Study only.",
-        "confidence": "Medium."
+        "confidence": "Medium.",
     },
     "stronghamjji/PersoDub": {
         "verdict": "Local-first dubbing framework emphasizing personalized voice cloning and privacy.",
@@ -145,7 +143,7 @@ REPO_PROFILES = {
         "weaknesses": "Truncating audio causes lost words on sentence overruns.",
         "license": "Apache-2.0; moderate activity.",
         "recommendation": "Study only.",
-        "confidence": "Medium."
+        "confidence": "Medium.",
     },
     "johunsang/kekedubing": {
         "verdict": "Desktop desktop video translation and dubbing utility built for Asian short-form creators.",
@@ -162,7 +160,7 @@ REPO_PROFILES = {
         "weaknesses": "Limited English documentation; Windows-specific hardcoded paths.",
         "license": "GPL-3.0.",
         "recommendation": "Ignore.",
-        "confidence": "Medium."
+        "confidence": "Medium.",
     },
     "shyhirt/AutoDub": {
         "verdict": "Clean automated dubbing tool linking Whisper, XTTS-v2, and local Ollama for zero-cost dubbing.",
@@ -179,7 +177,7 @@ REPO_PROFILES = {
         "weaknesses": "XTTS v2 failure on unsupported Bengali characters without custom phoneme mapping.",
         "license": "MIT; 40+ stars.",
         "recommendation": "Study only (Ollama prompt structure).",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "mazzasaverio/youtube-auto-dub": {
         "verdict": "End-to-end automated YouTube dubbing script featuring Wav2Lip integration and Pyannote diarization.",
@@ -199,7 +197,7 @@ REPO_PROFILES = {
         "weaknesses": "Wav2Lip visual artifacts; heavy reliance on ElevenLabs paid API for best voice results.",
         "license": "MIT; 120+ stars.",
         "recommendation": "Copy ideas (Wav2Lip + GFPGAN restoration pass pipeline).",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "timoncool/dub-studio": {
         "verdict": "SOTA native Windows dubbing studio in Rust + C++/CUDA; zero Python runtime, Mel-Band Roformer, Nemotron diarization, and MCP server.",
@@ -220,7 +218,7 @@ REPO_PROFILES = {
         "weaknesses": "Requires 8GB-16GB NVIDIA GPU for full local pipeline; complex native build toolchain.",
         "license": "Custom / Source-available; 198 stars, highly active.",
         "recommendation": "Copy ideas (Mel-Band Roformer separation, character face-voice binding, and MCP server architecture).",
-        "confidence": "Very High (verified from extensive technical docs)."
+        "confidence": "Very High (verified from extensive technical docs).",
     },
     "R3gm/SoniTranslate": {
         "verdict": "The undisputed open-source reference standard for multilingual video dubbing with Pyannote diarization, RVC, and Overlap Reduction.",
@@ -239,7 +237,7 @@ REPO_PROFILES = {
         "weaknesses": "Gradio UI can become sluggish on videos longer than 30 minutes; heavy Conda dependency stack.",
         "license": "Apache-2.0; 1.4k+ stars, highly maintained.",
         "recommendation": "Use as dependency / Copy ideas (RVC voice conversion adapter and overlap reduction algorithms).",
-        "confidence": "High (verified from app_rvc.py and language matrix)."
+        "confidence": "High (verified from app_rvc.py and language matrix).",
     },
     "jsfan3/autodub-local": {
         "verdict": "Modular, clean CLI & Gradio dubbing tool designed specifically for hybrid local/cloud model switching.",
@@ -257,16 +255,22 @@ REPO_PROFILES = {
         "weaknesses": "Lacks advanced subtitle stabilization.",
         "license": "MIT; 80+ stars.",
         "recommendation": "Study only.",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "akshinmrv/Voxa": {
         "verdict": "Masterclass in timeline synchronization: eliminates cumulative dub drift via anchored placement, length-budgeted translation, and quality gating.",
         "stages": [
             ("ASR", "Faster-Whisper with word-onset refinement"),
             ("Diarization", "Pyannote (optional `--diarize`)"),
-            ("Translation", "Google / Ollama / OpenAI / Anthropic (context-aware, length-budgeted)"),
+            (
+                "Translation",
+                "Google / Ollama / OpenAI / Anthropic (context-aware, length-budgeted)",
+            ),
             ("TTS", "Edge-TTS (100+ locales) / Piper (offline) / XTTS v2 / OpenAI"),
-            ("Audio Timing", "Anchored placement (no cumulative drift), speed-up only, 2-pass loudnorm"),
+            (
+                "Audio Timing",
+                "Anchored placement (no cumulative drift), speed-up only, 2-pass loudnorm",
+            ),
             ("Quality Gate", "Back-transcription with 2nd ASR to score WER, clipping, and pacing"),
         ],
         "bengali": "Yes — Full Bengali coverage via Faster-Whisper, Google/OpenAI translation, and Edge-TTS (`bn-BD-NabanitaNeural`).",
@@ -276,7 +280,7 @@ REPO_PROFILES = {
         "weaknesses": "Single-file script structure makes deep UI extension harder.",
         "license": "MIT; 16 stars, exceptionally well-architected.",
         "recommendation": "Copy ideas (must adopt the anchored placement algorithm, character-budgeted translation prompt, and back-transcription QC).",
-        "confidence": "Very High (verified from source code and architecture doc)."
+        "confidence": "Very High (verified from source code and architecture doc).",
     },
     "lukaszliniewicz/Subdub": {
         "verdict": "Focused CLI video-to-dubbed-video tool specializing in subtitle-driven translation and synchronization.",
@@ -294,7 +298,7 @@ REPO_PROFILES = {
         "weaknesses": "Audio time-stretching causes distortion if subtitle is overly long.",
         "license": "GPL-3.0.",
         "recommendation": "Study only.",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "lukaszliniewicz/Pandrator": {
         "verdict": "Comprehensive media translation station converting PDFs/EPUBs to audiobooks and videos to dubbed videos with RVC and XTTS fine-tuning.",
@@ -312,7 +316,7 @@ REPO_PROFILES = {
         "weaknesses": "Heavy desktop GUI dependencies; high initial setup friction.",
         "license": "GPL-3.0; 80+ stars.",
         "recommendation": "Copy ideas (RVC character voice fine-tuning pipeline).",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "medahmedkrichen/ViDubb": {
         "verdict": "Jupyter Notebook / research prototype demonstrating video dubbing with Whisper, translation, and TTS.",
@@ -329,7 +333,7 @@ REPO_PROFILES = {
         "weaknesses": "Robotic TTS, no voice cloning, no vocal separation.",
         "license": "MIT.",
         "recommendation": "Ignore.",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "yaranbarzi/aigolden-dubbing": {
         "verdict": "Minimal notebook-based dubbing script converting video into foreign languages.",
@@ -346,7 +350,7 @@ REPO_PROFILES = {
         "weaknesses": "No background music preservation, single speaker.",
         "license": "None.",
         "recommendation": "Ignore.",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "Badri467/DubFlow": {
         "verdict": "Streamlined web utility for downloading and dubbing YouTube videos with synced audio tracks.",
@@ -364,7 +368,7 @@ REPO_PROFILES = {
         "weaknesses": "No vocal separation; completely destroys original background music.",
         "license": "MIT.",
         "recommendation": "Ignore.",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "xiesx123/CreatorBox": {
         "verdict": "All-in-one content creator toolbox featuring captioning, video translation, and audio separation.",
@@ -382,7 +386,7 @@ REPO_PROFILES = {
         "weaknesses": "Chinese UI focus; fragmented tool modules.",
         "license": "GPL-3.0.",
         "recommendation": "Study only (inspect PySide6 UI styling).",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "Supan-Roy/Jupiter-Player": {
         "verdict": "Specialized media player with real-time on-the-fly subtitle overlay, translation, and auto-dubbing.",
@@ -399,7 +403,7 @@ REPO_PROFILES = {
         "weaknesses": "Not an editor; cannot export studio masters.",
         "license": "MIT.",
         "recommendation": "Study only.",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "Nik-Kras/voice_ukr_to_eng": {
         "verdict": "Specialized pipeline for translating Ukrainian military/documentary YouTube dispatches into English.",
@@ -416,7 +420,7 @@ REPO_PROFILES = {
         "weaknesses": "Hardcoded language pair.",
         "license": "MIT.",
         "recommendation": "Ignore.",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "Amankumar321/AI-Dubber": {
         "verdict": "Academic pipeline utilizing Microsoft VALL-E X for zero-shot cross-lingual voice cloning from Asian source videos.",
@@ -433,7 +437,7 @@ REPO_PROFILES = {
         "weaknesses": "VALL-E X has high hallucination rate and no Bengali support.",
         "license": "MIT.",
         "recommendation": "Ignore.",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "DablewCodes/voicevoyage.ai": {
         "verdict": "Undergraduate final-year project connecting multiple cloud APIs for video translation.",
@@ -450,7 +454,7 @@ REPO_PROFILES = {
         "weaknesses": "Toy wrapper around 3 commercial paid APIs.",
         "license": "None.",
         "recommendation": "Ignore.",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "g33k0b1/Dubbing-World": {
         "verdict": "Static landing page / portfolio showcase; contains no runnable dubbing engine code.",
@@ -462,7 +466,7 @@ REPO_PROFILES = {
         "weaknesses": "Empty repository with no AI or media processing logic.",
         "license": "None.",
         "recommendation": "Ignore.",
-        "confidence": "High (verified from repository contents)."
+        "confidence": "High (verified from repository contents).",
     },
     "sahandghavidel/ai-video-editor": {
         "verdict": "Full AI video creation workspace handling scripting, transcription, dubbing, scene transitions, and export.",
@@ -479,7 +483,7 @@ REPO_PROFILES = {
         "weaknesses": "Cloud API heavy; no local model execution.",
         "license": "MIT; 150+ stars.",
         "recommendation": "Study only (timeline data schema).",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "Syedjunaid30/Video_Dubbing_with_ML_driven_Lip_Synchronization": {
         "verdict": "Classic academic research implementation coupling speech translation directly with Wav2Lip facial synchronization.",
@@ -496,7 +500,7 @@ REPO_PROFILES = {
         "weaknesses": "Wav2Lip blurry face artifact (teeth and mouth boundary distortion); unmaintained.",
         "license": "MIT.",
         "recommendation": "Study only (lip-sync cropping logic).",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "M-SRIKAR-VARDHAN/speech-to-speech-with-lipsync": {
         "verdict": "Comprehensive research pipeline combining speech-to-speech translation, RVC voice cloning, and Wav2Lip.",
@@ -514,7 +518,7 @@ REPO_PROFILES = {
         "weaknesses": "Multi-stage sequential pipeline has high execution latency (8-10x real-time).",
         "license": "MIT; active research project.",
         "recommendation": "Copy ideas (adopt the RVC + GFPGAN restoration chain).",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "grayhatdevelopers/deepdub": {
         "verdict": "Implementation of ICAI 2022 paper on automated dubbing and facial synchronization using deep learning.",
@@ -531,7 +535,7 @@ REPO_PROFILES = {
         "weaknesses": "Outdated legacy models (DeepSpeech, Tacotron2).",
         "license": "GPL-3.0.",
         "recommendation": "Ignore.",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "NISHAKAR06/VoiceFusionAi-ML": {
         "verdict": "Indic localization project translating English video to Hindi with speech synthesis and lip-sync.",
@@ -548,7 +552,7 @@ REPO_PROFILES = {
         "weaknesses": "Bark TTS is slow and prone to hallucinated acoustic artifacts; 16GB VRAM limit exceeded.",
         "license": "MIT.",
         "recommendation": "Copy ideas (IndicTrans evaluation for Bengali).",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "ElsebaiyMohamed/Modablag": {
         "verdict": "Specialized Arabic/multilingual video dubbing study with voice cloning and duration matching.",
@@ -566,7 +570,7 @@ REPO_PROFILES = {
         "weaknesses": "Narrow language focus.",
         "license": "MIT.",
         "recommendation": "Study only.",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "Shirajuki/cuddly-journey": {
         "verdict": "Specialized OCR-driven pipeline translating hardsubs (burned-in subtitles) into softsubs with synchronized TTS dubbing.",
@@ -583,7 +587,7 @@ REPO_PROFILES = {
         "weaknesses": "Niche use case.",
         "license": "MIT.",
         "recommendation": "Study only.",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "facebookresearch/demucs": {
         "verdict": "The foundational open-source music and vocal source separation library (Hybrid Demucs / HTDemucs).",
@@ -598,7 +602,7 @@ REPO_PROFILES = {
         "weaknesses": "Repo is archived by Meta; newer Mel-Band Roformer achieves 2-3 dB higher SDR with fewer vocal bleed artifacts.",
         "license": "MIT; 8.8k+ stars, industry standard.",
         "recommendation": "Use as dependency (baseline separation engine, while evaluating Mel-Band Roformer upgrade).",
-        "confidence": "Very High (verified from source and architecture)."
+        "confidence": "Very High (verified from source and architecture).",
     },
     "TencentARC/AudioStory": {
         "verdict": "SOTA research framework by Tencent ARC generating structured, long-form narrative audio, Foley sound effects, and background ambiences.",
@@ -615,16 +619,22 @@ REPO_PROFILES = {
         "weaknesses": "Heavy GPU footprint; requires high-end CUDA environment.",
         "license": "Apache-2.0; released late 2025.",
         "recommendation": "Copy ideas (use for background ambience regeneration when dialogue separation leaves acoustic holes).",
-        "confidence": "High (verified from AudioStory paper and repo)."
+        "confidence": "High (verified from AudioStory paper and repo).",
     },
     "google-marketing-solutions/ariel": {
         "verdict": "Google's enterprise Cloud Run solution for AI video ad dubbing with SOTA BS-RoFormer separation and Gemini intonation guidance.",
         "stages": [
-            ("Separation", "audio-separator with BS-RoFormer (`model_bs_roformer_ep_317_sdr_12.9755.ckpt`)"),
+            (
+                "Separation",
+                "audio-separator with BS-RoFormer (`model_bs_roformer_ep_317_sdr_12.9755.ckpt`)",
+            ),
             ("ASR", "Google Speech / Vertex AI"),
             ("Translation", "Gemini 2.5 Pro / Flash with custom translation instructions"),
             ("TTS", "Google Cloud TTS / Gemini TTS with Voice Intonation Guidance"),
-            ("Timeline Editor", "Interactive web UI with draggable utterance start/end times and original audio mute toggle"),
+            (
+                "Timeline Editor",
+                "Interactive web UI with draggable utterance start/end times and original audio mute toggle",
+            ),
             ("Deployment", "GCP Cloud Run + Identity-Aware Proxy (IAP)"),
         ],
         "bengali": "Yes — Gemini Pro/Flash and Google Cloud TTS provide native, studio-grade Bengali (`bn-BD` and `bn-IN`) support.",
@@ -634,7 +644,7 @@ REPO_PROFILES = {
         "weaknesses": "Requires Google Cloud project and active billing; not local-first.",
         "license": "Apache-2.0; official Google repo.",
         "recommendation": "Copy ideas (adopt the BS-RoFormer checkpoint and Gemini TTS intonation prompting design).",
-        "confidence": "Very High (verified from configuration.yaml and README)."
+        "confidence": "Very High (verified from configuration.yaml and README).",
     },
     "allvoicelab/allvoicelab": {
         "verdict": "Lightweight commercial client library for AllVoiceLab voice cloning and dubbing services.",
@@ -646,7 +656,7 @@ REPO_PROFILES = {
         "weaknesses": "Proprietary, closed-source backend; requires paid subscription.",
         "license": "MIT.",
         "recommendation": "Ignore.",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "allvoicelab/AllVoiceLab-MCP": {
         "verdict": "Model Context Protocol (MCP) server exposing AllVoiceLab TTS and video translation APIs to AI coding agents.",
@@ -658,7 +668,7 @@ REPO_PROFILES = {
         "weaknesses": "Hardcoded to proprietary AllVoiceLab cloud backend.",
         "license": "MIT.",
         "recommendation": "Copy ideas (pattern for exposing our local studio to Antigravity / Claude via MCP).",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "perso-ai/perso-dubbing-plugin": {
         "verdict": "Agent plugin allowing coding agents to trigger video dubbing jobs through the Perso API.",
@@ -670,7 +680,7 @@ REPO_PROFILES = {
         "weaknesses": "Vendor lock-in.",
         "license": "MIT.",
         "recommendation": "Ignore.",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "cr2007/cambai-python": {
         "verdict": "Python SDK wrapper for CAMB.AI multilingual dubbing and hyper-realistic voice cloning API.",
@@ -682,7 +692,7 @@ REPO_PROFILES = {
         "weaknesses": "Commercial paid API; closed-source models.",
         "license": "Apache-2.0.",
         "recommendation": "Study only (benchmark target for Bengali voice naturalness).",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "koesan/ReManga_web": {
         "verdict": "Web application for manga/comic translation, bubble detection, and colorization.",
@@ -694,7 +704,7 @@ REPO_PROFILES = {
         "weaknesses": "Image-only; not applicable to video speech dubbing.",
         "license": "GPL-3.0.",
         "recommendation": "Ignore.",
-        "confidence": "High."
+        "confidence": "High.",
     },
     "koesan/Evoars": {
         "verdict": "Multi-modal platform handling comics, manga, and short video translation with subtitle burning.",
@@ -711,7 +721,7 @@ REPO_PROFILES = {
         "weaknesses": "Broad scope dilutes dubbing engine quality.",
         "license": "GPL-3.0.",
         "recommendation": "Study only.",
-        "confidence": "High."
+        "confidence": "High.",
     },
 }
 
@@ -753,7 +763,7 @@ card_template = """# {repo}
 for repo, info in REPO_PROFILES.items():
     slug = repo.replace("/", "__")
     card_path = os.path.join(CARDS_DIR, f"{slug}.md")
-    
+
     stages_rows = "\n".join([f"| {s[0]} | {s[1]} |" for s in info["stages"]])
     content = card_template.format(
         repo=repo,
@@ -766,7 +776,7 @@ for repo, info in REPO_PROFILES.items():
         weaknesses=info["weaknesses"],
         license=info["license"],
         recommendation=info["recommendation"],
-        confidence=info["confidence"]
+        confidence=info["confidence"],
     )
     with open(card_path, "w", encoding="utf-8") as f:
         f.write(content)
@@ -777,11 +787,22 @@ print(f"Generated {len(REPO_PROFILES)} cards in {CARDS_DIR}")
 matrix_path = os.path.join(RESEARCH_DIR, "comparison_matrix.csv")
 with open(matrix_path, "w", newline="", encoding="utf-8") as f:
     writer = csv.writer(f)
-    writer.writerow([
-        "Repo", "Category", "Separation", "ASR", "Diarization", 
-        "Translation", "TTS / Cloning", "Timing Strategy", "Lip-Sync", 
-        "Bengali Support", "License", "Recommendation"
-    ])
+    writer.writerow(
+        [
+            "Repo",
+            "Category",
+            "Separation",
+            "ASR",
+            "Diarization",
+            "Translation",
+            "TTS / Cloning",
+            "Timing Strategy",
+            "Lip-Sync",
+            "Bengali Support",
+            "License",
+            "Recommendation",
+        ]
+    )
     for repo, info in REPO_PROFILES.items():
         sep = next((s[1] for s in info["stages"] if "Separation" in s[0]), "None")
         asr = next((s[1] for s in info["stages"] if "ASR" in s[0]), "None")
@@ -789,11 +810,27 @@ with open(matrix_path, "w", newline="", encoding="utf-8") as f:
         tra = next((s[1] for s in info["stages"] if "Translation" in s[0]), "None")
         tts = next((s[1] for s in info["stages"] if "TTS" in s[0] or "Cloning" in s[0]), "None")
         ls = info["lipsync"]
-        cat = "A1. Pipeline" if "webui" in repo or "dub" in repo.lower() else "A2. LipSync / A3. Component"
-        writer.writerow([
-            repo, cat, sep, asr, dia, tra, tts, info["timing"][:60] + "...", 
-            ls[:40] + "...", info["bengali"][:40] + "...", info["license"].split(";")[0], info["recommendation"]
-        ])
+        cat = (
+            "A1. Pipeline"
+            if "webui" in repo or "dub" in repo.lower()
+            else "A2. LipSync / A3. Component"
+        )
+        writer.writerow(
+            [
+                repo,
+                cat,
+                sep,
+                asr,
+                dia,
+                tra,
+                tts,
+                info["timing"][:60] + "...",
+                ls[:40] + "...",
+                info["bengali"][:40] + "...",
+                info["license"].split(";")[0],
+                info["recommendation"],
+            ]
+        )
 
 print("Generated comparison_matrix.csv")
 
@@ -881,7 +918,7 @@ Based on empirical code audits across 41 repositories, here are the optimal arch
 ---
 
 ### 6. Temporal Timing & Synchronization
-* **Best Approach:** **Anchored Timeline Placement + Bounded High-Quality Time-Stretch (Rubberband $\\le \\pm 8\%$)**.
+* **Best Approach:** **Anchored Timeline Placement + Bounded High-Quality Time-Stretch (Rubberband $\\le \\pm 8\\%$)**.
 * **Best Repository Example:** [`akshinmrv/Voxa`](cards/akshinmrv__Voxa.md).
 * **Why:** Traditional concatenation causes cumulative drift (e.g. +15s drift after 10 minutes). Anchored placement assigns every line to a fixed onset-to-onset time slot. Long lines breathe into following pauses; short lines are silence-padded; errors never compound.
 

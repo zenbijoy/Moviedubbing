@@ -16,6 +16,7 @@ from aidub.adapters.separation_demucs import (
 )
 from aidub.contracts.base import ContractModel
 from aidub.media.ffmpeg_ops import _run
+from aidub.media.probe import ContainerInfo
 
 logger = logging.getLogger(__name__)
 
@@ -96,9 +97,7 @@ class StemSelector:
             duration_seconds = probe.duration_seconds
             if duration_seconds is None and source_stream.time_base is not None:
                 if source_stream.duration_ticks is not None:
-                    duration_seconds = float(
-                        source_stream.duration_ticks * source_stream.time_base
-                    )
+                    duration_seconds = float(source_stream.duration_ticks * source_stream.time_base)
             if duration_seconds is None:
                 raise RuntimeError("studio M&E duration is unavailable")
 

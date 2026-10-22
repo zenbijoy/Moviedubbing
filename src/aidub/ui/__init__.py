@@ -1,4 +1,5 @@
 """User interface package."""
+
 from .application import DesktopApplication
 from .command_palette import CommandPaletteDialog
 from .commands import Command, CommandRegistry

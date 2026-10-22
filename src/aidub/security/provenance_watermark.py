@@ -6,9 +6,9 @@ Embeds robust, imperceptible provenance watermarks in synthesized audio and visu
 
 from __future__ import annotations
 
-import logging
 
-logger = logging.getLogger(__name__)
+class WatermarkUnavailableError(RuntimeError):
+    """Raised when no audio or video watermarking implementation is configured."""
 
 
 class AIProvenanceWatermarker:
@@ -18,12 +18,16 @@ class AIProvenanceWatermarker:
 
     def watermark_audio_payload(self, audio_bytes: bytes, provenance_id: str) -> bytes:
         """
-        Embed watermark signal into audio bytes.
+        Reject claims of watermarking until a real signal-domain encoder is configured.
         """
-        logger.info("provenance_watermark: embedded audio watermark %s into payload", provenance_id)
-        return audio_bytes + b"_AI_PROVENANCE_WATERMARKED"
+        del audio_bytes, provenance_id
+        raise WatermarkUnavailableError(
+            "Audio provenance watermarking is unavailable: no signal-domain watermark encoder "
+            "is configured. No payload was modified."
+        )
 
 
 __all__ = [
     "AIProvenanceWatermarker",
+    "WatermarkUnavailableError",
 ]

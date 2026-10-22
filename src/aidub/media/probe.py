@@ -151,7 +151,7 @@ class MediaProbe:
         try:
             # The executable is resolved to an existing local file and arguments
             # are passed as a sequence; no shell parsing is involved.
-            process = subprocess.run(  # noqa: S603
+            process = subprocess.run(
                 command,
                 check=False,
                 capture_output=True,

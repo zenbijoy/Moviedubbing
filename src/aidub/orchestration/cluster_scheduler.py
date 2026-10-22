@@ -31,18 +31,24 @@ class DistributedClusterScheduler:
     Schedules AI jobs across cluster worker nodes.
     """
 
-    def select_best_worker_node(self, nodes: Sequence[ClusterWorkerNode], required_vram_gb: float = 8.0) -> ClusterWorkerNode | None:
+    def select_best_worker_node(
+        self, nodes: Sequence[ClusterWorkerNode], required_vram_gb: float = 8.0
+    ) -> ClusterWorkerNode | None:
         """
         Select cluster worker node with highest available VRAM.
         """
         eligible = [n for n in nodes if n.available_vram_gb >= required_vram_gb]
         if not eligible:
-            logger.warning("cluster_scheduler: no eligible worker node with >= %.1f GB VRAM", required_vram_gb)
+            logger.warning(
+                "cluster_scheduler: no eligible worker node with >= %.1f GB VRAM", required_vram_gb
+            )
             return None
 
         eligible.sort(key=lambda n: n.available_vram_gb, reverse=True)
         selected = eligible[0]
-        logger.info("cluster_scheduler: assigned job to node %s (%s)", selected.node_id, selected.hostname)
+        logger.info(
+            "cluster_scheduler: assigned job to node %s (%s)", selected.node_id, selected.hostname
+        )
         return selected
 
 

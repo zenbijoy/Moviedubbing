@@ -167,7 +167,9 @@ class LocalAnalyzerIdentity(AnalysisModel):
     @model_validator(mode="after")
     def _validate_model_identity(self) -> Self:
         model_fields = (self.model_id, self.model_version, self.model_weights_sha256)
-        if any(value is None for value in model_fields) and any(value is not None for value in model_fields):
+        if any(value is None for value in model_fields) and any(
+            value is not None for value in model_fields
+        ):
             raise ValueError("model id, version, and weights hash must be supplied together")
         if self.execution_mode is not AnalysisExecutionMode.LOCAL:
             raise ValueError("source-analysis adapters must execute locally")
@@ -465,7 +467,9 @@ class AnalysisProgress(AnalysisModel):
 
     @model_validator(mode="after")
     def _validate_progress(self) -> Self:
-        require_unique(tuple(stage.stage_id for stage in self.stages), field_name="progress stage_ids")
+        require_unique(
+            tuple(stage.stage_id for stage in self.stages), field_name="progress stage_ids"
+        )
         if self.completed_weighted_units > self.total_weighted_units:
             raise ValueError("completed weighted units cannot exceed total weighted units")
         expected = (self.completed_weighted_units * BASIS_POINTS) // self.total_weighted_units
@@ -474,7 +478,10 @@ class AnalysisProgress(AnalysisModel):
         expected_status = derive_run_status(self.stages)
         if self.status is not expected_status:
             raise ValueError("run progress status does not match stage statuses")
-        if self.status is AnalysisRunStatus.SUCCEEDED and self.progress_basis_points != BASIS_POINTS:
+        if (
+            self.status is AnalysisRunStatus.SUCCEEDED
+            and self.progress_basis_points != BASIS_POINTS
+        ):
             raise ValueError("successful analysis progress must be complete")
         if self.status is AnalysisRunStatus.QUEUED and self.progress_basis_points != 0:
             raise ValueError("queued analysis progress must be zero")
@@ -612,7 +619,10 @@ def derive_run_status(
         return AnalysisRunStatus.FAILED
     if AnalysisStageStatus.CANCELLED in statuses:
         return AnalysisRunStatus.CANCELLED
-    if all(status in {AnalysisStageStatus.SUCCEEDED, AnalysisStageStatus.SKIPPED} for status in statuses):
+    if all(
+        status in {AnalysisStageStatus.SUCCEEDED, AnalysisStageStatus.SKIPPED}
+        for status in statuses
+    ):
         return AnalysisRunStatus.SUCCEEDED
     if all(status is AnalysisStageStatus.PENDING for status in statuses):
         return AnalysisRunStatus.QUEUED

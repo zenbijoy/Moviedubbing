@@ -17,8 +17,8 @@ MAX_TAKES_PER_UTTERANCE = 10
 
 class TakeStatus(StrEnum):
     GENERATED = "generated"
-    SELECTED = "selected"       # Active A/B preview selection
-    MASTER = "master"           # Final approved take for render queue
+    SELECTED = "selected"  # Active A/B preview selection
+    MASTER = "master"  # Final approved take for render queue
     REJECTED = "rejected"
     ARCHIVED = "archived"
 
@@ -74,7 +74,9 @@ class TakeManager:
             )
 
         takes.append(take)
-        logger.debug("take_manager: added take %s (take #%d) for %s", take.take_id, take.take_number, uid)
+        logger.debug(
+            "take_manager: added take %s (take #%d) for %s", take.take_id, take.take_number, uid
+        )
 
     def select_for_preview(self, utterance_id: str, take_id: str) -> VoiceTake:
         """Mark a take as SELECTED for A/B preview (clears previous selection)."""
@@ -140,9 +142,7 @@ class TakeManager:
 
         target = takes[target_idx]
         if target.status in (TakeStatus.REJECTED, TakeStatus.ARCHIVED):
-            raise ValueError(
-                f"cannot promote take {take_id!r} with status {target.status.value!r}"
-            )
+            raise ValueError(f"cannot promote take {take_id!r} with status {target.status.value!r}")
 
         # Clear conflicting exclusive statuses
         exclusive = {TakeStatus.MASTER, TakeStatus.SELECTED}
@@ -150,15 +150,15 @@ class TakeManager:
             for i, t in enumerate(takes):
                 if t.status == new_status and t.take_id != take_id:
                     takes[i] = t.model_copy(update={"status": TakeStatus.GENERATED})
-                    logger.debug(
-                        "take_manager: demoted %s from %s", t.take_id, new_status.value
-                    )
+                    logger.debug("take_manager: demoted %s from %s", t.take_id, new_status.value)
 
         updated = target.model_copy(update={"status": new_status})
         takes[target_idx] = updated
         logger.info(
             "take_manager: %s -> %s for utterance %s",
-            take_id, new_status.value, utterance_id,
+            take_id,
+            new_status.value,
+            utterance_id,
         )
         return updated
 

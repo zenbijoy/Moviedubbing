@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from aidub.infrastructure.system_telemetry import (
     SystemTelemetryReport,
     get_real_gpu_telemetry,

@@ -7,6 +7,7 @@ Performs timing validation, overlap detection, duplicate checking, and duration 
 from __future__ import annotations
 
 import logging
+
 from aidub.subtitles.models import (
     DialogueSegment,
     ValidationReport,
@@ -161,4 +162,4 @@ class SubtitleValidator:
         return report
 
 
-__all__ = ["SubtitleValidator", "MAX_RECOMMENDED_DURATION_MS"]
+__all__ = ["MAX_RECOMMENDED_DURATION_MS", "SubtitleValidator"]

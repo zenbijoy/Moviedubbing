@@ -6,14 +6,15 @@ Distributes signed model packages, weights, and engine updates across cluster wo
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Sequence
 
 from pydantic import Field
 
 from aidub.contracts.base import ContractModel, Identifier
 
-logger = logging.getLogger(__name__)
+
+class FleetDeploymentUnavailableError(RuntimeError):
+    """Raised when there is no remote worker deployment transport configured."""
 
 
 class FleetDeploymentManifest(ContractModel):
@@ -30,20 +31,21 @@ class FleetModelDeployer:
     Deploys model packages to remote worker nodes.
     """
 
-    def deploy_package_to_nodes(self, manifest: FleetDeploymentManifest, node_ids: Sequence[str]) -> bool:
+    def deploy_package_to_nodes(
+        self, manifest: FleetDeploymentManifest, node_ids: Sequence[str]
+    ) -> bool:
         """
-        Deploy package to target nodes.
+        Refuse deployment until a real signed-package transport is configured.
         """
-        logger.info(
-            "fleet_deployer: deployed package %s v%s to %d nodes",
-            manifest.package_name,
-            manifest.version,
-            len(node_ids),
+        del manifest, node_ids
+        raise FleetDeploymentUnavailableError(
+            "Fleet deployment is unavailable: no authenticated remote worker transport is "
+            "configured. No package was sent to any node."
         )
-        return True
 
 
 __all__ = [
     "FleetDeploymentManifest",
+    "FleetDeploymentUnavailableError",
     "FleetModelDeployer",
 ]

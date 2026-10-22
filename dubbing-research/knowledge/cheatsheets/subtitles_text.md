@@ -26,15 +26,15 @@ subs = pysubs2.SSAFile()
 style = pysubs2.SSAStyle()
 style.fontname = "Noto Sans Bengali"
 style.fontsize = 24
-style.primarycolor = pysubs2.Color(255, 255, 255) # White
-style.outlinecolor = pysubs2.Color(0, 0, 0) # Black outline
+style.primarycolor = pysubs2.Color(255, 255, 255)  # White
+style.outlinecolor = pysubs2.Color(0, 0, 0)  # Black outline
 style.outline = 2
 subs.styles["Default"] = style
 
 event = pysubs2.SSAEvent(
     start=pysubs2.make_time(s=1, ms=200),
     end=pysubs2.make_time(s=4, ms=500),
-    text="আপনি কি আমাকে শুনতে পাচ্ছেন?"
+    text="আপনি কি আমাকে শুনতে পাচ্ছেন?",
 )
 subs.events.append(event)
 subs.save("bangla_subtitles.ass")

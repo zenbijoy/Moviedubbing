@@ -7,17 +7,16 @@ Orchestrates import, parsing, validation, persistence, track operations, and eve
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Any
+from typing import Any
 
 from aidub.subtitles.encoding import detect_and_read_subtitle_file
 from aidub.subtitles.exceptions import SubtitleImportError
-from aidub.subtitles.exporter import SubtitleExporter
 from aidub.subtitles.models import (
     DialogueSegment,
     ImportSummary,
     SubtitleTrack,
-    ValidationReport,
 )
 from aidub.subtitles.repository import SubtitleRepository
 from aidub.subtitles.srt_parser import SRTParser
@@ -161,12 +160,14 @@ class SubtitleService:
                     speaker_id=seg.speaker_id,
                     character_name=seg.character_name,
                 )
-                track.segments[i:i + 1] = [seg1, seg2]
+                track.segments[i : i + 1] = [seg1, seg2]
                 self._emit("subtitle_updated", {"track": track})
                 return seg1, seg2
         return None
 
-    def merge_segments(self, track: SubtitleTrack, segment_ids: list[str]) -> DialogueSegment | None:
+    def merge_segments(
+        self, track: SubtitleTrack, segment_ids: list[str]
+    ) -> DialogueSegment | None:
         """Merge multiple adjacent segments into a single segment."""
         matching = [s for s in track.segments if s.id in segment_ids]
         if len(matching) < 2:

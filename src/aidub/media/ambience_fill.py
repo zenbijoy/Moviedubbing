@@ -32,7 +32,11 @@ class AmbienceFillGenerator:
         """
         Generate matching room tone fill audio bytes.
         """
-        logger.info("ambience_fill: generated %d ms room tone fill at %.1f dB", duration_ms, profile.noise_floor_db)
+        logger.info(
+            "ambience_fill: generated %d ms room tone fill at %.1f dB",
+            duration_ms,
+            profile.noise_floor_db,
+        )
         return b"RIFF_ROOM_TONE_AMBIENCE_FILL"
 
 

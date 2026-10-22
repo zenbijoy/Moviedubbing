@@ -6,7 +6,6 @@ import hashlib
 import logging
 from enum import StrEnum
 from pathlib import Path
-from typing import Self
 
 from pydantic import BaseModel, Field
 
@@ -105,10 +104,9 @@ class ModelManager:
                 entry.verified = True
                 entry.status = ModelStatus.CACHED
                 return True
-            else:
-                entry.verified = False
-                entry.status = ModelStatus.FAILED
-                return False
+            entry.verified = False
+            entry.status = ModelStatus.FAILED
+            return False
         except OSError:
             entry.verified = False
             entry.status = ModelStatus.FAILED
@@ -121,7 +119,9 @@ class ModelManager:
             raise KeyError(f"model {model_id!r} is not registered")
 
         if not entry.verified:
-            raise ModelIntegrityError(f"model {model_id!r} has not been verified or failed verification")
+            raise ModelIntegrityError(
+                f"model {model_id!r} has not been verified or failed verification"
+            )
 
         entry.status = ModelStatus.LOADED
         self._loaded[model_id] = entry.descriptor

@@ -23,8 +23,37 @@ def format_srt_timestamp(seconds: float) -> str:
     hrs = int(seconds // 3600)
     mins = int((seconds % 3600) // 60)
     secs = int(seconds % 60)
-    millis = int(round((seconds - int(seconds)) * 1000))
+    millis = round((seconds - int(seconds)) * 1000)
     return f"{hrs:02d}:{mins:02d}:{secs:02d},{millis:03d}"
+
+
+def resync_subtitles_to_fitted_timing(
+    segments: list[dict[str, Any]],
+    fitted_durations_ms: dict[str, int],
+) -> list[dict[str, Any]]:
+    """
+    Adjust subtitle segment start/end timestamps to match time-fitted dubbed speech.
+    Protects subtitle readability by ensuring subtitle cues perfectly match dubbed dialogue.
+    """
+    adjusted_segments: list[dict[str, Any]] = []
+
+    for seg in segments:
+        new_seg = dict(seg)
+        uid = str(seg.get("id") or seg.get("utterance_id", ""))
+        orig_start = float(seg.get("start", 0.0))
+        orig_end = float(seg.get("end", orig_start + 1.0))
+        orig_dur = max(0.1, orig_end - orig_start)
+
+        if uid in fitted_durations_ms:
+            fitted_dur = fitted_durations_ms[uid] / 1000.0
+            # Retain start time, adjust end time to fitted length
+            new_seg["end"] = round(orig_start + fitted_dur, 3)
+        else:
+            new_seg["end"] = orig_end
+
+        adjusted_segments.append(new_seg)
+
+    return adjusted_segments
 
 
 def write_srt(
@@ -108,4 +137,10 @@ def write_bilingual_srt(
     return out_p
 
 
-__all__ = ["LineMode", "format_srt_timestamp", "write_bilingual_srt", "write_srt"]
+__all__ = [
+    "LineMode",
+    "format_srt_timestamp",
+    "resync_subtitles_to_fitted_timing",
+    "write_bilingual_srt",
+    "write_srt",
+]

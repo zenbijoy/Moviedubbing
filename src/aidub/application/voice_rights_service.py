@@ -110,7 +110,11 @@ class VoiceRightsService:
             )
             raise RightsViolation(f"voice profile {voice_profile_id!r} is not registered")
 
-        consent = self._consents.get(profile.consent_record_id or "") if profile.consent_record_id else None
+        consent = (
+            self._consents.get(profile.consent_record_id or "")
+            if profile.consent_record_id
+            else None
+        )
 
         request = VoiceUsageRequest(
             project_id=project_id,

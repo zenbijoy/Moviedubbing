@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from aidub.media.ffmpeg_ops import duration, time_stretch
+from aidub.media.ffmpeg_ops import _ffmpeg_exe, _run, duration, time_stretch
 
 logger = logging.getLogger(__name__)
 
@@ -15,15 +15,15 @@ logger = logging.getLogger(__name__)
 def normalize_voice(
     samples: np.ndarray,
     sr: int,
-    target_lufs: float = -16.0,
-    target_rms_db: float = -18.0,
-    max_gain_db: float = 12.0,
+    target_lufs: float = -14.0,
+    target_rms_db: float = -14.0,
+    max_gain_db: float = 18.0,
     peak_limit: float = 0.985,
 ) -> np.ndarray:
     """
     EBU R128 (or RMS fallback) integrated loudness normalization per phrase.
 
-    Applies pure linear gain capped at +12dB to avoid amplifying background noise,
+    Applies pure linear gain capped at +18dB to ensure crisp dialogue audibility,
     followed by peak limiting to 0.985 to prevent clipping distortion.
 
     Args:
@@ -107,17 +107,38 @@ def fit_to_slot(
     out_p = Path(out_wav)
 
     if cur_dur <= target_dur * 1.02:
-        # Fits comfortably within slot, no stretching needed
-        import shutil
-
-        shutil.copyfile(str(seg_wav), str(out_p))
+        # Decode/re-encode even when timing fits. Copying an MP3 into a .wav
+        # filename corrupts the artifact and breaks the timeline assembler.
+        out_p.parent.mkdir(parents=True, exist_ok=True)
+        _run(
+            [
+                _ffmpeg_exe(),
+                "-y",
+                "-i",
+                str(seg_wav),
+                "-vn",
+                "-ac",
+                "1",
+                "-ar",
+                "44100",
+                "-c:a",
+                "pcm_s16le",
+                str(out_p),
+            ]
+        )
         return out_p
 
     # Requires speed-up
     ratio = cur_dur / max(target_dur, 0.1)
     ratio_clamped = min(ratio, max_stretch)
 
-    logger.debug("fit_to_slot: speed up %s from %.2fs to %.2fs (ratio %.2fx)", Path(seg_wav).name, cur_dur, target_dur, ratio_clamped)
+    logger.debug(
+        "fit_to_slot: speed up %s from %.2fs to %.2fs (ratio %.2fx)",
+        Path(seg_wav).name,
+        cur_dur,
+        target_dur,
+        ratio_clamped,
+    )
     return time_stretch(seg_wav, out_p, ratio_clamped)
 
 
@@ -175,7 +196,11 @@ def assemble_timeline(
         cursor_sample = end_sample
 
     out_p = Path(output_wav)
-    sf.write(str(out_p), timeline_buf[: int(total_duration_s * sample_rate)], sample_rate)
+    exact_len = int(total_duration_s * sample_rate)
+    final_buf = timeline_buf[:exact_len]
+    if len(final_buf) < exact_len:
+        final_buf = np.pad(final_buf, (0, exact_len - len(final_buf)))
+    sf.write(str(out_p), final_buf, sample_rate)
     return out_p
 
 

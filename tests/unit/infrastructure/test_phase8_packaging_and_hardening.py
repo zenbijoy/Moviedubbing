@@ -11,9 +11,19 @@ from __future__ import annotations
 
 import zipfile
 
-from aidub.benchmarks.autonomous_harness import AutonomousBenchmarkHarness
+import pytest
+
+from aidub.benchmarks.autonomous_harness import (
+    AutonomousBenchmarkHarness,
+    BenchmarkMeasurementsUnavailableError,
+    BenchmarkMetricScore,
+    MetricDirection,
+)
 from aidub.diagnostics.support_bundle import SupportBundleGenerator
-from aidub.infrastructure.persistence.recovery import CrashRecoveryEngine
+from aidub.infrastructure.persistence.recovery import (
+    CrashRecoveryEngine,
+    RecoveryUnavailableError,
+)
 from aidub.packaging.build_windows import PackagingSpec, WindowsPackager
 from aidub.ui.first_run_wizard import HardwareDiagnosticWizardController, HardwareTier
 
@@ -38,7 +48,11 @@ def test_hardware_diagnostic_wizard() -> None:
     assert report.cpu_cores >= 1
     assert report.ram_gb >= 0.0
     assert report.vram_gb >= 0.0
-    assert report.assigned_tier in (HardwareTier.ULTRA_CUDA, HardwareTier.MID_GPU, HardwareTier.CPU_BASIC)
+    assert report.assigned_tier in (
+        HardwareTier.ULTRA_CUDA,
+        HardwareTier.MID_GPU,
+        HardwareTier.CPU_BASIC,
+    )
 
     bench_ms = ctrl.run_micro_benchmark()
     assert bench_ms > 0.0
@@ -51,6 +65,7 @@ def test_crash_recovery_engine(tmp_path) -> None:
     snap1 = engine.create_snapshot("proj_001", "TRANSLATION", {"lines": "120"})
     assert snap1.snapshot_id is not None
     assert snap1.project_id == "proj_001"
+    assert len(snap1.metadata_sha256) == 64
 
     snap2 = engine.create_snapshot("proj_001", "LIPSYNC", {"shots": "45"})
 
@@ -58,10 +73,18 @@ def test_crash_recovery_engine(tmp_path) -> None:
     snapshots = engine.list_snapshots("proj_001")
     assert len(snapshots) == 2
 
-    # Recover latest
-    recovered = engine.recover_latest_valid_snapshot("proj_001")
-    assert recovered is not None
-    assert recovered.snapshot_id == snap2.snapshot_id
+    # Metadata checkpoints can be inspected, but do not contain restorable project data.
+    assert snapshots[0].snapshot_id == snap2.snapshot_id
+    with pytest.raises(RecoveryUnavailableError, match="cannot restore project media"):
+        engine.recover_latest_valid_snapshot("proj_001")
+
+    # Tampered checkpoint metadata is detected and excluded from the valid list.
+    checkpoint_path = next(tmp_path.glob(f"proj_001_{snap2.snapshot_id}.json"))
+    checkpoint_path.write_text(
+        checkpoint_path.read_text(encoding="utf-8").replace("LIPSYNC", "EDITING"),
+        encoding="utf-8",
+    )
+    assert [item.snapshot_id for item in engine.list_snapshots("proj_001")] == [snap1.snapshot_id]
 
 
 def test_support_bundle_secret_redaction(tmp_path) -> None:
@@ -90,10 +113,29 @@ def test_support_bundle_secret_redaction(tmp_path) -> None:
 
 def test_autonomous_benchmark_harness() -> None:
     harness = AutonomousBenchmarkHarness()
-    cert = harness.run_benchmark_suite("1.0.0", ["en-US", "bn-BD", "hi-IN"])
+    with pytest.raises(BenchmarkMeasurementsUnavailableError):
+        harness.run_benchmark_suite("1.0.0", ["en-US", "bn-BD", "hi-IN"], measured_metrics={})
+
+    measurements = {
+        "asr_wer": BenchmarkMetricScore(
+            metric_name="ASR Word Error Rate (WER)",
+            score_value=0.04,
+            target_threshold=0.10,
+            direction=MetricDirection.LOWER_IS_BETTER,
+        ),
+        "translation_bleu": BenchmarkMetricScore(
+            metric_name="Translation BLEU Score",
+            score_value=38.5,
+            target_threshold=30.0,
+            direction=MetricDirection.HIGHER_IS_BETTER,
+        ),
+    }
+    cert = harness.run_benchmark_suite(
+        "1.0.0", ["en-US", "bn-BD", "hi-IN"], measured_metrics=measurements
+    )
 
     assert cert.app_version == "1.0.0"
     assert cert.is_approved_for_release is True
     assert cert.overall_quality_score == 1.0
     assert "asr_wer" in cert.metric_details
-    assert "tts_mos" in cert.metric_details
+    assert "translation_bleu" in cert.metric_details

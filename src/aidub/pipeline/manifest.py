@@ -8,6 +8,7 @@ import os
 import shutil
 import tempfile
 from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ class PipelineOutputs:
     dubbed_vocals: str = ""
     dubbed_audio: str = ""
     dubbed_video: str = ""
+    lipsynced_video: str = ""
     bench_json: str = ""
     transcript_json: str = ""
 
@@ -45,7 +47,7 @@ class PipelineOutputs:
 class PipelineManifest:
     """
     Stage-tracking state machine for fully restartable dubbing pipeline runs.
-    
+
     Saved as ``aidub_manifest.json`` after every stage completes. If a job is
     interrupted, subsequent runs load the manifest and skip already completed stages.
     """
@@ -56,6 +58,9 @@ class PipelineManifest:
     origin_language: str = ""
     target_language: str = "bn"
     caption_source: str = ""
+    pipeline_version: int = 0
+    source_signature: str = ""
+    config_signature: str = ""
     outputs: PipelineOutputs = field(default_factory=PipelineOutputs)
     stages: dict[str, StageStatus] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
@@ -73,18 +78,17 @@ class PipelineManifest:
         self.outputs.dubbed_vocals = str(w / "dubbed_vocals.wav")
         self.outputs.dubbed_audio = str(w / "dubbed_audio.m4a")
         self.outputs.dubbed_video = str(w / "dubbed_video.mp4")
+        self.outputs.lipsynced_video = str(w / "lipsynced_video.mp4")
         self.outputs.bench_json = str(w / "bench.json")
         self.outputs.transcript_json = str(w / "transcript.json")
 
     def mark_stage(self, stage_name: str, ok: bool, error: str = "", duration_ms: int = 0) -> None:
         """Mark completion status of a pipeline stage."""
-        import datetime
-
         self.stages[stage_name] = StageStatus(
             ok=ok,
             error=error,
             duration_ms=duration_ms,
-            updated_at=datetime.datetime.now().isoformat(),
+            updated_at=datetime.now(UTC).isoformat(),
         )
 
     def is_stage_completed(self, stage_name: str) -> bool:
@@ -102,13 +106,18 @@ class PipelineManifest:
             "origin_language": self.origin_language,
             "target_language": self.target_language,
             "caption_source": self.caption_source,
+            "pipeline_version": self.pipeline_version,
+            "source_signature": self.source_signature,
+            "config_signature": self.config_signature,
             "outputs": asdict(self.outputs),
             "stages": {k: asdict(v) for k, v in self.stages.items()},
             "warnings": self.warnings,
         }
 
         json_str = json.dumps(data, indent=2, ensure_ascii=False)
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8", dir=self.work_dir) as tmp:
+        with tempfile.NamedTemporaryFile(
+            mode="w", delete=False, encoding="utf-8", dir=self.work_dir
+        ) as tmp:
             tmp.write(json_str)
             tmp.flush()
             os.fsync(tmp.fileno())
@@ -116,7 +125,7 @@ class PipelineManifest:
 
         shutil.copyfile(tmp_name, str(manifest_path))
         try:
-            os.remove(tmp_name)
+            Path(tmp_name).unlink(missing_ok=True)
         except Exception:
             pass
 
@@ -140,6 +149,9 @@ class PipelineManifest:
                 origin_language=data.get("origin_language", ""),
                 target_language=data.get("target_language", "bn"),
                 caption_source=data.get("caption_source", ""),
+                pipeline_version=int(data.get("pipeline_version", 0)),
+                source_signature=data.get("source_signature", ""),
+                config_signature=data.get("config_signature", ""),
                 outputs=outputs,
                 stages=stages,
                 warnings=data.get("warnings", []),

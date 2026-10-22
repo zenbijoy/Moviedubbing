@@ -81,9 +81,7 @@ class LlmResponseValidator:
                 except LlmProviderError:
                     continue
 
-        raise ValidationRepairError(
-            f"repair loop exhausted for {schema.__name__}"
-        )
+        raise ValidationRepairError(f"repair loop exhausted for {schema.__name__}")
 
 
 def _extract_json(text: str) -> Any:

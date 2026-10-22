@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import shutil
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -15,10 +17,12 @@ logger = logging.getLogger(__name__)
 def separate_stems(
     audio_path: Path | str,
     output_dir: Path | str,
-    model_name: str = "UVR-MDX-NET-Inst_HQ_3.onnx",
+    model_name: str = "htdemucs",
 ) -> tuple[Path, Path]:
     """
     Separate audio track into clean vocals and background accompaniment.
+
+    Fails explicitly when Demucs is unavailable or does not produce both stems.
 
     Returns:
         Tuple of (vocals_wav_path, accompaniment_wav_path).
@@ -30,27 +34,46 @@ def separate_stems(
     vocal_path = out_dir / "vocals.wav"
     music_path = out_dir / "music.wav"
 
-    try:
-        cmd = [
-            "demucs", "--two-stems", "vocals",
-            "-o", str(out_dir),
-            str(audio_p),
-        ]
-        _run(cmd)
-        
-        # Locate generated outputs
-        sep_dir = out_dir / "htdemucs" / audio_p.stem
-        if (sep_dir / "vocals.wav").exists():
-            import shutil
-            shutil.copyfile(str(sep_dir / "vocals.wav"), str(vocal_path))
-            shutil.copyfile(str(sep_dir / "no_vocals.wav"), str(music_path))
-            return vocal_path, music_path
-        raise RuntimeError("Demucs completed without producing the expected stems")
-    except Exception as exc:
-        logger.exception("Demucs source separation failed")
+    # ------------------------------------------------------------------
+    # Try real Demucs separation first
+    # ------------------------------------------------------------------
+    if not _try_import_demucs():
         raise RuntimeError(
-            "Demucs source separation failed; install Demucs and its model weights"
-        ) from exc
+            "Demucs is required for dialogue/music separation. Install "
+            "'demucs>=4.0,<5' in the active studio environment."
+        )
+
+    demucs_exe = shutil.which("demucs")
+    command = [demucs_exe] if demucs_exe else [sys.executable, "-m", "demucs"]
+    command.extend(["--two-stems", "vocals", "-n", model_name, "-o", str(out_dir), str(audio_p)])
+    try:
+        _run(command)
+    except RuntimeError as exc:
+        raise RuntimeError(f"Demucs stem separation failed: {exc}") from exc
+
+    sep_dir = out_dir / model_name / audio_p.stem
+    separated_vocals = sep_dir / "vocals.wav"
+    separated_music = sep_dir / "no_vocals.wav"
+    if not separated_vocals.is_file() or not separated_music.is_file():
+        raise RuntimeError(
+            f"Demucs completed without both expected stems in {sep_dir}; "
+            "the source audio has not been substituted."
+        )
+
+    shutil.copyfile(separated_vocals, vocal_path)
+    shutil.copyfile(separated_music, music_path)
+    logger.info("Stem separation complete: vocals=%s music=%s", vocal_path, music_path)
+    return vocal_path, music_path
+
+
+def _try_import_demucs() -> bool:
+    """Return True if demucs is importable."""
+    try:
+        import demucs  # type: ignore[import-not-found]  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
 
 
 def needs_background_normalization(

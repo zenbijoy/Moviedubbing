@@ -11,7 +11,11 @@ import logging
 
 from aidub.collaboration.session_sync import CollaborativeSessionSync
 from aidub.export.distribution_exporter import DistributionFormat, DistributionPackageExporter
-from aidub.orchestration.render_orchestrator import MultiEngineRenderOrchestrator, RenderPlan
+from aidub.orchestration.render_orchestrator import (
+    MultiEngineRenderOrchestrator,
+    RenderExecutionUnavailableError,
+    RenderPlan,
+)
 from aidub.security.audit_logger import CryptographicAuditLogger
 
 logger = logging.getLogger(__name__)
@@ -43,28 +47,36 @@ class CollaborationStudioController:
 
     def trigger_render_orchestration(self, job_id: str) -> RenderPlan:
         """
-        Build and execute multi-stage audio/video render plan.
+        Build a plan, then report that the render workers are unavailable.
         """
         plan = self.render_orchestrator.create_render_plan(job_id)
-        executed_plan = self.render_orchestrator.execute_render_plan(plan)
-        self.audit_logger.log_event(
-            event_id=f"evt_render_{job_id}",
-            event_type="RENDER_EXECUTED",
-            actor_id="system_orchestrator",
-            details=f"Render plan {executed_plan.plan_id} completed with progress {executed_plan.overall_progress}%",
-        )
-        return executed_plan
+        try:
+            return self.render_orchestrator.execute_render_plan(plan)
+        except RenderExecutionUnavailableError:
+            self.audit_logger.log_event(
+                event_id=f"evt_render_{job_id}",
+                event_type="RENDER_BLOCKED",
+                actor_id="system_orchestrator",
+                details="Render plan blocked because no render workers are configured",
+            )
+            raise
 
-    def export_distribution_package(self, project_id: str, format_type: str = "DCP") -> DistributionFormat:
+    def export_distribution_package(
+        self, project_id: str, format_type: str = "DCP"
+    ) -> DistributionFormat:
         """
         Export master studio distribution package.
         """
         if format_type.upper() == "DCP":
-            dist = self.distribution_exporter.export_dcp_manifest(project_id, "Movie Title", ["en-US", "bn-BD"])
+            dist = self.distribution_exporter.export_dcp_manifest(
+                project_id, "Movie Title", ["en-US", "bn-BD"]
+            )
         elif format_type.upper() in ["MXF", "BROADCAST"]:
             dist = self.distribution_exporter.export_broadcast_layback(project_id, "7.1_Surround")
         else:
-            dist = self.distribution_exporter.export_ott_streaming_package(project_id, ["en-US", "bn-BD", "es-ES"])
+            dist = self.distribution_exporter.export_ott_streaming_package(
+                project_id, ["en-US", "bn-BD", "es-ES"]
+            )
 
         self.audit_logger.log_event(
             event_id=f"evt_export_{project_id}",

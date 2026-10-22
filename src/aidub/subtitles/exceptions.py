@@ -24,9 +24,9 @@ class SubtitleValidationError(SubtitleError):
 
 
 __all__ = [
+    "SubtitleEncodingError",
     "SubtitleError",
     "SubtitleImportError",
-    "SubtitleEncodingError",
     "SubtitleParseError",
     "SubtitleValidationError",
 ]

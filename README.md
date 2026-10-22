@@ -1,14 +1,13 @@
 # AI Dubbing Studio
 
-AI Dubbing Studio is a Windows-first, local-first workstation for professional multilingual
-movie dubbing. The product combines a frame- and sample-accurate editorial timeline with an
-artifact-based AI pipeline for transcription, translation, voice generation, timing, mixing,
-subtitles, quality control, and selective visual dubbing.
+AI Dubbing Studio is a Windows-first workstation for multilingual movie dubbing. It combines a
+video/audio timeline and subtitle editing with a full-length audio-dubbing pipeline that produces
+translated speech, mixed audio, subtitles, and a new video master.
 
-This repository is at the platform-foundation stage. Its current contract is intentionally
-small: the domain package defines durable media-time primitives and strict, versionable business
-schemas. Desktop, persistence, worker, and media-engine layers consume these contracts without
-being imported by them.
+This repository contains a Windows-first desktop dubbing workflow and a headless operator CLI.
+The active end-to-end job path is built around the shared `DubbingEngine`; Qt and CLI entry points
+use the same transcription, translation, target-language speech synthesis, timing, mixing, subtitle,
+and video mux stages.
 
 ## Engineering principles
 
@@ -28,6 +27,20 @@ being imported by them.
 
 FFmpeg, GPU runtimes, and model packs are separately pinned and verified components; they are not
 implicitly downloaded when the Python package is installed.
+
+## Provider credentials
+
+Copy `.env.example` to `.env` and add provider credentials locally. The populated `.env` is ignored
+by Git. Gemini and OpenRouter accept one key or a key pool through `GEMINI_API_KEYS` and
+`OPENROUTER_API_KEYS`; pools can be JSON arrays, comma-separated values, or semicolon-separated
+values. The adapters rotate through configured keys after a failed request.
+The studio readiness screen checks whether credentials are configured; only an actual request can
+confirm whether a provider accepts a key.
+
+The full-quality dubbing profile also needs a Hugging Face token in `PYANNOTE_TOKEN` and access to
+the pyannote diarization model. The fast profile skips diarization and music stem separation. A
+required stage failing its prerequisites stops the run; it does not substitute fabricated dialogue,
+silent audio, or unmeasured quality scores.
 
 ## Local setup
 
@@ -102,13 +115,44 @@ See [ADR-001](docs/adr/ADR-001-time-model.md) for the time-model decision and
 - Deterministic subtitle interchange, revision-safe transcript editing, and a local ASR boundary
   with exact sample-clock chunking and auditable overlap merge warnings.
 
+### Studio audio analysis
+
+In the timeline editor, open **AI Actions → Audio Analysis**. The loaded source movie and current
+timeline interval are preselected; use **Browse** to inspect a generated dub, music bed, SFX, or
+another audio/video file. **Analyze Audio** streams the first audio track through FFmpeg and reports
+measured peak and RMS levels, near-full-scale samples, silence and active-audio ratios, frame-level
+level range, sampled pitch percentiles, spectral centroid, and zero-crossing rate. Feature-length
+media is decoded incrementally rather than read into memory as one large array.
+
+**Transcribe Selection** uses the existing local Faster-Whisper adapter on intervals up to five
+minutes. The selected model downloads its weights on first use when they are not cached.
+**Detect Emotion** reuses the existing EmotionEngine on selections up to one minute; it runs the
+local acoustic heuristic and, when dialogue text is supplied and a provider is configured, the
+existing contextual LLM detector. **Explain Findings with LLM** sends only the measured feature
+summary and text entered by the operator. It does not upload the media file. **Export JSON** saves
+measurements, transcript, emotion result, and any LLM interpretation for review or later prompting.
+
+The active-audio percentage is an RMS threshold proxy, not speech recognition or VAD. Pitch and
+energy on a film mix may be driven by music, effects, or another speaker. Emotion scores are
+estimates; use an isolated dialogue stem and review the result before applying TTS controls. Missing
+FFmpeg, Whisper weights, or LLM credentials surface as errors; these tools do not substitute sample
+results.
+
 ## Status
 
-The project is pre-alpha. Phase 0 and Phase 1 are implemented, and Phase 2 now includes media
-derivative generation plus transcript and speech pipeline boundaries; it is not yet a
-CapCut/Premiere replacement. Real ASR/diarization models, translation, voice generation, timeline
-playback/editing, mixing, QC, final render, and enterprise collaboration remain scheduled work in
-`ENTERPRISE_IMPLEMENTATION_PLAN.md`. Do not entrust production masters or represent AI/provider
-quality claims until the documented benchmark, licensing, clean-Windows, security, and release
-gates pass.
+`aidub dub --input <movie> --output <new-master.mp4>` runs the real full-source pipeline. It needs
+Faster-Whisper, FFmpeg, Edge TTS, a configured translation provider, and—when full speaker/music
+separation is enabled—PyAnnote access and Demucs. `--no-diarization` uses one selected target voice
+for all recognized dialogue. The app does not perform actor voice cloning or lip-sync generation in
+this pipeline.
+
+Some optional enterprise adapters are not implemented yet. Cloud object-storage sync, LoRA voice
+training, multi-engine render execution, remote fleet deployment, isolated plugin loading, C2PA
+signing, and audio provenance watermarking now fail with explicit unavailable errors. Release/QC
+reports require supplied measurements and do not invent passing scores. These limits are also
+reflected in the UI; a missing backend never marks a job successful.
+
+The desktop app is still pre-alpha and is not a full CapCut/Premiere replacement. The Inception
+media was validated locally for stream metadata, but a complete dubbed master was not rendered in
+this verification run. Rotate any credentials exposed outside `.env` before making provider calls.
 # Moviedubbing  

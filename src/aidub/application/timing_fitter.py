@@ -22,10 +22,10 @@ from aidub.contracts.base import ContractModel, Identifier
 logger = logging.getLogger(__name__)
 
 # Alignment algorithm constants
-RATE_CONTROL_MIN = 0.85      # Slowest rate via TTS rate control
-RATE_CONTROL_MAX = 1.20      # Fastest rate via TTS rate control
-STRETCH_MAX_PCT = 0.08       # ±8% maximum time-stretch before flagging
-SILENCE_TRIM_MAX_MS = 200    # Maximum silence to trim from start/end
+RATE_CONTROL_MIN = 0.85  # Slowest rate via TTS rate control
+RATE_CONTROL_MAX = 1.20  # Fastest rate via TTS rate control
+STRETCH_MAX_PCT = 0.08  # ±8% maximum time-stretch before flagging
+SILENCE_TRIM_MAX_MS = 200  # Maximum silence to trim from start/end
 REVIEW_FLAG_THRESHOLD = 0.15  # Flag for editor review if still >15% off
 
 
@@ -137,7 +137,10 @@ class TimingFitter:
             current_ms -= silence_trimmed
             if abs(current_ms - slot_ms) <= cfg.tolerance_ms:
                 return self._result(
-                    utterance_id, synthesized_ms, slot_ms, current_ms,
+                    utterance_id,
+                    synthesized_ms,
+                    slot_ms,
+                    current_ms,
                     FitStrategy.SILENCE_TRIM,
                     silence_trimmed_ms=silence_trimmed,
                 )
@@ -149,7 +152,10 @@ class TimingFitter:
 
         if abs(current_after_rate - slot_ms) <= cfg.tolerance_ms:
             return self._result(
-                utterance_id, synthesized_ms, slot_ms, current_after_rate,
+                utterance_id,
+                synthesized_ms,
+                slot_ms,
+                current_after_rate,
                 FitStrategy.RATE_CONTROL,
                 rate_applied=rate_clamped,
                 silence_trimmed_ms=silence_trimmed,
@@ -162,7 +168,10 @@ class TimingFitter:
         if abs(stretch_pct) <= cfg.max_stretch_pct:
             fitted_ms = int(current_after_rate * stretch_ratio)
             return self._result(
-                utterance_id, synthesized_ms, slot_ms, fitted_ms,
+                utterance_id,
+                synthesized_ms,
+                slot_ms,
+                fitted_ms,
                 FitStrategy.TIME_STRETCH,
                 rate_applied=rate_clamped,
                 stretch_pct_applied=round(stretch_pct * 100, 2),
@@ -170,10 +179,10 @@ class TimingFitter:
             )
 
         # ── Step 5: Flag for human editor review
-        best_ms = int(current_after_rate * max(
-            1.0 - cfg.max_stretch_pct,
-            min(1.0 + cfg.max_stretch_pct, stretch_ratio)
-        ))
+        best_ms = int(
+            current_after_rate
+            * max(1.0 - cfg.max_stretch_pct, min(1.0 + cfg.max_stretch_pct, stretch_ratio))
+        )
         remaining_delta_pct = abs(best_ms - slot_ms) / max(slot_ms, 1)
 
         logger.warning(
@@ -194,9 +203,11 @@ class TimingFitter:
             within_tolerance=False,
             flagged_for_review=True,
             rate_applied=rate_clamped,
-            stretch_pct_applied=round(cfg.max_stretch_pct * 100 * (1 if stretch_pct > 0 else -1), 2),
+            stretch_pct_applied=round(
+                cfg.max_stretch_pct * 100 * (1 if stretch_pct > 0 else -1), 2
+            ),
             silence_trimmed_ms=silence_trimmed,
-            notes=f"Remaining delta {remaining_delta_pct*100:.1f}% exceeds ±{cfg.max_stretch_pct*100:.0f}% stretch limit",
+            notes=f"Remaining delta {remaining_delta_pct * 100:.1f}% exceeds ±{cfg.max_stretch_pct * 100:.0f}% stretch limit",
         )
 
     def apply(
@@ -225,10 +236,11 @@ class TimingFitter:
 
         factor = result.rate_applied
         if result.stretch_pct_applied != 0.0:
-            factor *= (1.0 + (result.stretch_pct_applied / 100.0))
+            factor *= 1.0 + (result.stretch_pct_applied / 100.0)
 
         if abs(factor - 1.0) < 0.005:
             import shutil
+
             shutil.copyfile(str(in_p), str(out_p))
             return out_p
 
