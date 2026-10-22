@@ -67,7 +67,7 @@ class SidechainDucker:
             self._current_reduction_db = max(0.0, self._current_reduction_db * decay)
 
         linear_gain = 10.0 ** (-self._current_reduction_db / 20.0)
-        return round(linear_gain, 4)
+        return float(round(linear_gain, 4))
 
     def duck_buffers(
         self,

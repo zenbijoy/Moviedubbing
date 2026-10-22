@@ -9,7 +9,7 @@ pytest.importorskip("PySide6")
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QMessageBox, QPushButton
+from PySide6.QtWidgets import QApplication, QPushButton
 
 from aidub.ui.screens.timeline_editor import TimelineScreen
 
@@ -75,9 +75,15 @@ def test_dialogue_inputs_zero_overlap() -> None:
         trans_geom = insp.trans_in.geometry()
 
         # Check that inputs do not overlap vertically
-        assert char_geom.bottom() < lang_geom.top(), f"Overlap: char bottom {char_geom.bottom()} >= lang top {lang_geom.top()}"
-        assert lang_geom.bottom() < orig_geom.top(), f"Overlap: lang bottom {lang_geom.bottom()} >= orig top {orig_geom.top()}"
-        assert orig_geom.bottom() < trans_geom.top(), f"Overlap: orig bottom {orig_geom.bottom()} >= trans top {trans_geom.top()}"
+        assert char_geom.bottom() < lang_geom.top(), (
+            f"Overlap: char bottom {char_geom.bottom()} >= lang top {lang_geom.top()}"
+        )
+        assert lang_geom.bottom() < orig_geom.top(), (
+            f"Overlap: lang bottom {lang_geom.bottom()} >= orig top {orig_geom.top()}"
+        )
+        assert orig_geom.bottom() < trans_geom.top(), (
+            f"Overlap: orig bottom {orig_geom.bottom()} >= trans top {trans_geom.top()}"
+        )
     finally:
         screen.close()
         app.processEvents()
@@ -96,7 +102,11 @@ def test_track_lock_and_visibility_toggles() -> None:
 
         # Find lock and eye buttons on track S1
         lock_btns = [b for b in header.findChildren(QPushButton) if b.text() in {"🔓", "🔒"}]
-        eye_btns = [b for b in header.findChildren(QPushButton) if b.text() in {"👁️", "🎙", "💬", "🚫", "🔇", "🗨️"}]
+        eye_btns = [
+            b
+            for b in header.findChildren(QPushButton)
+            if b.text() in {"👁️", "🎙", "💬", "🚫", "🔇", "🗨️"}
+        ]
 
         assert len(lock_btns) == 10
         assert len(eye_btns) == 10
@@ -296,4 +306,3 @@ def test_track_header_import_buttons(monkeypatch: pytest.MonkeyPatch) -> None:
     finally:
         screen.close()
         app.processEvents()
-

@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any
+
 import pytest
 
 pytest.importorskip("PySide6")
@@ -201,22 +203,26 @@ def test_timeline_screen_per_cue_character_tracking(tmp_path: Path) -> None:
         assert counts.get("Ariadne") == 1
 
         # When clicking cue 1 (Cobb)
-        screen._on_timeline_clip_clicked({
-            "tid": "S1",
-            "start": 1.0,
-            "dur": 2.0,
-            "label": "[Cobb] We need an architect.",
-        })
+        screen._on_timeline_clip_clicked(
+            {
+                "tid": "S1",
+                "start": 1.0,
+                "dur": 2.0,
+                "label": "[Cobb] We need an architect.",
+            }
+        )
         app.processEvents()
         assert screen.inspector_panel.char_in.currentText() == "Cobb"
 
         # When clicking cue 2 (Ariadne)
-        screen._on_timeline_clip_clicked({
-            "tid": "S1",
-            "start": 4.0,
-            "dur": 2.0,
-            "label": "[Ariadne] What kind of architect?",
-        })
+        screen._on_timeline_clip_clicked(
+            {
+                "tid": "S1",
+                "start": 4.0,
+                "dur": 2.0,
+                "label": "[Ariadne] What kind of architect?",
+            }
+        )
         app.processEvents()
         assert screen.inspector_panel.char_in.currentText() == "Ariadne"
 
@@ -233,14 +239,19 @@ def test_timeline_screen_per_cue_character_tracking(tmp_path: Path) -> None:
         assert "Ariadne" not in new_counts
 
         # Test renaming Arthur -> "Arthur_Renamed" via _on_characters_updated
-        screen._on_characters_updated({
-            "renames": {"Arthur": "Arthur_Renamed"},
-            "voices": {"Arthur_Renamed": "bn-BD-PradeepNeural"},
-            "characters": ["Cobb", "Arthur_Renamed"],
-        })
+        screen._on_characters_updated(
+            {
+                "renames": {"Arthur": "Arthur_Renamed"},
+                "voices": {"Arthur_Renamed": "bn-BD-PradeepNeural"},
+                "characters": ["Cobb", "Arthur_Renamed"],
+            }
+        )
         app.processEvents()
         assert screen._current_project_data["clip_characters"][key_cue2] == "Arthur_Renamed"
-        assert screen._current_project_data["character_voices"]["Arthur_Renamed"] == "bn-BD-PradeepNeural"
+        assert (
+            screen._current_project_data["character_voices"]["Arthur_Renamed"]
+            == "bn-BD-PradeepNeural"
+        )
     finally:
         screen.close()
         app.processEvents()

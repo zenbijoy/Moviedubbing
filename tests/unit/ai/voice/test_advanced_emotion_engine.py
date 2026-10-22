@@ -5,20 +5,18 @@ Closed-Loop Verification, Regeneration, Continual Learning, and Manual Director 
 
 from __future__ import annotations
 
-import math
+from pathlib import Path
+
 import numpy as np
 import pytest
 import soundfile as sf
-from pathlib import Path
 
 from aidub.ai.voice.advanced_emotion import (
     CinematicLlmInstructor,
     ContinualEmotionLearner,
     DirectorEmotionController,
-    EmotionVerificationReport,
     EmotionVerifierAndRegenerator,
     FastAcousticProsodyAnalyzer,
-    HighPrecisionAcousticFeatures,
 )
 from aidub.ai.voice.emotion_engine import EmotionEngine
 from aidub.domain.emotion import EmotionObservation

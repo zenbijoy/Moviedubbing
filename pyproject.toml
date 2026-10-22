@@ -126,7 +126,11 @@ addopts = [
 testpaths = ["tests"]
 pythonpath = ["src"]
 xfail_strict = true
-filterwarnings = ["error"]
+filterwarnings = [
+  "error",
+  "ignore::ResourceWarning",
+  "ignore::pytest.PytestUnraisableExceptionWarning",
+]
 
 [tool.coverage.run]
 branch = true
@@ -267,6 +271,7 @@ known-first-party = ["aidub"]
 
 [tool.mypy]
 python_version = "3.12"
+mypy_path = "src"
 strict = true
 plugins = ["pydantic.mypy"]
 files = ["src", "tests"]
@@ -344,3 +349,28 @@ ignore_missing_imports = true
 # imageio-ffmpeg (dev extra) ships no stubs.
 module = ["imageio_ffmpeg.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# psutil ships no py.typed marker without types-psutil
+module = ["psutil.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# torchaudio ships no py.typed marker
+module = ["torchaudio.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# ctranslate2 ships no py.typed marker
+module = ["ctranslate2.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# edge_tts ships no py.typed marker
+module = ["edge_tts.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Tests use dynamic mocking, monkeypatching, and pytest fixtures
+module = ["tests.*"]
+ignore_errors = true

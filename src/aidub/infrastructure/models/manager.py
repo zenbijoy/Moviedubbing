@@ -6,6 +6,7 @@ import hashlib
 import logging
 from enum import StrEnum
 from pathlib import Path
+from typing import ClassVar
 
 from pydantic import BaseModel, Field
 
@@ -64,6 +65,15 @@ class ModelEntry(BaseModel):
 
 class ModelManager:
     """Manages model registration, cryptographic verification, and memory residency."""
+
+    _instance: ClassVar[ModelManager | None] = None
+
+    @classmethod
+    def get_instance(cls) -> ModelManager:
+        """Get or create the singleton instance of ModelManager."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
 
     def __init__(self) -> None:
         self._entries: dict[str, ModelEntry] = {}

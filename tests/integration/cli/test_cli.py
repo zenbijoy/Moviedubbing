@@ -84,7 +84,9 @@ def test_doctor_dubbing_reports_readiness_and_supports_json() -> None:
         checks=[
             DubbingCheckResult(name="ffmpeg/ffprobe", ok=True, detail="ffmpeg v7.1"),
             DubbingCheckResult(name="faster-whisper", ok=True, detail="v1.2.1 installed"),
-            DubbingCheckResult(name="pyannote token", ok=False, detail="token missing", fix="Set PYANNOTE_TOKEN"),
+            DubbingCheckResult(
+                name="pyannote token", ok=False, detail="token missing", fix="Set PYANNOTE_TOKEN"
+            ),
             DubbingCheckResult(name="demucs", ok=True, detail="v4.1.0 installed"),
             DubbingCheckResult(name="edge-tts reachability", ok=True, detail="reachable"),
             DubbingCheckResult(name="llm provider", ok=True, detail="Gemini configured"),
@@ -93,7 +95,12 @@ def test_doctor_dubbing_reports_readiness_and_supports_json() -> None:
     dependencies = CliDependencies(dubbing_diagnostics_collector=lambda: mock_report)
     output = StringIO()
 
-    result = main(["doctor", "--dubbing", "--json"], dependencies=dependencies, stdout=output, stderr=StringIO())
+    result = main(
+        ["doctor", "--dubbing", "--json"],
+        dependencies=dependencies,
+        stdout=output,
+        stderr=StringIO(),
+    )
     assert result == EXIT_OK
     data = json.loads(output.getvalue())
     assert data["all_passed"] is False
@@ -102,13 +109,20 @@ def test_doctor_dubbing_reports_readiness_and_supports_json() -> None:
     assert any(c["name"] == "pyannote token" and c["ok"] is False for c in data["checks"])
 
     human_output = StringIO()
-    result = main(["doctor", "--dubbing"], dependencies=dependencies, stdout=human_output, stderr=StringIO())
+    result = main(
+        ["doctor", "--dubbing"], dependencies=dependencies, stdout=human_output, stderr=StringIO()
+    )
     assert result == EXIT_OK
     assert "=== aidub dubbing pipeline readiness ===" in human_output.getvalue()
     assert "Set PYANNOTE_TOKEN" in human_output.getvalue()
 
     required_output = StringIO()
-    result = main(["doctor", "--dubbing", "--require-runtime"], dependencies=dependencies, stdout=required_output, stderr=StringIO())
+    result = main(
+        ["doctor", "--dubbing", "--require-runtime"],
+        dependencies=dependencies,
+        stdout=required_output,
+        stderr=StringIO(),
+    )
     assert result == EXIT_RUNTIME_UNAVAILABLE
 
 

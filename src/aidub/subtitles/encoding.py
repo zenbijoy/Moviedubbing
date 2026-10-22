@@ -74,7 +74,7 @@ def detect_and_read_subtitle_file(file_path: Path | str) -> tuple[str, str]:
 
     # Final chardet fallback if chardet library is installed
     try:
-        import chardet  # type: ignore[import-not-found]
+        import chardet
 
         detected = chardet.detect(raw_bytes)
         enc_name = detected.get("encoding")

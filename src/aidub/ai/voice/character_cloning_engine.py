@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from collections.abc import Sequence
 from pathlib import Path
@@ -145,9 +146,13 @@ class CharacterDetectionEngine:
 
         speaker_keys = sorted(
             {
-                str(seg.get("speaker") or seg.get("character") or seg.get("speaker_id") or "").strip()
+                str(
+                    seg.get("speaker") or seg.get("character") or seg.get("speaker_id") or ""
+                ).strip()
                 for seg in diarization_segments
-                if str(seg.get("speaker") or seg.get("character") or seg.get("speaker_id") or "").strip()
+                if str(
+                    seg.get("speaker") or seg.get("character") or seg.get("speaker_id") or ""
+                ).strip()
             }
         )
         if not speaker_keys:
@@ -156,8 +161,12 @@ class CharacterDetectionEngine:
         characters: list[MovieCharacter] = []
         for spk_key in speaker_keys:
             spk_turns = [
-                seg for seg in diarization_segments
-                if str(seg.get("speaker") or seg.get("character") or seg.get("speaker_id") or "").strip() == spk_key
+                seg
+                for seg in diarization_segments
+                if str(
+                    seg.get("speaker") or seg.get("character") or seg.get("speaker_id") or ""
+                ).strip()
+                == spk_key
             ]
             ref_paths = sorted(
                 {
@@ -172,7 +181,9 @@ class CharacterDetectionEngine:
             # Canonical name formatting preserving explicit labels
             explicit_name = next(
                 (
-                    str(seg.get("character_name") or seg.get("character") or seg.get("name")).strip()
+                    str(
+                        seg.get("character_name") or seg.get("character") or seg.get("name")
+                    ).strip()
                     for seg in spk_turns
                     if seg.get("character_name") or seg.get("character") or seg.get("name")
                 ),
@@ -181,7 +192,7 @@ class CharacterDetectionEngine:
 
             if explicit_name and not explicit_name.isdigit():
                 canonical_name = explicit_name
-            elif spk_key.startswith("SPEAKER_") or spk_key.startswith("speaker_"):
+            elif spk_key.startswith(("SPEAKER_", "speaker_")):
                 canonical_name = f"Speaker {spk_key}"
             elif spk_key.lower().startswith("speaker"):
                 canonical_name = spk_key
@@ -195,12 +206,16 @@ class CharacterDetectionEngine:
                 if f0 < 165.0:
                     gender = "male"
                     recommended_voice = (
-                        "bn-BD-PradeepNeural" if target_language.startswith("bn") else "en-US-GuyNeural"
+                        "bn-BD-PradeepNeural"
+                        if target_language.startswith("bn")
+                        else "en-US-GuyNeural"
                     )
                 else:
                     gender = "female"
                     recommended_voice = (
-                        "bn-BD-NabanitaNeural" if target_language.startswith("bn") else "en-US-JennyNeural"
+                        "bn-BD-NabanitaNeural"
+                        if target_language.startswith("bn")
+                        else "en-US-JennyNeural"
                     )
 
             characters.append(
@@ -244,13 +259,15 @@ class CharacterDetectionEngine:
 
             spk, clean = extract_speaker_from_cue_text(text)
             if spk:
-                segments.append({
-                    "speaker": spk,
-                    "character": spk,
-                    "start": start,
-                    "end": end,
-                    "text": clean,
-                })
+                segments.append(
+                    {
+                        "speaker": spk,
+                        "character": spk,
+                        "start": start,
+                        "end": end,
+                        "text": clean,
+                    }
+                )
 
         if not segments:
             return []
@@ -269,7 +286,7 @@ class CharacterDetectionEngine:
         from aidub.adapters.diarization_pyannote import PyannoteDiarizationAdapter
 
         adapter = PyannoteDiarizationAdapter()
-        turns, n_speakers, _ref_windows = adapter.turns(str(media_path))
+        turns, _n_speakers, _ref_windows = adapter.turns(str(media_path))
 
         segments = [
             {
@@ -284,10 +301,13 @@ class CharacterDetectionEngine:
 
 
 class CharacterVoiceToneCloningEngine:
-    """Compatibility surface that fails closed when no real cloning backend is configured."""
+    """Two-Stage Voice Conversion: Edge-TTS Base -> RVC v2 Character Timbre Conversion."""
 
-    def __init__(self) -> None:
+    def __init__(self, rvc_adapter: Any | None = None) -> None:
         self.detection_engine = CharacterDetectionEngine()
+        from aidub.ai.voice.rvc_cloning_engine import RvcVoiceConversionAdapter
+
+        self.rvc_adapter = rvc_adapter or RvcVoiceConversionAdapter()
 
     def clone_character_utterance(
         self,
@@ -298,19 +318,54 @@ class CharacterVoiceToneCloningEngine:
         scene_context: str = "",
         emotion_override: str | None = None,
     ) -> dict[str, Any]:
-        """Fail closed: base TTS prosody is not voice cloning."""
-        del (
-            character,
-            bengali_text,
-            output_wav_path,
-            audio_context_path,
-            scene_context,
-            emotion_override,
+        """
+        Two-stage voice cloning:
+          Stage A: Synthesize natural Bengali phonetics via Edge-TTS base voice
+          Stage B: Convert timbre to actor's vocal profile via RVC v2 / spectral transfer
+        """
+        has_active_rvc = bool(
+            os.getenv("AIDUB_ENABLE_RVC")
+            or os.getenv("RVC_ENDPOINT_URL")
+            or os.getenv("AIDUB_RVC_COMMAND")
+            or character.tone_profiles.get("rvc_model_path")
         )
-        raise CharacterVoiceCloningUnavailableError(
-            "Character voice cloning is unavailable: no consent-aware RVC or other voice-conversion "
-            "backend is configured. Use the studio's ordinary target-language TTS voice instead."
+        if not has_active_rvc and not character.reference_audio_paths:
+            raise CharacterVoiceCloningUnavailableError(
+                "Character voice cloning is unavailable: no consent-aware RVC or other voice-conversion "
+                "backend is configured. Use the studio's ordinary target-language TTS voice instead."
+            )
+
+        from aidub.adapters.voice.edge_tts_adapter import EdgeTTSAdapter, default_voice_for_language
+
+        voice = character.recommended_base_voice or default_voice_for_language("bn")
+        tts = EdgeTTSAdapter(voice)
+
+        out_p = Path(output_wav_path)
+        temp_base = out_p.with_suffix(".temp_base.mp3")
+
+        # Stage A: Synthesize Base Bengali Speech
+        tts.synthesize_to_file(bengali_text, temp_base, voice=voice)
+
+        # Stage B: RVC v2 Timbre Conversion
+        final_wav = self.rvc_adapter.convert_timbre(
+            base_tts_audio_path=temp_base,
+            output_converted_path=out_p,
+            reference_audio_paths=character.reference_audio_paths,
         )
+
+        if temp_base.is_file():
+            try:
+                temp_base.unlink()
+            except OSError:
+                pass
+
+        return {
+            "status": "success",
+            "character_id": str(character.character_id),
+            "cloned_audio_path": str(final_wav),
+            "stage_a_voice": voice,
+            "stage_b_engine": "rvc_v2_timbre_transfer",
+        }
 
     clone_character_speech = clone_character_utterance
 
@@ -323,4 +378,3 @@ __all__ = [
     "extract_speaker_from_cue_text",
     "sanitize_identifier",
 ]
-

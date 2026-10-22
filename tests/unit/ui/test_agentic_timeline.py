@@ -92,8 +92,7 @@ def test_reference_workspace_exposes_navigation_tools_and_ai_actions() -> None:
         screen.ai_overlay.run_btn.click()
         assert started == [True]
         assert tuple(
-            button.toolTip()
-            for button in screen.timeline_bar.findChildren(QPushButton)
+            button.toolTip() for button in screen.timeline_bar.findChildren(QPushButton)
         ) == ("Add Marker", "Timeline Settings")
         assert not screen.status_dock.findChildren(QPushButton)
         ai_actions = {
@@ -145,25 +144,22 @@ def test_timeline_settings_controls_real_canvas_preferences() -> None:
 
         menu = screen._build_timeline_settings_menu()
         snapping = next(
-            action for action in menu.actions()
-            if action.text() == "Snap to clip edges and markers"
+            action for action in menu.actions() if action.text() == "Snap to clip edges and markers"
         )
         snapping.trigger()
         assert screen.canvas_view._snapping_enabled is False
         assert screen._timeline_toggles["Toggle Snapping"] is False
 
         linked = next(
-            action for action in menu.actions()
+            action
+            for action in menu.actions()
             if action.text() == "Link related dialogue and dub clips"
         )
         linked.trigger()
         assert screen.canvas_view._linked_selection_enabled is False
         assert screen._timeline_toggles["Linked Selection"] is False
 
-        fit = next(
-            action for action in menu.actions()
-            if action.text() == "Fit timeline to window"
-        )
+        fit = next(action for action in menu.actions() if action.text() == "Fit timeline to window")
         fit.trigger()
         assert 0.55 <= screen.canvas_view.transform().m11() <= 3.5
         screen._set_timeline_zoom(200)

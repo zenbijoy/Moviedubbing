@@ -63,7 +63,7 @@ def analyze_layout(
 
     def _cy(b_idx: int) -> float:
         cys = sorted(r[2] + r[4] / 2.0 for r in bands[b_idx])
-        return cys[len(cys) // 2]
+        return float(cys[len(cys) // 2])
 
     def _distinct_texts(rs: list[tuple[Any, ...]]) -> int:
         return len({r[0].strip().lower() for r in rs if r[0].strip()})

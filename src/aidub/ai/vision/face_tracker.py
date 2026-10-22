@@ -257,9 +257,7 @@ class FaceTracker:
             s_start = getattr(shot, "start_frame", 0)
             s_end = getattr(shot, "end_frame", 0)
 
-            shot_dets = [
-                det_map[f] for f in range(s_start, s_end + 1) if f in det_map
-            ]
+            shot_dets = [det_map[f] for f in range(s_start, s_end + 1) if f in det_map]
             if shot_dets:
                 # Isolate Kalman filtering exclusively within this shot
                 shot_tracks = self.track_faces_in_shot(str(s_id), shot_dets)

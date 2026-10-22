@@ -61,7 +61,6 @@ class TimelineScrollController:
                 self.engine.scroll_x_ms = playhead_ms
             elif playhead_ms < self.engine.scroll_x_ms:
                 self.engine.scroll_x_ms = max(0, playhead_ms - (viewport_dur_ms // 2))
-            return self.engine.scroll_x_ms
 
         return self.engine.scroll_x_ms
 

@@ -42,7 +42,6 @@ def resync_subtitles_to_fitted_timing(
         uid = str(seg.get("id") or seg.get("utterance_id", ""))
         orig_start = float(seg.get("start", 0.0))
         orig_end = float(seg.get("end", orig_start + 1.0))
-        orig_dur = max(0.1, orig_end - orig_start)
 
         if uid in fitted_durations_ms:
             fitted_dur = fitted_durations_ms[uid] / 1000.0

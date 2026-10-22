@@ -128,12 +128,12 @@ class VectorizedDspEngine:
 
         # Hop parameters for WSOLA
         ha = window_size // 2  # Analysis hop
-        hs = max(1, int(round(ha / effective_tempo)))  # Synthesis hop
+        hs = max(1, round(ha / effective_tempo))  # Synthesis hop
 
         win = np.hanning(window_size).astype(np.float32)
         n_samples = samples.size
         # Estimate output length
-        target_len = int(round(n_samples / effective_tempo))
+        target_len = round(n_samples / effective_tempo)
         output = np.zeros(target_len + window_size * 2, dtype=np.float32)
         weight = np.zeros(target_len + window_size * 2, dtype=np.float32)
 
@@ -142,9 +142,6 @@ class VectorizedDspEngine:
         search_range = window_size // 4
 
         while in_pos + window_size <= n_samples and out_pos + window_size < output.size:
-            # Current analysis segment
-            seg = samples[in_pos : in_pos + window_size]
-
             # Find best cross-correlation alignment within search_range to avoid phase cancellation
             best_offset = 0
             if in_pos > 0 and search_range > 0:

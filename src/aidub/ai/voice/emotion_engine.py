@@ -16,13 +16,12 @@ import logging
 import math
 import os
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from pydantic import Field
 
-from aidub.contracts.base import ContractModel, Identifier
-from aidub.domain.emotion import EmotionObservation, PerformanceEmotionState
 from aidub.ai.voice.advanced_emotion import (
     CinematicLlmInstructor,
     ContinualEmotionLearner,
@@ -30,8 +29,9 @@ from aidub.ai.voice.advanced_emotion import (
     EmotionVerificationReport,
     EmotionVerifierAndRegenerator,
     FastAcousticProsodyAnalyzer,
-    HighPrecisionAcousticFeatures,
 )
+from aidub.contracts.base import ContractModel, Identifier
+from aidub.domain.emotion import EmotionObservation, PerformanceEmotionState
 
 logger = logging.getLogger(__name__)
 
@@ -478,7 +478,9 @@ class EmotionEngine:
         adjusted_pitch = round(base_pitch_hz + arousal * 10 * intensity)
 
         # Incorporate online continual learning bias if available
-        learned_pitch, learned_rate = self.continual_learner.get_learned_prosody_offset(character_id, cat)
+        learned_pitch, learned_rate = self.continual_learner.get_learned_prosody_offset(
+            character_id, cat
+        )
         adjusted_pitch += learned_pitch
         adjusted_rate += learned_rate
 
@@ -621,8 +623,8 @@ def compute_continuous_prosody_params(
     a = max(-1.0, min(1.0, float(arousal)))
     d = max(-1.0, min(1.0, float(dominance)))
 
-    pitch_hz = int(round(14.0 * a + 6.0 * v))
-    rate_pct = int(round(12.0 * a - 8.0 * max(0.0, -v)))
+    pitch_hz = round(14.0 * a + 6.0 * v)
+    rate_pct = round(12.0 * a - 8.0 * max(0.0, -v))
     volume_db = round(4.0 * a + 2.0 * d, 1)
 
     pitch_str = f"+{pitch_hz}Hz" if pitch_hz >= 0 else f"{pitch_hz}Hz"
@@ -640,17 +642,17 @@ __all__ = [
     "EDGE_TTS_STYLE_MAP",
     "EMOTION_VAD_ANCHORS",
     "AcousticEmotionDetector",
+    "CinematicLlmInstructor",
     "ContextualLlmEmotionDetector",
+    "ContinualEmotionLearner",
+    "DirectorEmotionController",
     "EmotionAnalysisUnavailableError",
     "EmotionDetectionResult",
     "EmotionEngine",
-    "KaggleLocalEmotionAdapter",
-    "FastAcousticProsodyAnalyzer",
-    "CinematicLlmInstructor",
-    "EmotionVerifierAndRegenerator",
     "EmotionVerificationReport",
-    "ContinualEmotionLearner",
-    "DirectorEmotionController",
+    "EmotionVerifierAndRegenerator",
+    "FastAcousticProsodyAnalyzer",
+    "KaggleLocalEmotionAdapter",
     "compute_continuous_prosody_params",
     "compute_vad_distance",
 ]

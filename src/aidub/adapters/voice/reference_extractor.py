@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from aidub.media.ffmpeg_ops import trim
 
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def pick_reference(
-    segments: list[dict],
+    segments: list[dict[str, Any]],
     vocals16_path: Path | str,
     work_dir: Path | str,
     ref_windows: dict[int, tuple[float, float]] | None = None,

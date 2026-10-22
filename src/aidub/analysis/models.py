@@ -529,7 +529,9 @@ class AnalysisRun(AnalysisModel):
     @model_validator(mode="after")
     def _validate_run(self) -> Self:
         _validate_stage_graph(self.stages)
-        stage_by_id = {stage.stage_id: stage for stage in self.stages}
+        stage_by_id: dict[str, AnalysisStage] = {
+            str(stage.stage_id): stage for stage in self.stages
+        }
         _validate_stage_dependencies_satisfied(stage_by_id)
 
         expected_status = derive_run_status(self.stages)

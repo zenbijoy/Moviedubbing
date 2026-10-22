@@ -94,13 +94,15 @@ class EdgeTTSAdapter:
         out_p.parent.mkdir(parents=True, exist_ok=True)
         v = voice or self.voice_name
 
-        import edge_tts  # type: ignore[import-not-found]
         import time
+
+        import edge_tts
 
         max_retries = 4
         last_exc: Exception | None = None
         for attempt in range(1, max_retries + 1):
             try:
+
                 async def _run_synth() -> None:
                     communicate = edge_tts.Communicate(text, v, rate=rate, pitch=pitch)
                     await communicate.save(str(out_p))

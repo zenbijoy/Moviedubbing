@@ -12,6 +12,9 @@ Unit tests for Phase 9 — Authorized Character Voice Intelligence, Zero-Shot Vo
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 from aidub.ai.voice.acoustic_prosody import AcousticProsodyExtractor
@@ -143,16 +146,16 @@ def test_character_detection_uses_real_anonymous_speaker_ids() -> None:
         )
 
 
-def test_emotion_analysis_never_substitutes_neutral_defaults(tmp_path) -> None:
+def test_emotion_analysis_never_substitutes_neutral_defaults(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="does not exist"):
         AcousticEmotionDetector().analyze_audio_features(tmp_path / "missing.wav")
 
     class UnavailableContextDetector:
-        def detect_emotion(self, **_kwargs):
+        def detect_emotion(self, **_kwargs: Any) -> Any:
             raise EmotionAnalysisUnavailableError("provider unavailable")
 
     engine = EmotionEngine()
-    engine.context_detector = UnavailableContextDetector()
+    engine.context_detector = UnavailableContextDetector()  # type: ignore[assignment]
     with pytest.raises(EmotionAnalysisUnavailableError, match="provider unavailable"):
         engine.detect_emotion("utt_01", "hello")
 

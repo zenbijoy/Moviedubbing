@@ -50,7 +50,7 @@ def normalize_voice(
 
     if clip_dur >= 0.400:
         try:
-            import pyloudnorm as pyln  # type: ignore[import-not-found]
+            import pyloudnorm as pyln
 
             meter = pyln.Meter(sr)
             loudness = meter.integrated_loudness(signal)
@@ -164,7 +164,7 @@ def assemble_timeline(
     Returns:
         Path to completed audio track.
     """
-    import soundfile as sf  # type: ignore[import-not-found]
+    import soundfile as sf
 
     total_samples = int(total_duration_s * sample_rate) + sample_rate
     timeline_buf = np.zeros(total_samples, dtype=np.float32)
@@ -179,7 +179,7 @@ def assemble_timeline(
             data = data.mean(axis=1)
 
         if sr != sample_rate:
-            import librosa  # type: ignore[import-not-found]
+            import librosa
 
             data = librosa.resample(data, orig_sr=sr, target_sr=sample_rate)
 

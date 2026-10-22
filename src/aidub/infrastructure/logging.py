@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from aidub.security.privacy import DataClass, NetworkPolicy, PrivacyPolicy
@@ -52,7 +53,9 @@ def _redact(text: str) -> str:
     return text
 
 
-def _redact_args(args: object) -> object:
+def _redact_args(
+    args: tuple[object, ...] | Mapping[str, object] | None,
+) -> tuple[object, ...] | Mapping[str, object] | None:
     if isinstance(args, tuple):
         return tuple(_redact(str(a)) if isinstance(a, str) else a for a in args)
     if isinstance(args, dict):

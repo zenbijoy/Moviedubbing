@@ -37,7 +37,7 @@ class BenchmarkMetricScore(ContractModel):
     target_threshold: float = Field(ge=0.0)
     direction: MetricDirection
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def passed(self) -> bool:
         if self.direction == MetricDirection.LOWER_IS_BETTER:

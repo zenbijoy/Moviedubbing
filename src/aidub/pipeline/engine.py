@@ -101,6 +101,7 @@ class DubbingEngine:
     def _validate_prerequisites(self) -> None:
         """Validate the real components selected for this run before media work starts."""
         import os
+
         from aidub.adapters.voice.edge_tts_adapter import default_voice_for_language
         from aidub.diagnostics.dubbing import collect_dubbing_diagnostics
 
@@ -130,7 +131,9 @@ class DubbingEngine:
                     f"Set {env_var} to the installed model command using {{video}}, {{audio}}, and {{output}} placeholders.",
                 )
 
-        missing = [check for check in report.checks if check.name in required_names and not check.ok]
+        missing = [
+            check for check in report.checks if check.name in required_names and not check.ok
+        ]
         if missing:
             details = "\n".join(
                 f"{check.name}: {check.detail}" + (f". {check.fix}" if check.fix else "")
@@ -426,22 +429,40 @@ class DubbingEngine:
                         fit_wav_target = self.work_dir / f"seg_{i:03d}_fit.wav"
 
                         if not raw_seg_wav.is_file() or raw_seg_wav.stat().st_size == 0:
-                            def _synth_cb(t_text: str, out_p: Path, r_str: str, p_str: str) -> None:
+
+                            def _synth_cb(
+                                t_text: str,
+                                out_p: Path,
+                                r_str: str,
+                                p_str: str,
+                                current_voice: str = voice,
+                                current_char: Any = char,
+                            ) -> None:
                                 eff_rate = r_str
                                 eff_pitch = p_str
-                                if char and char.timbre_rate_offset:
-                                    c_rate = int(char.timbre_rate_offset.replace("%", "").replace("+", "") or 0)
+                                if current_char and current_char.timbre_rate_offset:
+                                    c_rate = int(
+                                        current_char.timbre_rate_offset.replace("%", "").replace(
+                                            "+", ""
+                                        )
+                                        or 0
+                                    )
                                     e_rate = int(r_str.replace("%", "").replace("+", "") or 0)
                                     eff_rate = f"{c_rate + e_rate:+d}%"
-                                if char and char.timbre_pitch_offset:
-                                    c_pitch = int(char.timbre_pitch_offset.replace("Hz", "").replace("+", "") or 0)
+                                if current_char and current_char.timbre_pitch_offset:
+                                    c_pitch = int(
+                                        current_char.timbre_pitch_offset.replace("Hz", "").replace(
+                                            "+", ""
+                                        )
+                                        or 0
+                                    )
                                     e_pitch = int(p_str.replace("Hz", "").replace("+", "") or 0)
                                     eff_pitch = f"{c_pitch + e_pitch:+d}Hz"
 
                                 tts.synthesize_to_file(
                                     text=t_text,
                                     output_mp3_path=out_p,
-                                    voice=voice,
+                                    voice=current_voice,
                                     rate=eff_rate,
                                     pitch=eff_pitch,
                                 )
@@ -460,8 +481,11 @@ class DubbingEngine:
                             )
                             logger.info(
                                 "Dubbed seg %d: Emotion=%s, Accuracy=%.2f, Pitch=%+dHz, Rate=%+d%%",
-                                i, emo_res.primary_emotion, vr_report.accuracy_score,
-                                vr_report.corrective_pitch_applied_hz, vr_report.corrective_rate_applied_percent
+                                i,
+                                emo_res.primary_emotion,
+                                vr_report.accuracy_score,
+                                vr_report.corrective_pitch_applied_hz,
+                                vr_report.corrective_rate_applied_percent,
                             )
 
                         at_s = max(float(seg["start"]), cursor)
@@ -566,9 +590,7 @@ class DubbingEngine:
                 preview_f = self.work_dir / f"{self.cfg.input.stem}_musetalk_preview.mp4"
                 cinema_f = self.work_dir / f"{self.cfg.input.stem}_latentsync_cinema.mp4"
                 lipsynced_video = (
-                    preview_f
-                    if preview_f.is_file()
-                    else (cinema_f if cinema_f.is_file() else None)
+                    preview_f if preview_f.is_file() else (cinema_f if cinema_f.is_file() else None)
                 )
 
         video_for_mux = (

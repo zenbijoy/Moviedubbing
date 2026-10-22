@@ -123,10 +123,7 @@ def run_configured_lipsync(
     command = [
         (
             t[1:-1]
-            if (
-                len(t) >= 2
-                and ((t[0] == '"' and t[-1] == '"') or (t[0] == "'" and t[-1] == "'"))
-            )
+            if (len(t) >= 2 and ((t[0] == '"' and t[-1] == '"') or (t[0] == "'" and t[-1] == "'")))
             else t
         )
         for t in command

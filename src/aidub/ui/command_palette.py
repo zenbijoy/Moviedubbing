@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Any, override
 
 from .qt_support import PYSIDE6_AVAILABLE, DesktopDependencyError, desktop_dependency_message
 
 if TYPE_CHECKING:
-    from PySide6.QtGui import QKeyEvent
+    from PySide6.QtGui import QKeyEvent, QShowEvent
     from PySide6.QtWidgets import QWidget
 
     from aidub.i18n import LocaleService
@@ -39,7 +39,7 @@ else:
 
 if _QT_WIDGETS_AVAILABLE:
 
-    class CommandPaletteDialog(QDialog):  # type: ignore[misc]
+    class CommandPaletteDialog(QDialog):
         """Modal palette projected from a :class:`CommandRegistry`."""
 
         def __init__(
@@ -73,7 +73,7 @@ if _QT_WIDGETS_AVAILABLE:
             self._refresh_results("")
 
         @override
-        def showEvent(self, event: object) -> None:
+        def showEvent(self, event: QShowEvent) -> None:
             super().showEvent(event)
             self._query.clear()
             self._query.setFocus(Qt.FocusReason.PopupFocusReason)
@@ -101,7 +101,7 @@ if _QT_WIDGETS_AVAILABLE:
                 self._results.setCurrentRow(0)
 
         def _execute_current(self) -> None:
-            item = self._results.currentItem()
+            item: Any = self._results.currentItem()
             if item is None:
                 return
             command_id = item.data(Qt.ItemDataRole.UserRole)

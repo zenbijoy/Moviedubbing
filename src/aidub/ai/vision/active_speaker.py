@@ -95,10 +95,7 @@ class ActiveSpeakerDetector:
             start = i * frame_len
             end = min(arr.size, start + frame_len)
             chunk = arr[start:end]
-            if chunk.size > 0:
-                rms = float(np.sqrt(np.mean(chunk**2)))
-            else:
-                rms = 0.0
+            rms = float(np.sqrt(np.mean(chunk**2))) if chunk.size > 0 else 0.0
             energy_profile.append(rms)
 
         return energy_profile

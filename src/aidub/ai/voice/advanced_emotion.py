@@ -15,17 +15,17 @@ from __future__ import annotations
 import json
 import logging
 import math
-import os
-from dataclasses import asdict, dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 import soundfile as sf
 from pydantic import Field
 
 from aidub.contracts.base import ContractModel, Identifier
-from aidub.domain.emotion import EmotionObservation, PerformanceEmotionState
+from aidub.domain.emotion import EmotionObservation
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +55,11 @@ EMOTION_VAD_ANCHORS: dict[str, tuple[float, float, float]] = {
 # 1. Ultra-Fast High-Precision Acoustic Prosody Analyzer
 # ==============================================================================
 
+
 @dataclass(frozen=True, slots=True)
 class HighPrecisionAcousticFeatures:
     """Rich acoustic prosodic descriptors extracted in sub-millisecond time."""
+
     duration_s: float
     f0_median_hz: float
     f0_std_hz: float
@@ -144,7 +146,7 @@ class FastAcousticProsodyAnalyzer:
         # 2. Sub-millisecond F0 via normalized autocorrelation with parabolic interpolation
         f0_estimates: list[float] = []
         min_lag = max(1, int(sr / 450.0))  # Max F0 = 450 Hz
-        max_lag = min(frame_len - 1, int(sr / 65.0))   # Min F0 = 65 Hz
+        max_lag = min(frame_len - 1, int(sr / 65.0))  # Min F0 = 65 Hz
 
         if max_lag > min_lag:
             stride_step = max(1, len(frames) // 16) if len(frames) > 16 else 1
@@ -175,7 +177,11 @@ class FastAcousticProsodyAnalyzer:
             f0_std = float(np.std(f0_estimates))
             f0_min = float(np.min(f0_estimates))
             f0_max = float(np.max(f0_estimates))
-            f0_slope = float((f0_estimates[-1] - f0_estimates[0]) / duration_s) if len(f0_estimates) > 1 else 0.0
+            f0_slope = (
+                float((f0_estimates[-1] - f0_estimates[0]) / duration_s)
+                if len(f0_estimates) > 1
+                else 0.0
+            )
             hnr_proxy = float(20.0 * math.log10(max(1.0, f0_median / max(1.0, f0_std))))
         else:
             f0_median = 160.0
@@ -200,13 +206,15 @@ class FastAcousticProsodyAnalyzer:
 
         # 5. Speech Tempo / Onset Energy Dynamics
         onset_diff = np.maximum(0, np.diff(frame_rms))
-        peaks = np.where((onset_diff[1:-1] > onset_diff[:-2]) & (onset_diff[1:-1] > onset_diff[2:]))[0]
+        peaks = np.where(
+            (onset_diff[1:-1] > onset_diff[:-2]) & (onset_diff[1:-1] > onset_diff[2:])
+        )[0]
         peaks_per_sec = len(peaks) / duration_s
         tempo_bpm = float(np.clip(peaks_per_sec * 60.0, 70.0, 240.0))
 
         # Heuristic classifications
-        is_whisper = (zcr > 0.08 and rms_mean < 0.035 and centroid > 2200.0)
-        is_shouting = (rms_mean > 0.16 and dyn_range_db > 20.0 and f0_std > 30.0)
+        is_whisper = zcr > 0.08 and rms_mean < 0.035 and centroid > 2200.0
+        is_shouting = rms_mean > 0.16 and dyn_range_db > 20.0 and f0_std > 30.0
 
         return HighPrecisionAcousticFeatures(
             duration_s=round(duration_s, 3),
@@ -234,7 +242,11 @@ class FastAcousticProsodyAnalyzer:
         norm_f0_var = np.clip((feats.f0_std_hz - 8.0) / 45.0, 0.0, 1.0)
         norm_tempo = np.clip((feats.estimated_tempo_bpm - 90.0) / 90.0, 0.0, 1.0)
 
-        arousal = float(np.clip((norm_energy * 0.45 + norm_f0_var * 0.35 + norm_tempo * 0.20) * 2.0 - 1.0, -1.0, 1.0))
+        arousal = float(
+            np.clip(
+                (norm_energy * 0.45 + norm_f0_var * 0.35 + norm_tempo * 0.20) * 2.0 - 1.0, -1.0, 1.0
+            )
+        )
 
         # Valence (Harmonics, smooth pitch contour, spectral softness)
         norm_zcr = np.clip(feats.zero_crossing_rate / 0.15, 0.0, 1.0)
@@ -265,8 +277,12 @@ class FastAcousticProsodyAnalyzer:
                     best_cat = cat
             primary = best_cat
 
-        intensity = float(np.clip(abs(arousal) * 0.6 + abs(dominance) * 0.25 + abs(valence) * 0.15, 0.1, 1.0))
-        confidence = float(np.clip(0.70 + (0.30 if feats.is_shouting or feats.is_whisper else 0.15), 0.5, 0.98))
+        intensity = float(
+            np.clip(abs(arousal) * 0.6 + abs(dominance) * 0.25 + abs(valence) * 0.15, 0.1, 1.0)
+        )
+        confidence = float(
+            np.clip(0.70 + (0.30 if feats.is_shouting or feats.is_whisper else 0.15), 0.5, 0.98)
+        )
 
         return EmotionObservation(
             dominant_category=primary,
@@ -275,7 +291,10 @@ class FastAcousticProsodyAnalyzer:
             arousal=round(arousal, 3),
             dominance=round(dominance, 3),
             intensity=round(intensity, 3),
-            secondary_emotions={"acoustic_arousal": round(arousal, 2), "tempo_bpm": feats.estimated_tempo_bpm},
+            secondary_emotions={
+                "acoustic_arousal": round(arousal, 2),
+                "tempo_bpm": feats.estimated_tempo_bpm,
+            },
         )
 
 
@@ -283,8 +302,10 @@ class FastAcousticProsodyAnalyzer:
 # 2. Cinematic LLM Emotion Instructor
 # ==============================================================================
 
+
 class CinematicPerformanceInstruction(ContractModel):
     """Detailed theatrical instruction generated by the LLM Director."""
+
     primary_emotion: str
     secondary_emotion: str = ""
     subtext: str = ""
@@ -348,7 +369,7 @@ class CinematicLlmInstructor:
         user_prompt = (
             f"Character: {character_name}\n"
             f"Scene Context: {scene_context or 'Cinematic dialogue'}\n"
-            f"Dialogue: \"{dialogue_text}\"\n"
+            f'Dialogue: "{dialogue_text}"\n'
             f"{hint_str}\n"
             "Direct this line:"
         )
@@ -365,7 +386,18 @@ class CinematicLlmInstructor:
             )
             data = json.loads(resp.content)
             style = str(data.get("ssml_style", "chat")).lower()
-            if style not in {"angry", "cheerful", "sad", "whispering", "friendly", "hopeful", "unfriendly", "chat", "shouting", "excited"}:
+            if style not in {
+                "angry",
+                "cheerful",
+                "sad",
+                "whispering",
+                "friendly",
+                "hopeful",
+                "unfriendly",
+                "chat",
+                "shouting",
+                "excited",
+            }:
                 style = "chat"
 
             v = float(data.get("valence", 0.0))
@@ -381,14 +413,18 @@ class CinematicLlmInstructor:
                 style_degree=float(np.clip(float(data.get("style_degree", 1.0)), 0.1, 2.0)),
                 pitch_offset_hz=int(np.clip(int(data.get("pitch_offset_hz", 0)), -30, 30)),
                 rate_offset_percent=int(np.clip(int(data.get("rate_offset_percent", 0)), -35, 35)),
-                volume_offset_db=float(np.clip(float(data.get("volume_offset_db", 0.0)), -12.0, 12.0)),
+                volume_offset_db=float(
+                    np.clip(float(data.get("volume_offset_db", 0.0)), -12.0, 12.0)
+                ),
                 intensity=float(np.clip(float(data.get("intensity", 0.5)), 0.0, 1.0)),
                 vad_vector=(v, a, d),
             )
         except Exception as exc:
             logger.warning("Cinematic LLM director fallback to heuristic: %s", exc)
             # Safe heuristic rule-based delivery
-            is_shout = dialogue_text.endswith("!") or any(w.isupper() and len(w) > 2 for w in dialogue_text.split())
+            is_shout = dialogue_text.endswith("!") or any(
+                w.isupper() and len(w) > 2 for w in dialogue_text.split()
+            )
             is_q = dialogue_text.endswith("?")
             if is_shout:
                 return CinematicPerformanceInstruction(
@@ -423,9 +459,11 @@ class CinematicLlmInstructor:
 # 3. Closed-Loop Emotion Verifier and Auto-Regenerator
 # ==============================================================================
 
+
 @dataclass(frozen=True, slots=True)
 class EmotionVerificationReport:
     """Detailed audit of synthesized voice vs. target emotion."""
+
     verified: bool
     accuracy_score: float  # 0.0 to 1.0
     target_category: str
@@ -473,7 +511,9 @@ class EmotionVerifierAndRegenerator:
         arousal_match = float(max(0.0, 1.0 - (arousal_diff / 1.6)))
 
         # 2. Valence / Category concordance
-        cat_match = 1.0 if target_intent.dominant_category == measured_obs.dominant_category else 0.70
+        cat_match = (
+            1.0 if target_intent.dominant_category == measured_obs.dominant_category else 0.70
+        )
 
         # 3. Tempo / Duration match
         if target_duration_s and target_duration_s > 0.1:
@@ -484,14 +524,13 @@ class EmotionVerifierAndRegenerator:
             tempo_match = 0.95
 
         # 4. Energy dynamic match
-        energy_match = float(np.clip(1.0 - abs(target_intent.intensity - measured_obs.intensity), 0.0, 1.0))
+        energy_match = float(
+            np.clip(1.0 - abs(target_intent.intensity - measured_obs.intensity), 0.0, 1.0)
+        )
 
         # Composite Accuracy Score
         accuracy = float(
-            arousal_match * 0.40 +
-            cat_match * 0.25 +
-            tempo_match * 0.20 +
-            energy_match * 0.15
+            arousal_match * 0.40 + cat_match * 0.25 + tempo_match * 0.20 + energy_match * 0.15
         )
 
         details = {
@@ -559,8 +598,8 @@ class EmotionVerifierAndRegenerator:
             if attempts <= self.max_attempts:
                 # If target was more energetic than measured, boost pitch and rate
                 arousal_gap = target_intent.arousal - measured_obs.arousal
-                pitch_correction = int(round(arousal_gap * 10))
-                rate_correction = int(round(arousal_gap * 8))
+                pitch_correction = round(arousal_gap * 10)
+                rate_correction = round(arousal_gap * 8)
 
                 # If duration was too long, increase rate
                 if target_duration_s and details["measured_duration"] > target_duration_s * 1.15:
@@ -570,7 +609,12 @@ class EmotionVerifierAndRegenerator:
                 current_rate_int = int(np.clip(current_rate_int + rate_correction, -30, 30))
                 logger.info(
                     "Regenerating take (%d/%d): accuracy=%.2f < %.2f. Adjusting pitch=%+dHz, rate=%+d%%",
-                    attempts, self.max_attempts, accuracy, self.min_accuracy, current_pitch_int, current_rate_int
+                    attempts,
+                    self.max_attempts,
+                    accuracy,
+                    self.min_accuracy,
+                    current_pitch_int,
+                    current_rate_int,
                 )
 
         return EmotionVerificationReport(
@@ -590,6 +634,7 @@ class EmotionVerifierAndRegenerator:
 # ==============================================================================
 # 4. Continual Emotion Learner (Learns & Fine-Tunes from Every Work)
 # ==============================================================================
+
 
 class ContinualEmotionLearner:
     """
@@ -658,8 +703,12 @@ class ContinualEmotionLearner:
             }
         else:
             rec = self.character_biases[char_key][emo_key]
-            rec["pitch_bias"] = round((1.0 - weight) * rec["pitch_bias"] + weight * applied_pitch_hz, 2)
-            rec["rate_bias"] = round((1.0 - weight) * rec["rate_bias"] + weight * applied_rate_percent, 2)
+            rec["pitch_bias"] = round(
+                (1.0 - weight) * rec["pitch_bias"] + weight * applied_pitch_hz, 2
+            )
+            rec["rate_bias"] = round(
+                (1.0 - weight) * rec["rate_bias"] + weight * applied_rate_percent, 2
+            )
             rec["n_samples"] += 1.0
 
         # 2. Update global baseline weights
@@ -672,8 +721,12 @@ class ContinualEmotionLearner:
         else:
             g_rec = self.global_biases[emo_key]
             g_weight = weight * 0.5
-            g_rec["pitch_bias"] = round((1.0 - g_weight) * g_rec["pitch_bias"] + g_weight * applied_pitch_hz, 2)
-            g_rec["rate_bias"] = round((1.0 - g_weight) * g_rec["rate_bias"] + g_weight * applied_rate_percent, 2)
+            g_rec["pitch_bias"] = round(
+                (1.0 - g_weight) * g_rec["pitch_bias"] + g_weight * applied_pitch_hz, 2
+            )
+            g_rec["rate_bias"] = round(
+                (1.0 - g_weight) * g_rec["rate_bias"] + g_weight * applied_rate_percent, 2
+            )
             g_rec["n_samples"] += 1.0
 
         self.save()
@@ -691,11 +744,11 @@ class ContinualEmotionLearner:
 
         if char_key in self.character_biases and emo_key in self.character_biases[char_key]:
             rec = self.character_biases[char_key][emo_key]
-            return int(round(rec["pitch_bias"])), int(round(rec["rate_bias"]))
+            return round(rec["pitch_bias"]), round(rec["rate_bias"])
 
         if emo_key in self.global_biases:
             g_rec = self.global_biases[emo_key]
-            return int(round(g_rec["pitch_bias"])), int(round(g_rec["rate_bias"]))
+            return round(g_rec["pitch_bias"]), round(g_rec["rate_bias"])
 
         return 0, 0
 
@@ -703,6 +756,7 @@ class ContinualEmotionLearner:
 # ==============================================================================
 # 5. Director Emotion Controller (Full Manual Control)
 # ==============================================================================
+
 
 class DirectorEmotionController:
     """
@@ -757,12 +811,12 @@ class DirectorEmotionController:
 
 
 __all__ = [
-    "HighPrecisionAcousticFeatures",
-    "FastAcousticProsodyAnalyzer",
-    "CinematicPerformanceInstruction",
     "CinematicLlmInstructor",
-    "EmotionVerificationReport",
-    "EmotionVerifierAndRegenerator",
+    "CinematicPerformanceInstruction",
     "ContinualEmotionLearner",
     "DirectorEmotionController",
+    "EmotionVerificationReport",
+    "EmotionVerifierAndRegenerator",
+    "FastAcousticProsodyAnalyzer",
+    "HighPrecisionAcousticFeatures",
 ]

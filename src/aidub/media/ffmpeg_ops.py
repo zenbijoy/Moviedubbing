@@ -7,7 +7,7 @@ import logging
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +23,11 @@ def _ffmpeg_exe() -> str:
     Raises RuntimeError if neither is found.
     """
     try:
-        import imageio_ffmpeg  # type: ignore[import-not-found]
+        import imageio_ffmpeg
 
         exe = imageio_ffmpeg.get_ffmpeg_exe()
         if Path(exe).is_file():
-            return exe
+            return str(exe)
     except Exception:
         pass
     # Fallback: system PATH
@@ -49,7 +49,7 @@ def _ffprobe_exe() -> str | None:
     """
     # Check imageio-ffmpeg binary directory for a co-located ffprobe
     try:
-        import imageio_ffmpeg  # type: ignore[import-not-found]
+        import imageio_ffmpeg
 
         ffmpeg_dir = Path(imageio_ffmpeg.get_ffmpeg_exe()).parent
         for candidate in ffmpeg_dir.iterdir():
@@ -104,7 +104,7 @@ def probe(path: Path | str) -> dict[str, Any]:
         )
         if result.returncode != 0:
             raise RuntimeError(f"ffprobe could not read {media_path}: {result.stderr[-2_000:]}")
-        return json.loads(result.stdout)
+        return cast("dict[str, Any]", json.loads(result.stdout))
 
     # FFmpeg reports stream headers when opening an input. Decoding to a null
     # muxer here would make importing a feature film take as long as playing it.

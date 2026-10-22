@@ -161,7 +161,9 @@ class GeminiAdapter:
             audio_path: Path to a ≤28s audio clip (WAV/MP3) for tone context.
         """
         try:
-            import google.generativeai as genai  # type: ignore[import-not-found]
+            import google.generativeai as _genai
+
+            genai: Any = _genai
         except ImportError as exc:
             raise LlmProviderError(
                 "gemini",
@@ -227,7 +229,9 @@ class GeminiAdapter:
     def _get_model(self) -> Any:
         if self._model is None:
             try:
-                import google.generativeai as genai  # type: ignore[import-not-found]
+                import google.generativeai as _genai
+
+                genai: Any = _genai
             except ImportError as exc:
                 raise LlmProviderError(
                     "gemini",
@@ -242,14 +246,14 @@ class GeminiAdapter:
 # ── Module helpers ────────────────────────────────────────────────────────────
 
 
-def _build_contents(request: LlmRequest) -> list[dict[str, str]]:
+def _build_contents(request: LlmRequest) -> list[dict[str, Any]]:
     """
     Gemini uses a different message format than OpenAI.
     System messages are embedded as the first user turn, followed by a
     model ACK, then the real user message.  This prevents the system
     prompt from being ignored in some Gemini versions.
     """
-    parts: list[dict[str, str]] = []
+    parts: list[dict[str, Any]] = []
     if request.system_prompt:
         # Gemini: system role goes in GenerativeModel(system_instruction=…)
         # but for backward compat we add it as first user content
@@ -271,11 +275,11 @@ def _generation_config(request: LlmRequest) -> dict[str, Any]:
 
 def _extract_text(response: Any) -> str:
     try:
-        return response.text.strip()
+        return str(response.text.strip())
     except Exception:
         # Blocked or empty candidate
         try:
-            return response.candidates[0].content.parts[0].text.strip()
+            return str(response.candidates[0].content.parts[0].text.strip())
         except Exception:
             return ""
 

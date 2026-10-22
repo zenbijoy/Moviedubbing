@@ -11,8 +11,8 @@ Comprehensive unit tests for Advanced Mathematical Dubbing and Lip-Sync Engines:
 from __future__ import annotations
 
 import math
+
 import numpy as np
-import pytest
 
 from aidub.ai.vision.active_speaker import ActiveSpeakerDetector
 from aidub.ai.vision.face_tracker import (
@@ -39,19 +39,19 @@ def test_wsola_time_stretch_clamps_and_resizes():
 
     # 1. Test speeding up by 1.2x (tempo_factor = 1.2)
     sped_up = dsp.process_time_stretch(tone, tempo_factor=1.2, sample_rate=sr)
-    expected_len = int(round(sr / 1.2))
+    expected_len = round(sr / 1.2)
     assert abs(sped_up.size - expected_len) <= 100
     assert not np.isnan(sped_up).any()
     assert np.max(np.abs(sped_up)) > 0.1
 
     # 2. Test slowing down by 0.9x (tempo_factor = 0.9)
     slowed = dsp.process_time_stretch(tone, tempo_factor=0.9, sample_rate=sr)
-    expected_len_slow = int(round(sr / 0.9))
+    expected_len_slow = round(sr / 0.9)
     assert abs(slowed.size - expected_len_slow) <= 100
 
     # 3. Test clamp bounds (e.g., requesting extreme 2.5x gets clamped to 1.35x)
     extreme = dsp.process_time_stretch(tone, tempo_factor=2.5, sample_rate=sr)
-    clamped_expected = int(round(sr / 1.35))
+    clamped_expected = round(sr / 1.35)
     assert abs(extreme.size - clamped_expected) <= 100
 
 

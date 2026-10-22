@@ -35,6 +35,7 @@
 - **Root Cause Fix**: Added backward-compatibility shims in `src/aidub/adapters/diarization_pyannote.py` before importing `pyannote.audio`:
   ```python
   if not hasattr(torchaudio, "AudioMetaData"):
+
       @dataclass
       class AudioMetaData:
           sample_rate: int
@@ -42,6 +43,7 @@
           num_channels: int
           bits_per_sample: int
           encoding: str
+
       torchaudio.AudioMetaData = AudioMetaData
   if not hasattr(torchaudio, "list_audio_backends"):
       torchaudio.list_audio_backends = lambda: ["soundfile"]

@@ -238,24 +238,27 @@ if _QT:
                 self.progress_updated.emit(10, "Scanning subtitle cues for characters…")
                 engine = CharacterDetectionEngine()
                 cue_chars = (
-                    engine.detect_from_subtitle_cues(self.subtitle_cues, target_language=self.target_language)
+                    engine.detect_from_subtitle_cues(
+                        self.subtitle_cues, target_language=self.target_language
+                    )
                     if self.subtitle_cues
                     else []
                 )
 
                 turns: list[tuple[float, float, int]] = []
-                n_speakers = len(cue_chars) if cue_chars else 1
                 ref_windows: dict[int, tuple[float, float]] = {}
 
                 if self.media_path and self.media_path.is_file():
                     if self.isInterruptionRequested():
                         self.detection_cancelled.emit()
                         return
-                    self.progress_updated.emit(35, "Running speaker diarization & acoustic analysis…")
+                    self.progress_updated.emit(
+                        35, "Running speaker diarization & acoustic analysis…"
+                    )
                     from aidub.adapters.diarization_pyannote import PyannoteDiarizationAdapter
 
                     adapter = PyannoteDiarizationAdapter()
-                    turns, n_speakers, ref_windows = adapter.turns(str(self.media_path))
+                    turns, _n_speakers, ref_windows = adapter.turns(str(self.media_path))
 
                     self.progress_updated.emit(70, "Profiling detected character voices…")
                     audio_chars, _ = engine.detect_from_media(
@@ -284,7 +287,9 @@ if _QT:
                         target_language=self.target_language,
                     )
 
-                self.progress_updated.emit(100, f"Identified {len(all_characters)} movie characters")
+                self.progress_updated.emit(
+                    100, f"Identified {len(all_characters)} movie characters"
+                )
                 self.characters_detected.emit(all_characters)
                 self.diarization_completed.emit(turns, max(1, len(all_characters)), ref_windows)
             except Exception as exc:

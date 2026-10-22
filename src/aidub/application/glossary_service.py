@@ -7,6 +7,7 @@ import re
 
 from aidub.domain.character_bible import (
     CharacterBibleEntry,
+    CharacterProfile,
     GlossaryTerm,
     ProjectCharacterBible,
 )
@@ -79,7 +80,7 @@ class GlossaryService:
             return None
         return char.pronunciation_phonetic or None
 
-    def get_character(self, character_id: str) -> CharacterBibleEntry | None:
+    def get_character(self, character_id: str) -> CharacterBibleEntry | CharacterProfile | None:
         return self._bible.get_character(character_id)
 
 

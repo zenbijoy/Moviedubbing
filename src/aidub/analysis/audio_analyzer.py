@@ -84,9 +84,7 @@ def analyze_audio_file(
 
     metadata = probe(path)
     streams = [
-        stream
-        for stream in metadata.get("streams", [])
-        if stream.get("codec_type") == "audio"
+        stream for stream in metadata.get("streams", []) if stream.get("codec_type") == "audio"
     ]
     if not streams:
         raise ValueError(f"No audio stream was found in {path.name}")
@@ -122,9 +120,7 @@ def analyze_audio_file(
     ]
     if duration_seconds is not None:
         command.extend(["-t", f"{expected_duration:.3f}"])
-    command.extend(
-        ["-ac", "1", "-ar", "16000", "-f", "f32le", "-acodec", "pcm_f32le", "pipe:1"]
-    )
+    command.extend(["-ac", "1", "-ar", "16000", "-f", "f32le", "-acodec", "pcm_f32le", "pipe:1"])
 
     sample_rate = 16_000
     frame_size = 512
@@ -250,7 +246,9 @@ def analyze_audio_file(
             stderr_file.seek(0)
             error_text = stderr_file.read().decode("utf-8", errors="replace")[-2_000:]
             if exit_code != 0:
-                raise RuntimeError(error_text.strip() or "FFmpeg could not decode this audio stream")
+                raise RuntimeError(
+                    error_text.strip() or "FFmpeg could not decode this audio stream"
+                )
         finally:
             if process is not None and process.stdout is not None:
                 process.stdout.close()
@@ -302,9 +300,7 @@ def analyze_audio_file(
         pitch_p10_hz=pitch_p10,
         pitch_p90_hz=pitch_p90,
         pitch_voiced_sample_percent=round(min(voiced_percent, 100.0), 2),
-        spectral_centroid_hz=round(
-            spectral_centroid_sum / max(spectral_centroid_frames, 1), 1
-        ),
+        spectral_centroid_hz=round(spectral_centroid_sum / max(spectral_centroid_frames, 1), 1),
         zero_crossing_rate=round(crossing_count / max(crossing_intervals, 1), 5),
         measurement_note=(
             "Active-audio percentage uses a -40 dBFS RMS threshold; it is an energy proxy, not "

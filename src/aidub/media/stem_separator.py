@@ -69,7 +69,7 @@ def separate_stems(
 def _try_import_demucs() -> bool:
     """Return True if demucs is importable."""
     try:
-        import demucs  # type: ignore[import-not-found]  # noqa: F401
+        import demucs  # noqa: F401
 
         return True
     except ImportError:
@@ -98,7 +98,7 @@ def needs_background_normalization(
         Tuple of (needs_normalization_bool, max_peak_amplitude).
     """
     try:
-        import soundfile as sf  # type: ignore[import-not-found]
+        import soundfile as sf
 
         data, _ = sf.read(str(background_audio_path), dtype="float32")
         if data.ndim > 1:

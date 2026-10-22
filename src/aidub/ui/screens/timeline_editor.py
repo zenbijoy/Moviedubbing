@@ -15,6 +15,7 @@ Matches reference design pixel-for-pixel with zero hardcoded static locks:
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,8 @@ from aidub.application.agentic_studio import (
     StudioSessionStore,
     create_automation_plan,
 )
+
+logger = logging.getLogger(__name__)
 
 try:
     from PySide6.QtCore import (
@@ -347,7 +350,11 @@ if _QT:
             self._item(self.tree, "›  📁  05_Stems")
             self.tree.expandAll()
             root = self.tree.invisibleRootItem()
-            count = sum(1 + root.child(index).childCount() for index in range(root.childCount()))
+            count = 0
+            for index in range(root.childCount()):
+                child_item = root.child(index)
+                if child_item is not None:
+                    count += 1 + child_item.childCount()
             self.count_lbl.setText(str(count))
 
         def set_project_name(
@@ -385,6 +392,8 @@ if _QT:
                 any_child_match = False
                 for j in range(item.childCount()):
                     child = item.child(j)
+                    if child is None:
+                        continue
                     match_child = text in child.text(0).lower()
                     child.setHidden(not (match_child or match_parent))
                     if match_child:
@@ -723,7 +732,8 @@ if _QT:
             self._is_playing = False
             if self.play_btn is not None:
                 self.play_btn.setText("▶")
-            self.media_stack.setCurrentWidget(self._video_widget)
+            if self._video_widget is not None:
+                self.media_stack.setCurrentWidget(self._video_widget)
             self.action_triggered.emit(
                 "Native playback could not decode this media; using FFmpeg for frame seeking. "
                 + (error_string or "")
@@ -850,7 +860,7 @@ if _QT:
         ) -> None:
             if request_id != self._frame_request_id or not self._media_path:
                 return
-            image = QImage.fromData(frame_data, "PNG")
+            image = QImage.fromData(frame_data)
             if image.isNull():
                 self.action_triggered.emit("FFmpeg returned an unreadable preview frame")
                 return
@@ -905,7 +915,9 @@ if _QT:
                         self.play_btn.setText("▶")
                 else:
                     self._finish_video_prime()
-                    if self._audio_output is not None and not getattr(self, "_muted_by_user", False):
+                    if self._audio_output is not None and not getattr(
+                        self, "_muted_by_user", False
+                    ):
                         self._audio_output.setMuted(False)
                         if self._audio_output.volume() <= 0.05:
                             self._audio_output.setVolume(0.85)
@@ -1019,7 +1031,7 @@ if _QT:
                 return
             try:
                 import numpy as np
-                import soundfile as sf  # type: ignore[import-not-found]
+                import soundfile as sf
 
                 samples, _sample_rate = sf.read(str(audio_path), always_2d=True)
                 mono = np.mean(samples, axis=1)
@@ -1167,7 +1179,7 @@ if _QT:
             # Stacked widget for the 3 panel views
             self.panel_stack = QStackedWidget(self)
 
-            SCROLL_STYLE = (
+            scroll_style = (
                 "QScrollArea{background:transparent;border:none;}"
                 "QScrollBar:vertical{width:6px;background:#0D1117;border-radius:3px;margin:0;}"
                 "QScrollBar::handle:vertical{background:#263346;border-radius:3px;min-height:20px;}"
@@ -1175,7 +1187,7 @@ if _QT:
                 "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical{height:0;background:none;}"
             )
 
-            INPUT_STYLE = (
+            input_style = (
                 "QLineEdit, QComboBox {"
                 "  background: #16202E; color: #F7F9FC; border: 1px solid #283446;"
                 "  padding: 2px 8px; border-radius: 4px; font-size: 11px;"
@@ -1185,7 +1197,7 @@ if _QT:
                 "  border-color: #2563EB; background: #1A2638;"
                 "}"
             )
-            TRANS_STYLE = (
+            trans_style = (
                 "QLineEdit {"
                 "  background: #16202E; color: #22D3EE; font-weight: 700; border: 1px solid #283446;"
                 "  padding: 2px 8px; border-radius: 4px; font-size: 11px;"
@@ -1195,7 +1207,7 @@ if _QT:
                 "  border-color: #06B6D4; background: #1A2638;"
                 "}"
             )
-            BTN_ACTION_STYLE = (
+            btn_action_style = (
                 "QPushButton {"
                 "  background: #1E293B; color: #94A3B8; border: 1px solid #283446;"
                 "  border-radius: 4px; font-size: 11px; padding: 0; min-height: 0;"
@@ -1236,7 +1248,7 @@ if _QT:
             self.char_in.setPlaceholderText("Select or type speaker / character")
             self.char_in.addItems(["SPEAKER_00", "SPEAKER_01", "Narrator"])
             self.char_in.setStyleSheet(
-                INPUT_STYLE
+                input_style
                 + "QComboBox QAbstractItemView{background:#111722;color:#F7F9FC;selection-background-color:#2563EB;}"
             )
             self.char_in.currentTextChanged.connect(self._on_char_changed)
@@ -1257,7 +1269,7 @@ if _QT:
             # Language Row
             self.lang_in = QLineEdit(d_frame)
             self.lang_in.setPlaceholderText("Target language code")
-            self.lang_in.setStyleSheet(INPUT_STYLE)
+            self.lang_in.setStyleSheet(input_style)
             d_lay.addRow(form_label("Language"), self.lang_in)
 
             # Original Dialogue Row: QLineEdit + Import Source SRT button
@@ -1265,7 +1277,7 @@ if _QT:
             orig_row.setSpacing(4)
             self.orig_in = QLineEdit(d_frame)
             self.orig_in.setPlaceholderText("Select or import source dialogue")
-            self.orig_in.setStyleSheet(INPUT_STYLE)
+            self.orig_in.setStyleSheet(input_style)
             self.orig_in.textChanged.connect(self._on_orig_changed)
             orig_row.addWidget(self.orig_in, stretch=1)
 
@@ -1273,7 +1285,7 @@ if _QT:
             self.btn_import_orig_srt.setToolTip("Import Source Subtitles (SRT/VTT) into S1…")
             self.btn_import_orig_srt.setFixedSize(26, 26)
             self.btn_import_orig_srt.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.btn_import_orig_srt.setStyleSheet(BTN_ACTION_STYLE)
+            self.btn_import_orig_srt.setStyleSheet(btn_action_style)
             self.btn_import_orig_srt.clicked.connect(self.import_source_srt_requested.emit)
             orig_row.addWidget(self.btn_import_orig_srt)
             d_lay.addRow(form_label("Original"), orig_row)
@@ -1283,7 +1295,7 @@ if _QT:
             trans_row.setSpacing(4)
             self.trans_in = QLineEdit(d_frame)
             self.trans_in.setPlaceholderText("Translation appears after processing")
-            self.trans_in.setStyleSheet(TRANS_STYLE)
+            self.trans_in.setStyleSheet(trans_style)
             self.trans_in.textChanged.connect(self._on_trans_changed)
             trans_row.addWidget(self.trans_in, stretch=1)
 
@@ -1430,7 +1442,7 @@ if _QT:
             p0_scroll.setWidgetResizable(True)
             p0_scroll.setFrameShape(QFrame.Shape.NoFrame)
             p0_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-            p0_scroll.setStyleSheet(SCROLL_STYLE)
+            p0_scroll.setStyleSheet(scroll_style)
             p0_scroll.setWidget(p0)
             self.panel_stack.addWidget(p0_scroll)
 
@@ -1456,7 +1468,9 @@ if _QT:
             # Audio Analysis & Verification Button
             btn_audio_diag = QPushButton("🔍  Audio Analysis & Diagnostics…", ai_tools_frame)
             btn_audio_diag.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn_audio_diag.setToolTip("Open local audio measurements, pitch, loudness, ASR, and emotion analysis")
+            btn_audio_diag.setToolTip(
+                "Open local audio measurements, pitch, loudness, ASR, and emotion analysis"
+            )
             btn_audio_diag.setStyleSheet(
                 "QPushButton{background:#1E293B;color:#38BDF8;border:1px solid #0284C7;font-weight:700;font-size:11px;padding:6px;border-radius:4px;text-align:left;min-height:24px;}"
                 "QPushButton:hover{background:#0284C7;color:#FFF;}"
@@ -1467,7 +1481,9 @@ if _QT:
             # Manage Characters Button
             btn_mgr_chars = QPushButton("👥  Character & Speaker Manager…", ai_tools_frame)
             btn_mgr_chars.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn_mgr_chars.setToolTip("Inspect detected speakers, rename characters across all cues, assign voices")
+            btn_mgr_chars.setToolTip(
+                "Inspect detected speakers, rename characters across all cues, assign voices"
+            )
             btn_mgr_chars.setStyleSheet(
                 "QPushButton{background:#1E293B;color:#A78BFA;border:1px solid #7C3AED;font-weight:700;font-size:11px;padding:6px;border-radius:4px;text-align:left;min-height:24px;}"
                 "QPushButton:hover{background:#7C3AED;color:#FFF;}"
@@ -1477,15 +1493,43 @@ if _QT:
 
             # Action Grid
             for icon, name, tip in [
-                ("🤖", "Auto-Detect Characters", "Automatically recognize movie characters from dialogue and audio diarization"),
-                ("🎙", "Select Dub Voice", "Pick consent-approved neural Edge-TTS voice for the selected character"),
-                ("✨", "Improve Emotion", "Rewrite localized line for emotional fidelity while matching timing"),
-                ("⏱", "Match Timing", "Apply audio DSP time-stretch/compression to fit exact dialogue slot"),
-                ("📝", "Rewrite Translation", "Rewrite localized translation with LLM for natural spoken screen dialogue"),
-                ("✂", "Shorten Translation", "Condense translation so dialogue fits faster speech timing"),
+                (
+                    "🤖",
+                    "Auto-Detect Characters",
+                    "Automatically recognize movie characters from dialogue and audio diarization",
+                ),
+                (
+                    "🎙",
+                    "Select Dub Voice",
+                    "Pick consent-approved neural Edge-TTS voice for the selected character",
+                ),
+                (
+                    "✨",
+                    "Improve Emotion",
+                    "Rewrite localized line for emotional fidelity while matching timing",
+                ),
+                (
+                    "⏱",
+                    "Match Timing",
+                    "Apply audio DSP time-stretch/compression to fit exact dialogue slot",
+                ),
+                (
+                    "📝",
+                    "Rewrite Translation",
+                    "Rewrite localized translation with LLM for natural spoken screen dialogue",
+                ),
+                (
+                    "✂",
+                    "Shorten Translation",
+                    "Condense translation so dialogue fits faster speech timing",
+                ),
                 ("🗣", "Fix Pronunciation", "Revise words for natural phonetics and pronunciation"),
                 ("📋", "Subtitle QC", "Run broadcast subtitle quality control rules"),
-                ("🩺", "Pipeline Readiness", "Check FFmpeg, Faster-Whisper, Demucs, Edge-TTS, and LLM readiness"),
+                (
+                    "🩺",
+                    "Pipeline Readiness",
+                    "Check FFmpeg, Faster-Whisper, Demucs, Edge-TTS, and LLM readiness",
+                ),
             ]:
                 b = QPushButton(f"{icon}  {name}", ai_tools_frame)
                 b.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1504,7 +1548,7 @@ if _QT:
             p1_scroll.setWidgetResizable(True)
             p1_scroll.setFrameShape(QFrame.Shape.NoFrame)
             p1_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-            p1_scroll.setStyleSheet(SCROLL_STYLE)
+            p1_scroll.setStyleSheet(scroll_style)
             p1_scroll.setWidget(p1)
             self.panel_stack.addWidget(p1_scroll)
 
@@ -1563,7 +1607,7 @@ if _QT:
             p2_scroll.setWidgetResizable(True)
             p2_scroll.setFrameShape(QFrame.Shape.NoFrame)
             p2_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-            p2_scroll.setStyleSheet(SCROLL_STYLE)
+            p2_scroll.setStyleSheet(scroll_style)
             p2_scroll.setWidget(p2)
             self.panel_stack.addWidget(p2_scroll)
 
@@ -1656,14 +1700,21 @@ if _QT:
             if file_path and Path(file_path).is_file():
                 try:
                     from aidub.media.ffmpeg_ops import probe
+
                     info = probe(file_path)
                     fmt = info.get("format", {})
-                    self.meta_format_lbl.setText(f"{fmt.get('format_name', 'media')} ({int(fmt.get('bit_rate', 0)) // 1000} kbps)")
+                    self.meta_format_lbl.setText(
+                        f"{fmt.get('format_name', 'media')} ({int(fmt.get('bit_rate', 0)) // 1000} kbps)"
+                    )
                     for s in info.get("streams", []):
                         if s.get("codec_type") == "video":
-                            self.meta_video_lbl.setText(f"{s.get('codec_name', 'h264')} {s.get('width', 0)}x{s.get('height', 0)}")
+                            self.meta_video_lbl.setText(
+                                f"{s.get('codec_name', 'h264')} {s.get('width', 0)}x{s.get('height', 0)}"
+                            )
                         elif s.get("codec_type") == "audio":
-                            self.meta_audio_lbl.setText(f"{s.get('codec_name', 'aac')} {s.get('sample_rate', 44100)}Hz ({s.get('channels', 2)}ch)")
+                            self.meta_audio_lbl.setText(
+                                f"{s.get('codec_name', 'aac')} {s.get('sample_rate', 44100)}Hz ({s.get('channels', 2)}ch)"
+                            )
                 except Exception:
                     pass
 
@@ -2280,7 +2331,9 @@ if _QT:
             self.run_btn = QPushButton("✦  AUTO DUB MASTER", self)
             self.run_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self.run_btn.setVisible(True)
-            self.run_btn.setToolTip("Run the complete dubbing pipeline using the selected target language")
+            self.run_btn.setToolTip(
+                "Run the complete dubbing pipeline using the selected target language"
+            )
             self.run_btn.setStyleSheet(
                 "QPushButton{background:#2563EB;color:#FFF;border:1px solid #3B82F6;"
                 "border-radius:5px;padding:5px;font-size:10px;font-weight:800;}"
@@ -2419,12 +2472,14 @@ if _QT:
                     "QPushButton:checked{color:#EF4444;background:#261214;border-radius:2px;}"
                     "QPushButton:hover{background:#1E293B;}"
                 )
-                lock_btn.toggled.connect(
-                    lambda checked, track_id=tid, btn=lock_btn: (
-                        btn.setText("🔒" if checked else "🔓"),
-                        self.track_lock_toggled.emit(track_id, checked),
-                    )
-                )
+
+                def _on_lock_toggled(
+                    checked: bool, track_id: str = tid, btn: QPushButton = lock_btn
+                ) -> None:
+                    btn.setText("🔒" if checked else "🔓")
+                    self.track_lock_toggled.emit(track_id, checked)
+
+                lock_btn.toggled.connect(_on_lock_toggled)
                 c_lay.addWidget(lock_btn)
 
                 default_icon = "👁️" if ttype == "video" else "🎙" if ttype == "audio" else "💬"
@@ -2440,12 +2495,18 @@ if _QT:
                     "QPushButton:checked{color:#F59E0B;background:#2A2010;border-radius:2px;}"
                     "QPushButton:hover{background:#1E293B;}"
                 )
-                eye_btn.toggled.connect(
-                    lambda checked, track_id=tid, def_ico=default_icon, m_ico=mute_icon, btn=eye_btn: (
-                        btn.setText(m_ico if checked else def_ico),
-                        self.track_visibility_toggled.emit(track_id, not checked),
-                    )
-                )
+
+                def _on_vis_toggled(
+                    checked: bool,
+                    track_id: str = tid,
+                    def_ico: str = default_icon,
+                    m_ico: str = mute_icon,
+                    btn: QPushButton = eye_btn,
+                ) -> None:
+                    btn.setText(m_ico if checked else def_ico)
+                    self.track_visibility_toggled.emit(track_id, not checked)
+
+                eye_btn.toggled.connect(_on_vis_toggled)
                 c_lay.addWidget(eye_btn)
 
                 t_lbl = QLabel(f"{tid}  {label}", cell)
@@ -2505,6 +2566,7 @@ if _QT:
                 target_language="bn",
             )
             self._dubbing_worker: Any | None = None
+            self._active_lipsync_worker: Any | None = None
             self._assistant_worker: Any | None = None
             self._audio_analysis_dialog: Any | None = None
             self._tts_worker: Any | None = None
@@ -3329,9 +3391,7 @@ if _QT:
             duration: float = 1.0,
         ) -> ClipTuple | None:
             candidates = [
-                clip
-                for clip in self._current_project_data.get("clips", [])
-                if clip[0] == track_id
+                clip for clip in self._current_project_data.get("clips", []) if clip[0] == track_id
             ]
             if not candidates:
                 return None
@@ -3340,10 +3400,18 @@ if _QT:
                 c_start = float(clip[1])
                 c_end = c_start + max(0.1, float(clip[2]))
                 if max(start, c_start) < min(end, c_end):
-                    return clip
+                    score = float(clip[4]) if len(clip) > 4 and clip[4] is not None else None
+                    return (str(clip[0]), float(clip[1]), float(clip[2]), str(clip[3]), score)
             nearest = min(candidates, key=lambda clip: abs(float(clip[1]) - start))
             if abs(float(nearest[1]) - start) <= 2.0:
-                return nearest
+                score = float(nearest[4]) if len(nearest) > 4 and nearest[4] is not None else None
+                return (
+                    str(nearest[0]),
+                    float(nearest[1]),
+                    float(nearest[2]),
+                    str(nearest[3]),
+                    score,
+                )
             return None
 
         def _on_original_changed(self, text: str) -> None:
@@ -3373,8 +3441,7 @@ if _QT:
             counts: dict[str, int] = {}
             clip_chars = self._current_project_data.setdefault("clip_characters", {})
             clips = [
-                c for c in self._current_project_data.get("clips", [])
-                if c[0] in {"S1", "S2", "A2"}
+                c for c in self._current_project_data.get("clips", []) if c[0] in {"S1", "S2", "A2"}
             ]
             for clip in clips:
                 tid, start_s = clip[0], float(clip[1])
@@ -3396,8 +3463,7 @@ if _QT:
 
             voices = self._current_project_data.get("character_voices", {})
             clips = [
-                c for c in self._current_project_data.get("clips", [])
-                if c[0] in {"S1", "S2", "A2"}
+                c for c in self._current_project_data.get("clips", []) if c[0] in {"S1", "S2", "A2"}
             ]
             dlg = CharacterManagerDialog(
                 counts,
@@ -3437,7 +3503,9 @@ if _QT:
             if self._active_clip_info:
                 tid = self._active_clip_info.get("tid", "")
                 start = float(self._active_clip_info.get("start", 0.0))
-                active_char = clip_chars.get(f"{tid}:{round(start, 3)}") or self._current_project_data.get("character", "")
+                active_char = clip_chars.get(
+                    f"{tid}:{round(start, 3)}"
+                ) or self._current_project_data.get("character", "")
                 if active_char:
                     self.inspector_panel.char_in.blockSignals(True)
                     self.inspector_panel.char_in.setCurrentText(active_char)
@@ -3451,8 +3519,7 @@ if _QT:
             )
 
             clips = [
-                c for c in self._current_project_data.get("clips", [])
-                if c[0] in {"S1", "S2", "A2"}
+                c for c in self._current_project_data.get("clips", []) if c[0] in {"S1", "S2", "A2"}
             ]
             clip_chars = self._current_project_data.setdefault("clip_characters", {})
             media_path = str(self._current_project_data.get("file_path", ""))
@@ -3481,7 +3548,9 @@ if _QT:
                         for seg in segs:
                             start_s = float(seg.get("start", 0.0))
                             spk = str(seg.get("speaker", "0"))
-                            spk_label = f"Speaker {spk}" if not spk.lower().startswith("speaker") else spk
+                            spk_label = (
+                                f"Speaker {spk}" if not spk.lower().startswith("speaker") else spk
+                            )
                             clip_chars[f"S1:{round(start_s, 3)}"] = spk_label
                             clip_chars[f"S2:{round(start_s, 3)}"] = spk_label
                         break
@@ -3492,7 +3561,9 @@ if _QT:
             if not detected_names and media_path and Path(media_path).is_file():
                 try:
                     engine = CharacterDetectionEngine()
-                    chars, _turns = engine.detect_from_media(media_path, self._automation_state.target_language)
+                    chars, _turns = engine.detect_from_media(
+                        media_path, self._automation_state.target_language
+                    )
                     for c in chars:
                         detected_names.add(c.canonical_name)
                 except Exception as exc:
@@ -3567,7 +3638,8 @@ if _QT:
 
             if s1_cues or s2_cues:
                 other_clips = [
-                    c for c in self._current_project_data.get("clips", [])
+                    c
+                    for c in self._current_project_data.get("clips", [])
                     if c[0] not in {"S1", "S2"}
                 ]
                 all_clips = other_clips + s1_cues + s2_cues
@@ -3604,7 +3676,9 @@ if _QT:
                     self._automation_state.target_language,
                 )
                 self.inspector_panel.update_metadata_display(self._current_project_data)
-                self._show_status(f"Imported bilingual subtitles: {len(s1_cues)} cues loaded to S1 and S2")
+                self._show_status(
+                    f"Imported bilingual subtitles: {len(s1_cues)} cues loaded to S1 and S2"
+                )
 
         def _on_translation_changed(self, text: str) -> None:
             self._current_project_data["translation_text"] = text
@@ -3882,9 +3956,8 @@ if _QT:
                 output = preview_dir / f"take_{take_index:04d}.mp3"
             from aidub.adapters.voice.edge_tts_adapter import default_voice_for_language
 
-            active_char = (
-                self.inspector_panel.char_in.currentText().strip()
-                or str(self._current_project_data.get("character", ""))
+            active_char = self.inspector_panel.char_in.currentText().strip() or str(
+                self._current_project_data.get("character", "")
             )
             char_voice = self._current_project_data.get("character_voices", {}).get(active_char)
             try:
@@ -4141,7 +4214,7 @@ if _QT:
             self.inspector_panel.update_clip_info(
                 self.inspector_panel.orig_in.text(),
                 self.inspector_panel.trans_in.text(),
-                self.inspector_panel.char_in.text(),
+                self.inspector_panel.char_in.currentText(),
                 self.inspector_panel.lang_in.text(),
                 float(pending.get("target_duration", fitted_duration)),
                 fitted_duration,
@@ -4308,12 +4381,16 @@ if _QT:
                     for seg in segs:
                         start_s = float(seg.get("start", 0.0))
                         spk = str(seg.get("speaker", "0"))
-                        spk_label = f"Speaker {spk}" if not spk.lower().startswith("speaker") else spk
+                        spk_label = (
+                            f"Speaker {spk}" if not spk.lower().startswith("speaker") else spk
+                        )
                         clip_chars[f"S1:{round(start_s, 3)}"] = spk_label
                         clip_chars[f"S2:{round(start_s, 3)}"] = spk_label
                     if detected_chars:
                         self.inspector_panel.update_characters(detected_chars)
-                        self.inspector_panel.meta_chars_lbl.setText(f"{len(detected_chars)} speakers")
+                        self.inspector_panel.meta_chars_lbl.setText(
+                            f"{len(detected_chars)} speakers"
+                        )
                 except Exception as exc:
                     logger.debug("Failed loading asr_segments in on_dubbing_completed: %s", exc)
 
@@ -4602,15 +4679,15 @@ if _QT:
                 shutil.copy2(source_dub, target_path)
                 self._show_status(f"Exported dubbed video: {Path(target_path).name}")
                 QMessageBox.information(
-                    self, "Export Complete", f"Successfully exported dubbed master video:\n{target_path}"
+                    self,
+                    "Export Complete",
+                    f"Successfully exported dubbed master video:\n{target_path}",
                 )
             else:
                 self._show_status("No rendered dub found; running Auto Dub Master first…")
                 self.run_auto_dub()
 
-        def export_subtitles_dialog(
-            self, *, target: bool = True, bilingual: bool = False
-        ) -> None:
+        def export_subtitles_dialog(self, *, target: bool = True, bilingual: bool = False) -> None:
             """Export current timeline cues as standard single-language or dual-language bilingual SRT."""
             from aidub.subtitles.bilingual import LineMode, write_bilingual_srt, write_srt
 
@@ -4620,7 +4697,9 @@ if _QT:
 
             if not s1_clips and not s2_clips:
                 QMessageBox.warning(
-                    self, "Export Subtitles", "No subtitle cues are present on the timeline to export."
+                    self,
+                    "Export Subtitles",
+                    "No subtitle cues are present on the timeline to export.",
                 )
                 return
 
@@ -4661,9 +4740,7 @@ if _QT:
                 ]
                 write_srt(segments, save_path, translated=False)
 
-            self._show_status(
-                f"Exported {len(segments)} subtitle cues to: {Path(save_path).name}"
-            )
+            self._show_status(f"Exported {len(segments)} subtitle cues to: {Path(save_path).name}")
             QMessageBox.information(
                 self, "Export Complete", f"Subtitles exported successfully:\n{save_path}"
             )
@@ -4694,7 +4771,12 @@ if _QT:
             return self._dubbing_worker is not None and self._dubbing_worker.isRunning()
 
         def closeEvent(self, event: Any) -> None:  # noqa: N802
-            for worker_name in ("_assistant_worker", "_timing_worker", "_tts_worker", "_dubbing_worker"):
+            for worker_name in (
+                "_assistant_worker",
+                "_timing_worker",
+                "_tts_worker",
+                "_dubbing_worker",
+            ):
                 worker = getattr(self, worker_name, None)
                 if worker is not None and worker.isRunning():
                     if hasattr(worker, "cancel"):

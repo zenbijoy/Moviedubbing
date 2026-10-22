@@ -127,7 +127,7 @@ class HardwareDiagnosticWizardController:
 
 if PYSIDE6_AVAILABLE:
 
-    class FirstRunHardwareWizardWidget(QWidget):  # type: ignore[misc]
+    class FirstRunHardwareWizardWidget(QWidget):
         """PySide6 QWidget for First-Run Setup & Hardware Diagnostic Wizard."""
 
         diagnostic_completed = Signal(object)

@@ -4,20 +4,19 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from aidub.adapters.lipsync_base import (
     LipSyncOptions,
-    LipSyncQualityTier,
     run_configured_lipsync,
 )
 from aidub.cli import build_parser
-from aidub.diagnostics.dubbing import _check_lipsync, collect_dubbing_diagnostics
+from aidub.diagnostics.dubbing import _check_lipsync
 from aidub.pipeline.config import PipelineConfig
 from aidub.pipeline.engine import DubbingEngine
-from aidub.pipeline.errors import ErrorKind, PipelineError
+from aidub.pipeline.errors import PipelineError
 
 
 def test_cli_parses_lipsync_arguments() -> None:
@@ -157,7 +156,7 @@ def test_dubbing_engine_runs_lipsync_stage_when_configured(
     )
     monkeypatch.setenv(
         "AIDUB_MUSETALK_COMMAND",
-        'python -c "import sys, pathlib; pathlib.Path(sys.argv[1]).write_bytes(b\'video\')" {output}',
+        "python -c \"import sys, pathlib; pathlib.Path(sys.argv[1]).write_bytes(b'video')\" {output}",
     )
 
     work_dir = tmp_path / "work"

@@ -167,7 +167,9 @@ if _QT:
 
             self.results = QPlainTextEdit(self)
             self.results.setReadOnly(True)
-            self.results.setPlaceholderText("Measured analysis, transcript, and emotion findings appear here.")
+            self.results.setPlaceholderText(
+                "Measured analysis, transcript, and emotion findings appear here."
+            )
             self.results.setMinimumHeight(150)
             root.addWidget(self.results, stretch=1)
 
@@ -295,7 +297,9 @@ if _QT:
                 self.status.setText(str(exc))
                 return
             if duration is None or duration > 300:
-                self.status.setText("Choose a finite selection of 300 seconds or less for transcription.")
+                self.status.setText(
+                    "Choose a finite selection of 300 seconds or less for transcription."
+                )
                 return
             self._set_busy(True)
             self.status.setText("Starting the local Faster-Whisper recognizer…")
@@ -311,9 +315,7 @@ if _QT:
             self._transcription_worker.transcription_completed.connect(
                 self._transcription_completed
             )
-            self._transcription_worker.transcription_failed.connect(
-                self._tool_failed
-            )
+            self._transcription_worker.transcription_failed.connect(self._tool_failed)
             self._transcription_worker.start()
 
         def _transcription_completed(self, transcript: str) -> None:
@@ -338,7 +340,9 @@ if _QT:
                 self.status.setText(str(exc))
                 return
             if duration is None or duration > 60:
-                self.status.setText("Select a finite interval of 60 seconds or less for EmotionEngine.")
+                self.status.setText(
+                    "Select a finite interval of 60 seconds or less for EmotionEngine."
+                )
                 return
             self._set_busy(True)
             self.status.setText("Running the existing EmotionEngine on the selected interval…")
@@ -393,7 +397,9 @@ if _QT:
                 f"Operator-supplied scene context:\n{context or '[not supplied]'}"
             )
             self._set_busy(True)
-            self.status.setText("Sending the feature summary and supplied text to the configured LLM…")
+            self.status.setText(
+                "Sending the feature summary and supplied text to the configured LLM…"
+            )
             self._assistant_worker = AIAssistantWorker(prompt, parent=self)
             self._assistant_worker.response_received.connect(self._llm_interpretation_received)
             self._assistant_worker.request_failed.connect(self._tool_failed)
@@ -415,9 +421,13 @@ if _QT:
             rate = report.get("source_sample_rate_hz")
             channels = report.get("source_channels")
             pitch = report.get("pitch_median_hz")
-            pitch_text = "No stable pitch estimate" if pitch is None else (
-                f"{pitch:.1f} Hz median "
-                f"(P10 {report.get('pitch_p10_hz'):.1f}, P90 {report.get('pitch_p90_hz'):.1f})"
+            pitch_text = (
+                "No stable pitch estimate"
+                if pitch is None
+                else (
+                    f"{pitch:.1f} Hz median "
+                    f"(P10 {report.get('pitch_p10_hz'):.1f}, P90 {report.get('pitch_p90_hz'):.1f})"
+                )
             )
             loudness_range = report.get("loudness_range_db")
             loudness_text = "n/a" if loudness_range is None else f"{loudness_range:.2f} dB"
@@ -504,13 +514,13 @@ if _QT:
             self.analyze_button.setEnabled(not busy)
             self.transcribe_button.setEnabled(not busy)
             self.emotion_button.setEnabled(
-                not busy and self._report is not None and self._report.get("analyzed_seconds", 0) <= 60
+                not busy
+                and self._report is not None
+                and self._report.get("analyzed_seconds", 0) <= 60
             )
             self.llm_button.setEnabled(not busy and self._report is not None)
             self.cancel_button.setEnabled(
-                busy
-                and self._analysis_worker is not None
-                and self._analysis_worker.isRunning()
+                busy and self._analysis_worker is not None and self._analysis_worker.isRunning()
             )
             self.file_edit.setEnabled(not busy)
             self.browse_button.setEnabled(not busy)
@@ -530,7 +540,9 @@ if _QT:
             if running:
                 if self._analysis_worker in running:
                     self._analysis_worker.cancel()
-                self.status.setText("A background audio tool is still running; wait for it to finish.")
+                self.status.setText(
+                    "A background audio tool is still running; wait for it to finish."
+                )
                 event.ignore()
                 return
             event.accept()
@@ -538,7 +550,7 @@ if _QT:
 
 else:
 
-    class AudioAnalysisDialog:
+    class AudioAnalysisDialog:  # type: ignore[no-redef]
         """Fail clearly if someone imports this dialog without the optional desktop runtime."""
 
         def __init__(self, *_args: Any, **_kwargs: Any) -> None:

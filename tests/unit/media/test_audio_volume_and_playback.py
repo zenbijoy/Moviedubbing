@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import numpy as np
 import soundfile as sf
-import pytest
 
-from aidub.media.assemble import assemble_timeline, fit_to_slot, normalize_voice
-from aidub.media.ffmpeg_ops import mix, mux, time_stretch, probe
+from aidub.media.assemble import fit_to_slot, normalize_voice
+from aidub.media.ffmpeg_ops import mix, mux, probe
 
 
 def test_normalize_voice_loudness() -> None:
@@ -53,10 +53,12 @@ def test_mix_preserves_dialogue_loudness(tmp_path: Path) -> None:
 
     # Background music: 220Hz stereo tone with peak 0.20
     music_path = tmp_path / "music.wav"
-    music_data = np.column_stack([
-        0.20 * np.sin(2 * np.pi * 220 * t),
-        0.20 * np.sin(2 * np.pi * 220 * t),
-    ]).astype(np.float32)
+    music_data = np.column_stack(
+        [
+            0.20 * np.sin(2 * np.pi * 220 * t),
+            0.20 * np.sin(2 * np.pi * 220 * t),
+        ]
+    ).astype(np.float32)
     sf.write(str(music_path), music_data, sr)
 
     # Mix to WAV
@@ -84,6 +86,7 @@ def test_mix_preserves_dialogue_loudness(tmp_path: Path) -> None:
 
 def test_mux_generates_audible_faststart_video(tmp_path: Path) -> None:
     import subprocess
+
     from aidub.media.ffmpeg_ops import _ffmpeg_exe
 
     ffmpeg = _ffmpeg_exe()
@@ -92,20 +95,33 @@ def test_mux_generates_audible_faststart_video(tmp_path: Path) -> None:
 
     # Synthetic test video: 2-second silent lavfi mp4
     video_path = tmp_path / "test_video.mp4"
-    subprocess.run([
-        ffmpeg, "-y",
-        "-f", "lavfi", "-i", f"testsrc=size=320x240:rate=24:duration={dur}",
-        "-c:v", "libx264", "-pix_fmt", "yuv420p",
-        str(video_path),
-    ], check=True, capture_output=True)
+    subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            f"testsrc=size=320x240:rate=24:duration={dur}",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            str(video_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
 
     # Audio track with clear tone
     audio_path = tmp_path / "loud_audio.wav"
     t = np.linspace(0, dur, int(sr * dur), endpoint=False)
-    audio_data = np.column_stack([
-        0.80 * np.sin(2 * np.pi * 440 * t),
-        0.80 * np.sin(2 * np.pi * 440 * t),
-    ]).astype(np.float32)
+    audio_data = np.column_stack(
+        [
+            0.80 * np.sin(2 * np.pi * 440 * t),
+            0.80 * np.sin(2 * np.pi * 440 * t),
+        ]
+    ).astype(np.float32)
     sf.write(str(audio_path), audio_data, sr)
 
     out_mp4 = tmp_path / "muxed_master.mp4"
@@ -120,10 +136,11 @@ def test_mux_generates_audible_faststart_video(tmp_path: Path) -> None:
 
     # Extract audio and verify audibility
     extracted_wav = tmp_path / "extracted.wav"
-    subprocess.run([
-        ffmpeg, "-y", "-i", str(out_mp4),
-        "-vn", "-c:a", "pcm_s16le", str(extracted_wav)
-    ], check=True, capture_output=True)
+    subprocess.run(
+        [ffmpeg, "-y", "-i", str(out_mp4), "-vn", "-c:a", "pcm_s16le", str(extracted_wav)],
+        check=True,
+        capture_output=True,
+    )
     d, _ = sf.read(str(extracted_wav))
     max_extracted = float(np.max(np.abs(d)))
     assert max_extracted > 0.65, f"Muxed audio is too quiet: peak={max_extracted}"

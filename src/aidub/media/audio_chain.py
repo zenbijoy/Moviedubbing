@@ -252,7 +252,7 @@ class AudioDspChain(ContractModel):
 
 
 def _db_to_linear(db: float) -> float:
-    return 10.0 ** (db / 20.0)
+    return float(10.0 ** (db / 20.0))
 
 
 __all__ = [

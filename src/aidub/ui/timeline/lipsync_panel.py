@@ -110,7 +110,7 @@ class LipSyncControlPanelController:
 
 if PYSIDE6_AVAILABLE:
 
-    class LipSyncControlPanelWidget(QWidget):  # type: ignore[misc]
+    class LipSyncControlPanelWidget(QWidget):
         """PySide6 QWidget for Lip-Sync control panel."""
 
         state_changed = Signal(dict)

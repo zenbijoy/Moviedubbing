@@ -27,7 +27,9 @@ def dub_inception_to_bangla(argv: Sequence[str] | None = None) -> int:
     if not any(arg in {"-i", "--input"} or arg.startswith("--input=") for arg in forwarded):
         source = DEFAULT_MOVIE if DEFAULT_MOVIE.is_file() else Path("clip.mp4")
         if not source.is_file():
-            print(f"[DEMO NOTICE] External movie '{DEFAULT_MOVIE}' not found and 'clip.mp4' not generated.")
+            print(
+                f"[DEMO NOTICE] External movie '{DEFAULT_MOVIE}' not found and 'clip.mp4' not generated."
+            )
             print("Run 'python scripts/make_test_clip.py' first or pass '--input <path>'.")
         forwarded.extend(("--input", str(source)))
     if not any(arg in {"-o", "--output"} or arg.startswith("--output=") for arg in forwarded):

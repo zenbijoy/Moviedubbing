@@ -105,8 +105,8 @@ class DemucsSeparationAdapter:
         if not source_path.is_file():
             raise FileNotFoundError(f"source audio does not exist: {source_path}")
         try:
-            import demucs.api  # type: ignore[import-not-found]
-            from demucs.audio import save_audio  # type: ignore[import-not-found]
+            import demucs.api
+            from demucs.audio import save_audio
         except ImportError as exc:
             raise RuntimeError(
                 "Demucs is not installed; install the production source-separation dependencies"
@@ -124,7 +124,7 @@ class DemucsSeparationAdapter:
             )
 
         # Execute demucs separation
-        _origin, separated = self._separator_instance.separate_audio_file(str(source_path))
+        _origin, separated = self._separator_instance.separate_audio_file(source_path)
         stems: list[SeparatedStem] = []
         sample_rate = int(self._separator_instance.samplerate)
 

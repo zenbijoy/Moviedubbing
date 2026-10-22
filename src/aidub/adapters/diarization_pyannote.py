@@ -14,6 +14,7 @@ from typing import Any, Self
 # list_audio_backends were refactored, preventing pyannote.audio from crashing on import.
 try:
     import torchaudio
+
     if not hasattr(torchaudio, "AudioMetaData"):
         from dataclasses import dataclass
 
@@ -25,10 +26,10 @@ try:
             bits_per_sample: int
             encoding: str
 
-        torchaudio.AudioMetaData = AudioMetaData  # type: ignore[attr-defined]
+        torchaudio.AudioMetaData = AudioMetaData
 
     if not hasattr(torchaudio, "list_audio_backends"):
-        torchaudio.list_audio_backends = lambda: ["soundfile"]  # type: ignore[attr-defined]
+        torchaudio.list_audio_backends = lambda: ["soundfile"]
 except ImportError:
     pass
 
@@ -124,7 +125,7 @@ class PyannoteDiarizationAdapter:
 
     def _pipeline(self) -> Any:
         try:
-            import pyannote.audio  # type: ignore[import-not-found]
+            import pyannote.audio
         except ImportError as exc:
             raise RuntimeError(
                 "Pyannote.audio is not installed; install the production diarization dependencies"
@@ -145,7 +146,7 @@ class PyannoteDiarizationAdapter:
                     "Pyannote could not load the diarization model; verify Hugging Face access or PYANNOTE_TOKEN"
                 )
             try:
-                import torch  # type: ignore[import-not-found]
+                import torch
 
                 device = self.options.device
                 if device == "cuda" and not torch.cuda.is_available():

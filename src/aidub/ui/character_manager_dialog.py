@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 try:
@@ -10,9 +11,6 @@ try:
         QComboBox,
         QDialog,
         QDialogButtonBox,
-        QFormLayout,
-        QFrame,
-        QGroupBox,
         QHBoxLayout,
         QHeaderView,
         QInputDialog,
@@ -90,11 +88,17 @@ if _QT:
             # Table of characters
             self.table = QTableWidget(self)
             self.table.setColumnCount(4)
-            self.table.setHorizontalHeaderLabels(["Character / Speaker", "Lines / Cues", "Assigned Dub Voice", "Actions"])
+            self.table.setHorizontalHeaderLabels(
+                ["Character / Speaker", "Lines / Cues", "Assigned Dub Voice", "Actions"]
+            )
             self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-            self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+            self.table.horizontalHeader().setSectionResizeMode(
+                1, QHeaderView.ResizeMode.ResizeToContents
+            )
             self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-            self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+            self.table.horizontalHeader().setSectionResizeMode(
+                3, QHeaderView.ResizeMode.ResizeToContents
+            )
             self.table.setStyleSheet(
                 "QTableWidget{background:#111722;color:#E2E8F0;border:1px solid #283446;gridline-color:#1E293B;}"
                 "QHeaderView::section{background:#1A2234;color:#94A3B8;padding:6px;border:none;font-weight:700;}"
@@ -104,7 +108,9 @@ if _QT:
             # Toolbar under table
             tb_row = QHBoxLayout()
             self.detect_btn = QPushButton("🤖 Auto-Detect Characters…", self)
-            self.detect_btn.setToolTip("Automatically detect movie characters from dialogue cues and media audio")
+            self.detect_btn.setToolTip(
+                "Automatically detect movie characters from dialogue cues and media audio"
+            )
             self.detect_btn.setStyleSheet(
                 "QPushButton{background:#1E3A8A;color:#93C5FD;border:1px solid #3B82F6;border-radius:4px;padding:5px 12px;font-weight:700;}"
                 "QPushButton:hover{background:#2563EB;color:#FFF;}"
@@ -192,9 +198,11 @@ if _QT:
                 counts = (
                     parent_studio._compute_character_counts()
                     if hasattr(parent_studio, "_compute_character_counts")
-                    else {c: 1 for c in detected}
+                    else dict.fromkeys(detected, 1)
                 )
-                voices = parent_studio._current_project_data.get("character_voices", {})
+                voices = getattr(parent_studio, "_current_project_data", {}).get(
+                    "character_voices", {}
+                )
                 self._counts = dict(counts)
                 self._voices = dict(voices)
                 self._refresh_table()
@@ -222,8 +230,10 @@ if _QT:
             if not detected_counts and self._media_path and self._media_path.is_file():
                 try:
                     chars, _ = engine.detect_from_media(self._media_path)
-                    for c in chars:
-                        detected_counts[c.canonical_name] = detected_counts.get(c.canonical_name, 0) + 1
+                    for char_item in chars:
+                        detected_counts[char_item.canonical_name] = (
+                            detected_counts.get(char_item.canonical_name, 0) + 1
+                        )
                 except Exception:
                     pass
 
@@ -231,10 +241,12 @@ if _QT:
                 detected_counts = {"SPEAKER_00": 1, "SPEAKER_01": 1}
 
             self._counts = detected_counts
-            for idx, c in enumerate(sorted(self._counts.keys())):
-                if c not in self._voices:
-                    raw_voice = self._available_voices[idx % len(self._available_voices)].split(" ")[0]
-                    self._voices[c] = raw_voice
+            for idx, spk_name in enumerate(sorted(self._counts.keys())):
+                if spk_name not in self._voices:
+                    raw_voice = self._available_voices[idx % len(self._available_voices)].split(
+                        " ", maxsplit=1
+                    )[0]
+                    self._voices[spk_name] = raw_voice
 
             self._refresh_table()
             QMessageBox.information(
@@ -245,7 +257,7 @@ if _QT:
 
         def _on_voice_changed(self, character: str, voice_display: str) -> None:
             # Extract raw voice name from "bn-BD-PradeepNeural (Male - Default)"
-            voice_name = voice_display.split(" ")[0].strip()
+            voice_name = voice_display.split(" ", maxsplit=1)[0].strip()
             self._voices[character] = voice_name
 
         def _add_character(self) -> None:
@@ -290,7 +302,9 @@ if _QT:
         def _reassign_selected(self) -> None:
             row = self.table.currentRow()
             if row < 0:
-                QMessageBox.information(self, "Reassign Cues", "Select a source character row first.")
+                QMessageBox.information(
+                    self, "Reassign Cues", "Select a source character row first."
+                )
                 return
             item = self.table.item(row, 0)
             if not item:
@@ -298,7 +312,11 @@ if _QT:
             source_char = item.text()
             other_chars = [c for c in self._counts if c != source_char]
             if not other_chars:
-                QMessageBox.information(self, "Reassign Cues", "No other characters exist to reassign to. Add a character first.")
+                QMessageBox.information(
+                    self,
+                    "Reassign Cues",
+                    "No other characters exist to reassign to. Add a character first.",
+                )
                 return
 
             target_char, ok = QInputDialog.getItem(
@@ -336,4 +354,3 @@ if _QT:
 
         def get_voices(self) -> dict[str, str]:
             return dict(self._voices)
-

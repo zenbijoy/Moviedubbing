@@ -86,7 +86,7 @@ class FasterWhisperAdapter(SpeechRecognizer):
 
     def _model(self) -> Any:
         try:
-            import faster_whisper  # type: ignore[import-not-found]
+            import faster_whisper
         except ImportError as exc:
             raise RuntimeError(
                 "Faster-Whisper is not installed; install the production ASR dependencies"

@@ -117,7 +117,7 @@ class OpenAIAdapter:
     def _get_client(self) -> Any:
         if self._client is None:
             try:
-                from openai import OpenAI  # type: ignore[import-not-found]
+                from openai import OpenAI
             except ImportError as exc:
                 raise LlmProviderError(
                     "openai",

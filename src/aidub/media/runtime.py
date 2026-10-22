@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -35,7 +36,7 @@ class MediaRuntime:
                     Path.home()
                     / ".local"
                     / "bin"
-                    / (f"{default_name}.exe" if subprocess.os.name == "nt" else default_name)
+                    / (f"{default_name}.exe" if os.name == "nt" else default_name)
                 )
                 if candidate.is_file():
                     found = str(candidate)

@@ -160,7 +160,7 @@ class QcInspectorController:
 
 if PYSIDE6_AVAILABLE:
 
-    class QualityControlInspectorWidget(QWidget):  # type: ignore[misc]
+    class QualityControlInspectorWidget(QWidget):
         """PySide6 QWidget for Quality Control Inspector & Timeline Heatmap."""
 
         report_selected = Signal(str)

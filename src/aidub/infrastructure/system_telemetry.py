@@ -67,7 +67,7 @@ def get_real_ram_bytes() -> tuple[int, int]:
             logger.debug("Win32 memory status check fallback: %s", exc)
 
     try:
-        import psutil  # type: ignore[import-not-found]
+        import psutil
 
         mem = psutil.virtual_memory()
     except (ImportError, Exception) as exc:
@@ -108,7 +108,7 @@ def get_real_gpu_telemetry() -> tuple[str, int, float, float]:
             logger.debug("nvidia-smi telemetry probe failed: %s", exc)
 
     try:
-        import torch  # type: ignore[import-not-found]
+        import torch
 
         if torch.cuda.is_available():
             gpu_name = torch.cuda.get_device_name(0)
@@ -130,7 +130,7 @@ def probe_system_telemetry(target_dir: Path | str | None = None) -> SystemTeleme
     cpu_cores = os.cpu_count() or 0
     cpu_usage_pct = 0.0
     try:
-        import psutil  # type: ignore[import-not-found]
+        import psutil
 
         cpu_usage_pct = float(psutil.cpu_percent(interval=None))
     except ImportError:
@@ -154,14 +154,15 @@ def probe_system_telemetry(target_dir: Path | str | None = None) -> SystemTeleme
     loaded_models_count = 0
     models_summary = "No models currently loaded in VRAM"
     try:
-        from aidub.infrastructure.model_manager import (  # type: ignore[import-not-found]
+        from aidub.infrastructure.models.manager import (
             ModelManager,
         )
 
-        manager = ModelManager.get_instance()  # type: ignore[attr-defined]
-        loaded_models_count = len(manager.loaded_models)
+        manager = ModelManager.get_instance()
+        loaded = manager.loaded_models()
+        loaded_models_count = len(loaded)
         if loaded_models_count > 0:
-            models_summary = ", ".join(manager.loaded_models.keys())
+            models_summary = ", ".join(m.model_id for m in loaded)
     except Exception as exc:
         logger.debug("Model manager check fallback: %s", exc)
 
