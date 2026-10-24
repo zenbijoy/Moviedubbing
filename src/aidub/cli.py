@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from fractions import Fraction
 from pathlib import Path
 from typing import Protocol, TextIO, cast
@@ -562,6 +562,78 @@ def _handle_kaggle(
     return EXIT_OK
 
 
+def _handle_retake(
+    arguments: argparse.Namespace,
+    dependencies: CliDependencies,
+    stdout: TextIO = sys.stdout,
+    stderr: TextIO = sys.stderr,
+) -> int:
+    del dependencies, stderr
+    from aidub.pipeline.retake import UtteranceRetakeService
+
+    service = UtteranceRetakeService(
+        work_dir=arguments.work_dir,
+        target_language=getattr(arguments, "target_lang", "bn"),
+    )
+    result = service.retake_utterance(
+        utterance_index=arguments.index,
+        new_target_text=arguments.text,
+        voice_name=getattr(arguments, "voice_name", None),
+        rate_percent=getattr(arguments, "rate", 0),
+        pitch_hz=getattr(arguments, "pitch", 0),
+        output_video_path=getattr(arguments, "output", None),
+    )
+    if getattr(arguments, "output_json", False):
+        _write_json(stdout, asdict(result))
+    else:
+        stdout.write(
+            f"✓ Utterance #{result.utterance_index} retake applied in {result.elapsed_seconds:.2f}s\n"
+            f"  New text: {result.new_target_text}\n"
+            f"  Audio duration: {result.audio_duration_s:.2f}s\n"
+            f"  Dubbed vocals: {result.dubbed_vocals_path}\n"
+            f"  Updated subtitles: {result.subtitle_path}\n"
+        )
+        if result.dubbed_video_path:
+            stdout.write(f"  Remuxed video: {result.dubbed_video_path}\n")
+    return EXIT_OK
+
+
+def _handle_export_master(
+    arguments: argparse.Namespace,
+    dependencies: CliDependencies,
+    stdout: TextIO = sys.stdout,
+    stderr: TextIO = sys.stderr,
+) -> int:
+    del dependencies, stderr
+    from aidub.media.broadcast_exporter import BroadcastMasterExporter
+
+    preset_val = getattr(arguments, "preset", "youtube_4k")
+    if preset_val == "dual_audio":
+        if not getattr(arguments, "orig_audio", None):
+            stderr.write("error: --orig-audio is required for dual_audio export\n")
+            return EXIT_USAGE
+        out_p = BroadcastMasterExporter.export_dual_audio_master(
+            video_path=arguments.video,
+            original_audio_path=arguments.orig_audio,
+            dubbed_audio_path=arguments.dubbed_audio,
+            output_path=arguments.output,
+            original_lang=getattr(arguments, "orig_lang", "eng"),
+            dubbed_lang=getattr(arguments, "target_lang", "ben"),
+            bilingual_subtitle_path=getattr(arguments, "subtitles", None),
+        )
+    else:
+        out_p = BroadcastMasterExporter.export(
+            video_path=arguments.video,
+            audio_path=arguments.dubbed_audio,
+            output_path=arguments.output,
+            preset=preset_val,
+            subtitle_path=getattr(arguments, "subtitles", None),
+            burn_subtitles=getattr(arguments, "burn_subtitles", False),
+        )
+    stdout.write(f"✓ Broadcast master successfully exported: {out_p}\n")
+    return EXIT_OK
+
+
 CommandHandler = Callable[
     [argparse.Namespace, CliDependencies, TextIO, TextIO],
     int,
@@ -739,6 +811,35 @@ def build_parser() -> argparse.ArgumentParser:
     kaggle.add_argument("--target-lang", default="bn", help="target language for dubbing notebook (default: bn)")
     kaggle.add_argument("--voice-engine", default="chatterbox", help="voice engine for notebook (default: chatterbox)")
     kaggle.set_defaults(handler=_handle_kaggle)
+
+    retake_cmd = commands.add_parser("retake", help="ADR single-line dialogue re-synthesis and timeline retake")
+    retake_cmd.add_argument("--work-dir", type=Path, required=True, help="path to project work directory")
+    retake_cmd.add_argument("--index", type=int, required=True, help="0-indexed utterance number to replace")
+    retake_cmd.add_argument("--text", type=str, required=True, help="new localized dialogue text")
+    retake_cmd.add_argument("--target-lang", default="bn", help="target language code (default: bn)")
+    retake_cmd.add_argument("--voice-name", help="TTS voice override")
+    retake_cmd.add_argument("--rate", type=int, default=0, help="rate offset percent (-50..+100)")
+    retake_cmd.add_argument("--pitch", type=int, default=0, help="pitch offset Hz (-50..+50)")
+    retake_cmd.add_argument("--output", type=Path, help="optional remuxed output video destination")
+    retake_cmd.add_argument("--json", action="store_true", dest="output_json")
+    retake_cmd.set_defaults(handler=_handle_retake)
+
+    export_cmd = commands.add_parser("export-master", help="broadcast and multi-audio deliverable exporter")
+    export_cmd.add_argument("--video", type=Path, required=True, help="input source or dubbed video file")
+    export_cmd.add_argument("--dubbed-audio", type=Path, required=True, help="master dubbed audio track")
+    export_cmd.add_argument("--orig-audio", type=Path, help="original production audio track (required for dual_audio)")
+    export_cmd.add_argument("--output", type=Path, required=True, help="destination deliverable (.mp4, .mkv)")
+    export_cmd.add_argument(
+        "--preset",
+        default="youtube_4k",
+        choices=["youtube_4k", "netflix_51", "theatrical_master", "mobile_stream", "dual_audio"],
+        help="mastering delivery profile",
+    )
+    export_cmd.add_argument("--subtitles", type=Path, help="SRT or VTT subtitle track to embed")
+    export_cmd.add_argument("--burn-subtitles", action="store_true", help="hardcode subtitles into video stream")
+    export_cmd.add_argument("--orig-lang", default="eng", help="ISO code for original audio track (default: eng)")
+    export_cmd.add_argument("--target-lang", default="ben", help="ISO code for dubbed audio track (default: ben)")
+    export_cmd.set_defaults(handler=_handle_export_master)
     return parser
 
 

@@ -355,6 +355,70 @@ def mix(
     return out_p
 
 
+def dynamic_sidechain_mix(
+    voice_path: Path | str,
+    music_path: Path | str,
+    out_path: Path | str,
+    threshold_db: float = -28.0,
+    ducking_ratio: float = 4.0,
+    attack_ms: float = 15.0,
+    release_ms: float = 300.0,
+    voice_gain: float = 1.35,
+) -> Path:
+    """
+    Mix dubbed vocal track over dynamically ducked background music using sidechain compression.
+
+    When dialogue is active (above threshold_db), background music is automatically attenuated.
+    During pauses and speech silences, the cinematic score smoothly swells back to full volume.
+    Includes fallback to standard mix() if sidechain processing encounters legacy filter issues.
+    """
+    out_p = Path(out_path)
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+    suffix = out_p.suffix.lower()
+
+    # Convert dB threshold to linear amplitude (0.000976563 to 1.0)
+    threshold_linear = max(0.001, min(1.0, 10.0 ** (threshold_db / 20.0)))
+
+    # [0:a] is voice (control signal), [1:a] is music (signal to duck)
+    fc = (
+        f"[0:a]aformat=channel_layouts=stereo,volume={voice_gain:.2f}[voc];"
+        "[1:a]aformat=channel_layouts=stereo[mus];"
+        f"[mus][voc]sidechaincompress=threshold={threshold_linear:.5f}:ratio={ducking_ratio:.1f}:attack={attack_ms:.1f}:release={release_ms:.1f}:level_sc=1[ducked_mus];"
+        "[voc][ducked_mus]amix=inputs=2:duration=first:dropout_transition=0:weights=1 1:normalize=0[mix];"
+        "[mix]alimiter=limit=0.95:level=true[out]"
+    )
+
+    cmd = [
+        _ffmpeg_exe(),
+        "-y",
+        "-i",
+        str(voice_path),
+        "-i",
+        str(music_path),
+        "-filter_complex",
+        fc,
+        "-map",
+        "[out]",
+    ]
+
+    if suffix == ".wav":
+        cmd.extend(["-c:a", "pcm_s16le", "-ar", "44100"])
+    elif suffix == ".mp3":
+        cmd.extend(["-c:a", "libmp3lame", "-b:a", "192k", "-ar", "44100"])
+    else:
+        cmd.extend(["-c:a", "aac", "-b:a", "192k", "-ar", "44100"])
+
+    cmd.append(str(out_p))
+    try:
+        _run(cmd)
+        return out_p
+    except Exception as exc:
+        logger.warning(
+            "dynamic_sidechain_mix failed (%s); falling back to static mix.", exc
+        )
+        return mix(voice_path, music_path, out_path)
+
+
 def mux(video_path: Path | str, audio_path: Path | str, out_path: Path | str) -> Path:
     """
     Combine original video stream (stream copy) with new dubbed audio track.
@@ -423,6 +487,7 @@ __all__ = [
     "_ffmpeg_exe",
     "_ffprobe_exe",
     "duration",
+    "dynamic_sidechain_mix",
     "extract_audio",
     "mix",
     "mux",

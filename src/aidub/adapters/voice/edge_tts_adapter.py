@@ -94,6 +94,17 @@ class EdgeTTSAdapter:
         out_p.parent.mkdir(parents=True, exist_ok=True)
         v = voice or self.voice_name
 
+        rate_str = f"{rate:+d}%" if isinstance(rate, int) else str(rate)
+        pitch_str = f"{pitch:+d}Hz" if isinstance(pitch, int) else str(pitch)
+        if not rate_str.endswith("%"):
+            rate_str = f"{rate_str}%"
+        if not (rate_str.startswith("+") or rate_str.startswith("-")):
+            rate_str = f"+{rate_str}"
+        if not pitch_str.endswith("Hz"):
+            pitch_str = f"{pitch_str}Hz"
+        if not (pitch_str.startswith("+") or pitch_str.startswith("-")):
+            pitch_str = f"+{pitch_str}"
+
         import time
 
         import edge_tts
@@ -104,7 +115,7 @@ class EdgeTTSAdapter:
             try:
 
                 async def _run_synth() -> None:
-                    communicate = edge_tts.Communicate(text, v, rate=rate, pitch=pitch)
+                    communicate = edge_tts.Communicate(text, v, rate=rate_str, pitch=pitch_str)
                     await communicate.save(str(out_p))
 
                 asyncio.run(_run_synth())

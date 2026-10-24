@@ -33,6 +33,7 @@ try:
     from PySide6.QtCore import (
         QLineF,
         QPointF,
+        QRect,
         QRectF,
         QStandardPaths,
         Qt,
@@ -129,6 +130,8 @@ if _QT:
         workspace_selected = Signal(str)
         kaggle_requested = Signal()
         voice_model_requested = Signal()
+        casting_requested = Signal()
+        export_requested = Signal()
 
         _WORKSPACES = ("Ingest", "Dubbing", "Review", "Delivery")
 
@@ -177,7 +180,7 @@ if _QT:
 
             layout.addStretch(1)
 
-            # Pro Studio Quick Actions: Voice Model & Kaggle GPU
+            # Pro Studio Quick Actions: Voice Model, Character Casting, Cloud GPU, and Broadcast Export
             voice_btn = QPushButton("🎙️ Voice Model", self)
             voice_btn.setToolTip("Configure AI Voice Engine (Chatterbox AI, Edge-TTS, RVC)")
             voice_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -190,17 +193,41 @@ if _QT:
             voice_btn.clicked.connect(self.voice_model_requested.emit)
             layout.addWidget(voice_btn)
 
-            kaggle_btn = QPushButton("☁️ Kaggle GPU", self)
-            kaggle_btn.setToolTip("Accelerate Dubbing with Free Kaggle NVIDIA T4 GPU (Ctrl+K)")
+            cast_btn = QPushButton("🎭 Cast Voices", self)
+            cast_btn.setToolTip("Character Voice Casting & Actor Matching Studio")
+            cast_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            cast_btn.setFixedHeight(26)
+            cast_btn.setStyleSheet(
+                "QPushButton{background:#311042;color:#E9D5FF;border:1px solid #7E22CE;"
+                "border-radius:4px;padding:0 10px;font-size:11px;font-weight:700;margin-right:8px;}"
+                "QPushButton:hover{background:#581C87;color:#F3E8FF;border-color:#A855F7;}"
+            )
+            cast_btn.clicked.connect(self.casting_requested.emit)
+            layout.addWidget(cast_btn)
+
+            kaggle_btn = QPushButton("☁️ Cloud GPU", self)
+            kaggle_btn.setToolTip("Accelerate Dubbing with Free Kaggle & Colab NVIDIA T4 GPUs (Ctrl+K)")
             kaggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             kaggle_btn.setFixedHeight(26)
             kaggle_btn.setStyleSheet(
                 "QPushButton{background:#082F49;color:#7DD3FC;border:1px solid #0369A1;"
-                "border-radius:4px;padding:0 10px;font-size:11px;font-weight:700;margin-right:12px;}"
+                "border-radius:4px;padding:0 10px;font-size:11px;font-weight:700;margin-right:8px;}"
                 "QPushButton:hover{background:#0C4A6E;color:#BAE6FD;border-color:#0284C7;}"
             )
             kaggle_btn.clicked.connect(self.kaggle_requested.emit)
             layout.addWidget(kaggle_btn)
+
+            export_btn = QPushButton("📡 Broadcast Export", self)
+            export_btn.setToolTip("Export Master Delivery (Netflix 5.1 / YouTube 4K / EBU R128)")
+            export_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            export_btn.setFixedHeight(26)
+            export_btn.setStyleSheet(
+                "QPushButton{background:#064E3B;color:#6EE7B7;border:1px solid #059669;"
+                "border-radius:4px;padding:0 10px;font-size:11px;font-weight:700;margin-right:12px;}"
+                "QPushButton:hover{background:#047857;color:#A7F3D0;border-color:#10B981;}"
+            )
+            export_btn.clicked.connect(self.export_requested.emit)
+            layout.addWidget(export_btn)
 
         def _select_workspace(self, workspace: str) -> None:
             for name, button in self._buttons.items():
@@ -505,6 +532,13 @@ if _QT:
             self._priming_video = False
             self._prime_restore_muted = False
             self._prime_target_ms = 0
+            self._split_mode = False
+            self._split_ratio = 0.5
+            self._comparison_media_path = ""
+            self._comparison_image: Any | None = None
+            self._comparison_worker: Any | None = None
+            self._comparison_request_id = 0
+            self._split_btn: QPushButton | None = None
 
             layout = QVBoxLayout(self)
             layout.setContentsMargins(8, 7, 8, 5)
@@ -554,6 +588,21 @@ if _QT:
             self._fit_combo = fit_combo
             fit_combo.currentTextChanged.connect(lambda _value: self._update_video_surface())
             v_top.addWidget(fit_combo)
+
+            split_btn = QPushButton("⚖️ Split View", video_frame)
+            split_btn.setCheckable(True)
+            split_btn.setFixedHeight(22)
+            split_btn.setToolTip("Toggle Before/After Split-Screen Lip-Sync Comparison")
+            split_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            split_btn.setStyleSheet(
+                "QPushButton{background:#111622;color:#94A3B8;border:1px solid #1E293B;"
+                "border-radius:2px;font-size:11px;padding:2px 8px;min-height:0;}"
+                "QPushButton:hover{background:#1E293B;color:#F8FAFC;}"
+                "QPushButton:checked{background:#0369A1;color:#F0F9FF;border-color:#38BDF8;font-weight:700;}"
+            )
+            split_btn.toggled.connect(self._toggle_split_view)
+            self._split_btn = split_btn
+            v_top.addWidget(split_btn)
 
             self.dur_overlay = QLabel("00:00:00:000", video_frame)
             self.dur_overlay.setStyleSheet(
@@ -831,13 +880,99 @@ if _QT:
             if self._audio_output is not None:
                 self._audio_output.setMuted(self._prime_restore_muted)
 
+        def toggle_split_view(self, enabled: bool | None = None) -> None:
+            if enabled is None:
+                self._split_mode = not self._split_mode
+            else:
+                self._split_mode = bool(enabled)
+            if self._split_btn is not None and self._split_btn.isChecked() != self._split_mode:
+                self._split_btn.setChecked(self._split_mode)
+            if self._split_mode and self._comparison_media_path:
+                self._request_comparison_frame(self._playhead_sec)
+            self._update_video_surface()
+
+        def _toggle_split_view(self, checked: bool) -> None:
+            self._split_mode = checked
+            if self._split_mode and self._comparison_media_path:
+                self._request_comparison_frame(self._playhead_sec)
+            self._update_video_surface()
+
+        def load_comparison_media(self, media_path: str) -> None:
+            path = Path(media_path)
+            if path.is_file():
+                self._comparison_media_path = str(path.resolve())
+                if self._split_mode:
+                    self._request_comparison_frame(self._playhead_sec)
+
+        def _request_comparison_frame(self, time_sec: float) -> None:
+            if not self._comparison_media_path:
+                return
+            from aidub.ui.workers import VideoFrameWorker
+
+            self._comparison_request_id += 1
+            req_id = self._comparison_request_id
+            if self._comparison_worker is not None and self._comparison_worker.isRunning():
+                return
+            worker = VideoFrameWorker(self._comparison_media_path, time_sec, req_id, self)
+            self._comparison_worker = worker
+            worker.frame_decoded.connect(self._on_comparison_frame_decoded)
+            worker.finished.connect(lambda current=worker: self._on_comparison_worker_finished(current))
+            worker.start()
+
+        def _on_comparison_frame_decoded(
+            self, frame_data: bytes, _time_sec: float, req_id: int
+        ) -> None:
+            if req_id != self._comparison_request_id:
+                return
+            img = QImage.fromData(frame_data)
+            if not img.isNull():
+                self._comparison_image = img
+                self._update_video_surface()
+
+        def _on_comparison_worker_finished(self, worker: Any) -> None:
+            if self._comparison_worker is worker:
+                self._comparison_worker = None
+
         def _update_video_surface(self) -> None:
             if self._video_widget is None or self._last_video_image is None:
                 return
             widget_size = self._video_widget.size()
             if widget_size.width() <= 1 or widget_size.height() <= 1:
                 return
-            pixmap = QPixmap.fromImage(self._last_video_image)
+
+            if self._split_mode:
+                base_img = self._last_video_image
+                comp_img = self._comparison_image if self._comparison_image is not None else base_img
+                w = base_img.width()
+                h = base_img.height()
+                split_x = max(1, min(w - 1, int(w * self._split_ratio)))
+                composite = QImage(w, h, QImage.Format.Format_ARGB32_Premultiplied)
+                painter = QPainter(composite)
+                # Left side: original source
+                painter.drawImage(QRect(0, 0, split_x, h), base_img, QRect(0, 0, split_x, h))
+                # Right side: comparison / dubbed
+                painter.drawImage(QRect(split_x, 0, w - split_x, h), comp_img, QRect(split_x, 0, w - split_x, h))
+                # Divider line
+                pen = QPen(QColor("#38BDF8"))
+                pen.setWidth(3)
+                painter.setPen(pen)
+                painter.drawLine(split_x, 0, split_x, h)
+                # Badges
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(11, 14, 20, 210))
+                painter.drawRoundedRect(QRect(12, 12, 110, 24), 4, 4)
+                painter.drawRoundedRect(QRect(max(0, w - 172), 12, 160, 24), 4, 4)
+                font = QFont("Cascadia Mono, sans-serif", 9, QFont.Weight.Bold)
+                painter.setFont(font)
+                painter.setPen(QColor("#38BDF8"))
+                painter.drawText(QRect(12, 12, 110, 24), Qt.AlignmentFlag.AlignCenter, "ORIGINAL")
+                painter.setPen(QColor("#4ADE80"))
+                painter.drawText(QRect(max(0, w - 172), 12, 160, 24), Qt.AlignmentFlag.AlignCenter, "AI LIP-SYNC / DUB")
+                painter.end()
+                pixmap = QPixmap.fromImage(composite)
+            else:
+                pixmap = QPixmap.fromImage(self._last_video_image)
+
             mode = self._fit_combo.currentText() if self._fit_combo is not None else "Fit"
             if mode == "Fit":
                 scaled = pixmap.scaled(
@@ -866,6 +1001,9 @@ if _QT:
             if self._frame_worker is not None and self._frame_worker.isRunning():
                 self._frame_worker.cancel()
                 self._frame_worker.wait(5_000)
+            if self._comparison_worker is not None and self._comparison_worker.isRunning():
+                self._comparison_worker.cancel()
+                self._comparison_worker.wait(5_000)
             super().closeEvent(event)
 
         def _on_player_duration_changed(self, duration_ms: int) -> None:
@@ -884,6 +1022,8 @@ if _QT:
             self.tc_overlay.setText(_format_tc(self._playhead_sec))
             if not self.scrubber.isSliderDown():
                 self.scrubber.setValue(round(self._playhead_sec * 1_000))
+            if self._split_mode and self._comparison_media_path:
+                self._request_comparison_frame(self._playhead_sec)
             if self._software_preview and self._media_path:
                 self._request_software_frame(self._playhead_sec)
             elif self._player is not None and self._media_path:
@@ -2809,6 +2949,8 @@ if _QT:
             self.stage_bar.workspace_selected.connect(self._on_workspace_selected)
             self.stage_bar.kaggle_requested.connect(self._open_kaggle_accelerator)
             self.stage_bar.voice_model_requested.connect(self._open_voice_model_selector)
+            self.stage_bar.casting_requested.connect(self._open_character_casting_studio)
+            self.stage_bar.export_requested.connect(self._open_broadcast_export)
             self.navigation_rail.route_requested.connect(self._on_navigation_route)
             self.tool_palette.tool_selected.connect(self.canvas_view.set_tool)
             self.tool_palette.tool_selected.connect(
@@ -2855,6 +2997,42 @@ if _QT:
                 self._current_project_data["voice_emotion"] = new_emotion
                 self._show_status(f"AI Voice Model: {new_engine.upper()} (Emotion: {new_emotion})")
 
+        def _open_character_casting_studio(self) -> None:
+            from aidub.ui.dialogs.character_casting_dialog import CharacterCastingStudioDialog
+
+            counts = self._compute_character_counts()
+            char_list = list(counts.keys()) if counts else ["Protagonist (Speaker 0)", "Antagonist (Speaker 1)"]
+            current_voices = self._current_project_data.get("character_voices", {})
+
+            dlg = CharacterCastingStudioDialog(
+                self,
+                characters=char_list,
+                current_casting=current_voices,
+                target_language=self._automation_state.target_language or "bn",
+            )
+            if dlg.exec():
+                new_mapping = dlg.get_character_voices()
+                self._current_project_data.setdefault("character_voices", {}).update(new_mapping)
+                self._show_status(f"✓ AI Character Voices Cast: {len(new_mapping)} characters assigned")
+
+        def _open_broadcast_export(self) -> None:
+            from aidub.ui.dialogs.broadcast_export_dialog import BroadcastExportDialog
+
+            video_p = str(self._current_project_data.get("file_path", ""))
+            sub_p = str(self._current_project_data.get("subtitle_path", ""))
+            aud_p = str(self._current_project_data.get("dubbed_audio_path", ""))
+            music_p = str(self._current_project_data.get("background_audio_path", ""))
+
+            dlg = BroadcastExportDialog(
+                self,
+                video_path=video_p,
+                audio_path=aud_p or video_p,
+                music_path=music_p,
+                subtitle_path=sub_p,
+                default_output_name=f"broadcast_master_{Path(video_p).stem if video_p else 'movie'}.mp4",
+            )
+            dlg.exec()
+
         def keyPressEvent(self, event: Any) -> None:  # noqa: N802
             # Modifier shortcuts (Ctrl+...)
             if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
@@ -2868,6 +3046,14 @@ if _QT:
                     return
                 if event.key() == Qt.Key.Key_I:
                     self.import_media_dialog()
+                    event.accept()
+                    return
+                if event.key() == Qt.Key.Key_E:
+                    self._open_broadcast_export()
+                    event.accept()
+                    return
+                if event.key() == Qt.Key.Key_M:
+                    self._open_character_casting_studio()
                     event.accept()
                     return
 
@@ -3024,25 +3210,7 @@ if _QT:
             dialog(self, "Subtitle Quality Control", "\n".join(details))
 
         def _show_delivery(self) -> None:
-            available = [
-                Path(path)
-                for path in self._current_project_data.get("generated_paths", ())
-                if Path(path).is_file()
-            ]
-            if not available:
-                self._show_status("No delivery files exist yet. Run Auto Dub Master first.")
-                return
-
-            details = "\n".join(str(path) for path in available)
-            answer = QMessageBox.question(
-                self,
-                "Dubbed Delivery Files",
-                f"Generated files:\n\n{details}\n\nOpen the output folder?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes,
-            )
-            if answer is QMessageBox.StandardButton.Yes:
-                QDesktopServices.openUrl(QUrl.fromLocalFile(str(available[0].parent)))
+            self._open_broadcast_export()
 
         def _on_timeline_toolbar_action(self, action: str) -> None:
             if action == "Add Marker":
@@ -4665,9 +4833,12 @@ if _QT:
 
             # Automatically load the newly created dubbed video in the Program Monitor
             dubbed_video = str(result.get("lipsynced_video") or result.get("output_file") or "")
+            orig_video = str(self._current_project_data.get("file_path", ""))
             if dubbed_video and Path(dubbed_video).is_file():
                 try:
                     self.monitor_panel.load_media(dubbed_video)
+                    if orig_video and Path(orig_video).is_file():
+                        self.monitor_panel.load_comparison_media(orig_video)
                     self.monitor_panel.prog_title_lbl.setText(
                         f"Program: {Path(dubbed_video).stem} [DUBBED MASTER]"
                     )

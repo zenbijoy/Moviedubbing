@@ -35,7 +35,24 @@ def separate_stems(
     music_path = out_dir / "music.wav"
 
     # ------------------------------------------------------------------
-    # Try real Demucs separation first
+    # Route Roformer models to RoformerSeparationAdapter
+    # ------------------------------------------------------------------
+    if "roformer" in model_name.lower():
+        from aidub.adapters.separation_roformer import (
+            RoformerSeparationAdapter,
+            RoformerSeparationOptions,
+        )
+
+        adapter = RoformerSeparationAdapter(
+            RoformerSeparationOptions(model_name=model_name, device="cpu")
+        )
+        adapter.separate(str(audio_p), str(out_dir))
+        if vocal_path.is_file() and music_path.is_file():
+            logger.info("Roformer stem separation complete: vocals=%s music=%s", vocal_path, music_path)
+            return vocal_path, music_path
+
+    # ------------------------------------------------------------------
+    # Try real Demucs separation
     # ------------------------------------------------------------------
     if not _try_import_demucs():
         raise RuntimeError(

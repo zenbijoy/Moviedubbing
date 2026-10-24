@@ -1,9 +1,11 @@
 """
-Kaggle Cloud Accelerator Dialog for AIDub Studio.
+Cloud GPU Accelerator Dialog for AIDub Studio (Kaggle & Google Colab).
 
 Allows users to offload heavy movie dubbing workloads (Demucs stem separation,
 Whisper Large-v3, Chatterbox AI, and MuseTalk/LatentSync lip-sync) to free
-Kaggle NVIDIA GPUs (30 hours/week).
+cloud GPUs:
+- Kaggle NVIDIA T4 / P100 GPUs (30 hours/week)
+- Google Colab NVIDIA Tesla T4 Free GPU with 1-Click Google Drive integration
 """
 
 from __future__ import annotations
@@ -11,6 +13,13 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Any
+
+from aidub.cloud.colab_accelerator import ColabNotebookBuilder
+from aidub.cloud.kaggle_accelerator import (
+    KaggleNotebookBuilder,
+    load_kaggle_credentials,
+    save_kaggle_credentials,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -153,27 +162,55 @@ if _QT:
             btn_box = QVBoxLayout()
             btn_box.setSpacing(10)
 
-            self.gen_btn = QPushButton("🚀  Generate & Export Kaggle Dubbing Notebook (.ipynb)", self)
+            # Kaggle Actions
+            kaggle_row = QHBoxLayout()
+            self.gen_btn = QPushButton("🚀  Generate Kaggle Notebook (.ipynb)", self)
             self.gen_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self.gen_btn.setStyleSheet(
                 "QPushButton { background: #2563EB; color: #FFF; border: none; "
-                "border-radius: 5px; padding: 10px 18px; font-size: 13px; font-weight: 800; }"
+                "border-radius: 5px; padding: 10px 14px; font-size: 12px; font-weight: 800; }"
                 "QPushButton:hover { background: #3B82F6; }"
             )
             self.gen_btn.clicked.connect(self._generate_notebook)
-            btn_box.addWidget(self.gen_btn)
+            kaggle_row.addWidget(self.gen_btn, 1)
 
-            open_kaggle_btn = QPushButton("🌐  Open Kaggle Code in Browser", self)
+            open_kaggle_btn = QPushButton("🌐 Open Kaggle", self)
             open_kaggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             open_kaggle_btn.setStyleSheet(
                 "QPushButton { background: #0284C7; color: #FFF; border: none; "
-                "border-radius: 5px; padding: 8px 18px; font-size: 12px; font-weight: 700; }"
+                "border-radius: 5px; padding: 10px 14px; font-size: 12px; font-weight: 700; }"
                 "QPushButton:hover { background: #0EA5E9; }"
             )
             open_kaggle_btn.clicked.connect(
                 lambda: QDesktopServices.openUrl(QUrl("https://www.kaggle.com/code"))
             )
-            btn_box.addWidget(open_kaggle_btn)
+            kaggle_row.addWidget(open_kaggle_btn)
+            btn_box.addLayout(kaggle_row)
+
+            # Google Colab Actions
+            colab_row = QHBoxLayout()
+            self.colab_btn = QPushButton("⚡  Generate Google Colab Notebook (.ipynb)", self)
+            self.colab_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.colab_btn.setStyleSheet(
+                "QPushButton { background: #D97706; color: #FFF; border: none; "
+                "border-radius: 5px; padding: 10px 14px; font-size: 12px; font-weight: 800; }"
+                "QPushButton:hover { background: #F59E0B; }"
+            )
+            self.colab_btn.clicked.connect(self._generate_colab_notebook)
+            colab_row.addWidget(self.colab_btn, 1)
+
+            open_colab_btn = QPushButton("🌐 Open Colab", self)
+            open_colab_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            open_colab_btn.setStyleSheet(
+                "QPushButton { background: #B45309; color: #FFF; border: none; "
+                "border-radius: 5px; padding: 10px 14px; font-size: 12px; font-weight: 700; }"
+                "QPushButton:hover { background: #D97706; }"
+            )
+            open_colab_btn.clicked.connect(
+                lambda: QDesktopServices.openUrl(QUrl("https://colab.research.google.com/"))
+            )
+            colab_row.addWidget(open_colab_btn)
+            btn_box.addLayout(colab_row)
 
             layout.addLayout(btn_box)
 
@@ -239,6 +276,40 @@ if _QT:
             except Exception as exc:
                 logger.exception("Failed exporting Kaggle notebook: %s", exc)
                 QMessageBox.critical(self, "Export Failed", f"Could not create notebook:\n{exc}")
+
+        def _generate_colab_notebook(self) -> None:
+            default_name = f"colab_dubbing_{Path(self.movie_path).stem if self.movie_path else 'movie'}.ipynb"
+            save_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save Google Colab Dubbing Notebook",
+                default_name,
+                "Jupyter Notebook (*.ipynb);;All Files (*)",
+            )
+            if not save_path:
+                return
+
+            try:
+                ColabNotebookBuilder.export_to_file(
+                    save_path,
+                    movie_filename=Path(self.movie_path).name if self.movie_path else "movie.mp4",
+                    target_language=self.target_language,
+                    voice_engine=self.voice_engine,
+                    enable_lipsync=self.enable_lipsync,
+                )
+                QMessageBox.information(
+                    self,
+                    "Google Colab Notebook Created",
+                    f"✓ Google Colab GPU Dubbing Notebook saved to:\n{save_path}\n\n"
+                    "Next Steps:\n"
+                    "1. Open https://colab.research.google.com/\n"
+                    "2. Click 'File' -> 'Upload notebook' and select this file\n"
+                    "3. Select 'Runtime' -> 'Change runtime type' -> Choose 'T4 GPU'\n"
+                    "4. Run the cells to process your movie with full GPU power!",
+                )
+            except Exception as exc:
+                logger.exception("Failed exporting Colab notebook: %s", exc)
+                QMessageBox.critical(self, "Export Failed", f"Could not create Colab notebook:\n{exc}")
+
 
 
 __all__ = ["KaggleAcceleratorDialog"]

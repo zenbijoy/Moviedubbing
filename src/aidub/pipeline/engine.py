@@ -25,6 +25,7 @@ from aidub.media.ffmpeg_ops import (
     _ffmpeg_exe,
     _run,
     duration,
+    dynamic_sidechain_mix,
     extract_audio,
     mix,
     mux,
@@ -608,11 +609,11 @@ class DubbingEngine:
         final_audio_wav = self.work_dir / "dubbed_audio.wav"
         final_audio_m4a = self.work_dir / "dubbed_audio.m4a"
         if music and music.exists() and dub_vocals.exists():
-            self._progress("mix", 86, "Mixing dialogue against original stems")
+            self._progress("mix", 86, "Mixing dialogue against original stems (dynamic sidechain ducking)")
             with _timed("mix", bench):
                 try:
-                    mix(dub_vocals, music, final_audio_wav)
-                    mix(dub_vocals, music, final_audio_m4a)
+                    dynamic_sidechain_mix(dub_vocals, music, final_audio_wav)
+                    dynamic_sidechain_mix(dub_vocals, music, final_audio_m4a)
                 except Exception as exc:
                     raise PipelineError(
                         ErrorKind.INTERNAL,
