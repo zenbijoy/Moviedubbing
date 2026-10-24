@@ -548,31 +548,7 @@ class DubbingEngine:
                 mix(dub_vocals, music, final_audio_m4a)
             final_audio = final_audio_wav
         elif dub_vocals.exists():
-            self._progress("mix", 86, "Preparing dialogue master track")
-            with _timed("mix", bench):
-                import shutil
-
-                if not final_audio_wav.is_file() or final_audio_wav.resolve() != dub_vocals.resolve():
-                    shutil.copyfile(str(dub_vocals), str(final_audio_wav))
-                if not final_audio_m4a.is_file() or final_audio_m4a.stat().st_size == 0:
-                    _run(
-                        [
-                            _ffmpeg_exe(),
-                            "-y",
-                            "-i",
-                            str(dub_vocals),
-                            "-c:a",
-                            "aac",
-                            "-b:a",
-                            "192k",
-                            "-ar",
-                            "44100",
-                            "-ac",
-                            "2",
-                            str(final_audio_m4a),
-                        ]
-                    )
-            final_audio = final_audio_wav
+            final_audio = dub_vocals
         else:
             final_audio = wav_hq
 
