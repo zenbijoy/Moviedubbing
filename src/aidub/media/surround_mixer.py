@@ -84,8 +84,8 @@ class SurroundSoundMixer:
         # Full 5.1 mixing with dialogue in Center (c2) and music across FL/FR/Surrounds
         duck_lin = 10.0 ** (music_ducking_db / 20.0)
         filter_str = (
-            f"[0:a]volume={dialogue_gain_db}dB[dia];"
-            f"[1:a]volume={duck_lin}[bg];"
+            f"[0:a]aformat=sample_rates=48000:channel_layouts=stereo,volume={dialogue_gain_db}dB[dia];"
+            f"[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume={duck_lin}[bg];"
             f"[bg][dia]amerge=inputs=2[merged];"
             # c0=bg_L, c1=bg_R, c2=dia_L, c3=dia_R
             f"[merged]pan=5.1|c0=c0|c1=c1|c2=0.5*c2+0.5*c3|c3=0.3*c0+0.3*c1|c4=0.7*c0|c5=0.7*c1,"

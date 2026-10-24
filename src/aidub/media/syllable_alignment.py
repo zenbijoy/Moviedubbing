@@ -14,6 +14,8 @@ from typing import Any
 
 # Bengali Vowel Characters (Independent and Dependent Matras)
 BENGALI_VOWELS = set("অআইঈউঊঋএঐওঔািীুূৃেৈোৌ")
+# Devanagari Vowel Characters (Hindi, Marathi, Nepali, Sanskrit)
+DEVANAGARI_VOWELS = set("अआइईउऊऋएऐओऔािीुूृेैोौॉॅंः")
 # English Vowel Pattern for Syllable Approximation
 ENGLISH_VOWEL_PATTERN = re.compile(r"[aeiouy]+", re.IGNORECASE)
 
@@ -58,6 +60,35 @@ class SyllableAlignmentEngine:
         return max(1, count)
 
     @classmethod
+    def count_devanagari_syllables(cls, text: str) -> int:
+        """Count phonetic syllable nuclei in Devanagari (Hindi, Marathi, etc.) text."""
+        cleaned = re.sub(r"[^\u0900-\u097F\s]", "", text).strip()
+        if not cleaned:
+            return max(1, len(text.split()))
+
+        count = 0
+        words = cleaned.split()
+        for word in words:
+            vowels_in_word = sum(1 for ch in word if ch in DEVANAGARI_VOWELS)
+            if vowels_in_word == 0:
+                count += max(1, len(word) // 2)
+            else:
+                count += vowels_in_word
+        return max(1, count)
+
+    @classmethod
+    def count_cjk_syllables(cls, text: str) -> int:
+        """Count syllables/moras in CJK text (Chinese, Japanese, Korean)."""
+        cjk_chars = [
+            ch
+            for ch in text
+            if ("\u4e00" <= ch <= "\u9fff")
+            or ("\u3040" <= ch <= "\u30ff")
+            or ("\uac00" <= ch <= "\ud7af")
+        ]
+        return max(1, len(cjk_chars)) if cjk_chars else max(1, len(text.split()))
+
+    @classmethod
     def count_english_syllables(cls, text: str) -> int:
         """Estimate syllable count in English text using vowel-chunk analysis."""
         words = re.findall(r"[a-z]+", text.lower())
@@ -82,6 +113,20 @@ class SyllableAlignmentEngine:
         has_bengali = any("\u0980" <= ch <= "\u09FF" for ch in text)
         if has_bengali or lang == "bn":
             return cls.count_bengali_syllables(text)
+
+        has_devanagari = any("\u0900" <= ch <= "\u097F" for ch in text)
+        if has_devanagari or lang in ("hi", "mr", "ne", "sa"):
+            return cls.count_devanagari_syllables(text)
+
+        has_cjk = any(
+            ("\u4e00" <= ch <= "\u9fff")
+            or ("\u3040" <= ch <= "\u30ff")
+            or ("\uac00" <= ch <= "\ud7af")
+            for ch in text
+        )
+        if has_cjk or lang in ("zh", "ja", "ko"):
+            return cls.count_cjk_syllables(text)
+
         return cls.count_english_syllables(text)
 
     @classmethod
@@ -146,4 +191,9 @@ class SyllableAlignmentEngine:
         )
 
 
-__all__ = ["BENGALI_VOWELS", "RhythmMatchReport", "SyllableAlignmentEngine"]
+__all__ = [
+    "BENGALI_VOWELS",
+    "DEVANAGARI_VOWELS",
+    "RhythmMatchReport",
+    "SyllableAlignmentEngine",
+]

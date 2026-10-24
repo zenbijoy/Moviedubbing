@@ -19,7 +19,6 @@ try:
         QCheckBox,
         QComboBox,
         QDialog,
-        QFrame,
         QGroupBox,
         QHBoxLayout,
         QLabel,

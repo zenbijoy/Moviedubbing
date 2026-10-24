@@ -8,7 +8,6 @@ against Netflix, Amazon Prime, EBU R128, and YouTube Broadcast specifications.
 
 from __future__ import annotations
 
-import io
 import json
 import logging
 import math
@@ -16,7 +15,6 @@ import wave
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 from scipy import signal
@@ -104,13 +102,13 @@ class BroadcastQCCertificate:
         status_badge = "★ PASSED - BROADCAST CERTIFIED" if self.passed else "✖ FAILED - REMEDIATION REQUIRED"
         lines = [
             "=" * 70,
-            f"          AIDUB STUDIO BROADCAST DELIVERY QC CERTIFICATE",
+            "          AIDUB STUDIO BROADCAST DELIVERY QC CERTIFICATE",
             "=" * 70,
             f"Asset:          {self.media_name}",
             f"Specification:  {self.criteria.description}",
             f"QC Verdict:     {status_badge}",
             "-" * 70,
-            f"MEASURED METRICS (ITU-R BS.1770-4):",
+            "MEASURED METRICS (ITU-R BS.1770-4):",
             f"  • Integrated Loudness: {self.metrics.integrated_lufs:.2f} LUFS  (Target: {self.criteria.target_lufs:.1f} +/- {self.criteria.tolerance_lu:.1f} LUFS)",
             f"  • Loudness Range:      {self.metrics.loudness_range_lu:.2f} LU   (Limit: <= {self.criteria.max_lra_lu:.1f} LU)",
             f"  • True-Peak Level:     {self.metrics.true_peak_dbtp:.2f} dBTP (Limit: <= {self.criteria.max_true_peak_dbtp:.1f} dBTP)",
@@ -119,7 +117,7 @@ class BroadcastQCCertificate:
             f"  • Sample Rate:         {self.metrics.sample_rate} Hz",
             f"  • Duration:            {self.metrics.duration_s:.2f} seconds",
             "-" * 70,
-            f"CORRECTION & MASTERING:",
+            "CORRECTION & MASTERING:",
             f"  • Gain Adjustment:     {self.gain_correction_db:+.2f} dB",
             f"  • Digital Clipping:    {'DETECTED' if self.clipping_detected else 'None (Clean)'}",
         ]
@@ -423,9 +421,9 @@ class BroadcastQCEngine:
 
 
 __all__ = [
+    "DELIVERY_CRITERIA",
     "BroadcastQCCertificate",
     "BroadcastQCEngine",
-    "DELIVERY_CRITERIA",
     "DeliverySpec",
     "DeliverySpecCriteria",
     "LoudnessQCResult",

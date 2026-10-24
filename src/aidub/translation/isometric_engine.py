@@ -11,7 +11,6 @@ import logging
 import math
 import re
 from dataclasses import dataclass, field
-from typing import Any
 
 from aidub.media.syllable_alignment import SyllableAlignmentEngine
 
@@ -278,8 +277,8 @@ class IsometricTranslationEngine:
 
 
 __all__ = [
+    "PACING_PROFILES",
     "IsometricCandidate",
     "IsometricReport",
     "IsometricTranslationEngine",
-    "PACING_PROFILES",
 ]

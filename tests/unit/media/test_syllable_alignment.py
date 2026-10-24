@@ -74,3 +74,20 @@ def test_analyze_rhythm_match_extreme_mismatch():
     assert not report.is_lip_compatible
     assert report.recommended_stretch == 1.35  # clamped at max
     assert "too fast" in report.remediation_hint
+
+
+def test_devanagari_and_cjk_syllable_counting():
+    # Hindi: "नमस्ते दुनिया" (Namaste duniya)
+    hi_count = SyllableAlignmentEngine.count_devanagari_syllables("नमस्ते दुनिया")
+    assert hi_count >= 4
+
+    # CJK: Chinese "你好世界" (4 syllables/chars) and Japanese "こんにちは" (5 moras)
+    zh_count = SyllableAlignmentEngine.count_cjk_syllables("你好世界")
+    assert zh_count == 4
+    ja_count = SyllableAlignmentEngine.count_cjk_syllables("こんにちは")
+    assert ja_count == 5
+
+    # Auto detection for Hindi and CJK
+    assert SyllableAlignmentEngine.count_syllables("नमस्ते दुनिया", language="auto") >= 4
+    assert SyllableAlignmentEngine.count_syllables("你好世界", language="auto") == 4
+

@@ -92,3 +92,24 @@ def test_synthesis_result_has_seed_metadata(tmp_path: Path) -> None:
     result = engine.synthesize(_make_request(seed=99), str(tmp_path))
     assert result.seed_used == 99
     assert "99" in Path(result.output_path).name
+
+
+def test_edge_tts_all_supported_languages_mapped() -> None:
+    from aidub.adapters.voice.edge_tts_adapter import (
+        available_voices_for_language,
+        default_voice_for_language,
+    )
+
+    expected_langs = [
+        "bn", "hi", "es", "fr", "de", "ja", "zh", "ar", "pt", "ru", "ko", "it", "tr", "en"
+    ]
+    for lang in expected_langs:
+        voice = default_voice_for_language(lang)
+        assert isinstance(voice, str)
+        assert len(voice) > 5
+        assert "Neural" in voice
+
+        voices = available_voices_for_language(lang)
+        assert len(voices) >= 1
+        assert voice in voices
+

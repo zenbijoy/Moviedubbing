@@ -10,10 +10,8 @@ from __future__ import annotations
 import hashlib
 import io
 import logging
-import math
 import wave
 import zlib
-from typing import Any
 
 import numpy as np
 from scipy.fftpack import dct, idct
@@ -30,7 +28,7 @@ class AIProvenanceWatermarker:
     Signal-domain psychoacoustic audio provenance watermarking engine.
     """
 
-    def __init__(self, *, configured: bool = False, secret_key: str = "aidub_default_seed") -> None:
+    def __init__(self, *, configured: bool = False, secret_key: str = "aidub_default_seed") -> None:  # noqa: S107
         self._configured = configured
         self._secret_key = secret_key
 
@@ -61,7 +59,7 @@ class AIProvenanceWatermarker:
         try:
             with wave.open(io.BytesIO(audio_bytes), "rb") as wf:
                 n_channels = wf.getnchannels()
-                sample_width = wf.getsampwidth()
+                _sample_width = wf.getsampwidth()
                 framerate = wf.getframerate()
                 frames = wf.readframes(wf.getnframes())
 
@@ -108,7 +106,7 @@ class AIProvenanceWatermarker:
             return samples
 
         # Deterministic pseudorandom noise sequence based on secret key
-        rng = np.random.RandomState(int(hashlib.md5(self._secret_key.encode()).hexdigest()[:8], 16))
+        rng = np.random.RandomState(int(hashlib.sha256(self._secret_key.encode()).hexdigest()[:8], 16))
         pn_sequence = rng.choice([-1.0, 1.0], size=frame_len).astype(np.float32)
 
         # Mid-frequency band (e.g. indices 50 to 250 in 1024-point DCT)
@@ -152,7 +150,7 @@ class AIProvenanceWatermarker:
         if num_frames < len(bits):
             return False
 
-        rng = np.random.RandomState(int(hashlib.md5(self._secret_key.encode()).hexdigest()[:8], 16))
+        rng = np.random.RandomState(int(hashlib.sha256(self._secret_key.encode()).hexdigest()[:8], 16))
         pn_sequence = rng.choice([-1.0, 1.0], size=frame_len).astype(np.float32)
 
         band_start = 50

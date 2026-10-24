@@ -9,7 +9,6 @@ for seamless round-trip workflows in DaVinci Resolve, Adobe Premiere Pro, and Fi
 from __future__ import annotations
 
 import logging
-import math
 import re
 from xml.sax.saxutils import escape
 
@@ -35,7 +34,7 @@ class SMPTETimecode:
         if drop_frame and abs(safe_fps - 29.97) < 0.05:
             # Drop-frame calculation for 29.97 fps (SMPTE 12M standard)
             # Drops frame numbers 0 and 1 at the start of every minute, except every 10th minute
-            total_frames = int(round(safe_ms * (safe_fps / 1000.0)))
+            total_frames = round(safe_ms * (safe_fps / 1000.0))
             d = total_frames // 17982
             m = total_frames % 17982
             if m >= 2:
@@ -50,7 +49,7 @@ class SMPTETimecode:
             return f"{hh:02d}:{mm:02d}:{ss:02d};{ff:02d}"
 
         # Standard Non-Drop Frame (NDF) calculation
-        total_frames = int(round(safe_ms * (safe_fps / 1000.0)))
+        total_frames = round(safe_ms * (safe_fps / 1000.0))
         ff = total_frames % fps_nominal
         total_seconds = total_frames // fps_nominal
         ss = total_seconds % 60
@@ -67,7 +66,7 @@ class SMPTETimecode:
         safe_sec = max(0.0, seconds)
         safe_fps = max(1.0, fps)
         fps_nominal = round(safe_fps)
-        total_frames = int(round(safe_sec * safe_fps))
+        total_frames = round(safe_sec * safe_fps)
         return f"{total_frames}/{fps_nominal}s"
 
 
@@ -188,8 +187,8 @@ class EDLFCPXMLAdapter:
         xml.extend(asset_xml_lines)
         xml.extend([
             "  </resources>",
-            f'  <library location="file:///AIDub_Master.fcpbundle">',
-            f'    <event name="AIDub Production Event">',
+            '  <library location="file:///AIDub_Master.fcpbundle">',
+            '    <event name="AIDub Production Event">',
             f'      <project name="{escape(timeline.name)}">',
             f'        <sequence format="r1" duration="{seq_duration_str}" tcStart="0s" tcFormat="NDF">',
             "          <spine>",

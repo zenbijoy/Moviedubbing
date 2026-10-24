@@ -32,6 +32,13 @@ _LANGUAGE_VOICES = {
     "fr": "fr-FR-DeniseNeural",
     "de": "de-DE-KatjaNeural",
     "ja": "ja-JP-NanamiNeural",
+    "zh": "zh-CN-XiaoxiaoNeural",
+    "ar": "ar-SA-ZariyahNeural",
+    "pt": "pt-BR-FranciscaNeural",
+    "ru": "ru-RU-SvetlanaNeural",
+    "ko": "ko-KR-SunHiNeural",
+    "it": "it-IT-ElsaNeural",
+    "tr": "tr-TR-EmelNeural",
 }
 
 

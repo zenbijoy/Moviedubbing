@@ -154,6 +154,7 @@ if _QT:
                 from aidub.pipeline.config import PipelineConfig
                 from aidub.pipeline.engine import DubbingEngine, PipelineCancelled
 
+                out_path = self._available_output_path()
                 is_fast = self.quality_profile == "fast"
                 cfg = PipelineConfig(
                     input=self.input_path,

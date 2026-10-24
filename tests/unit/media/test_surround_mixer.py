@@ -48,3 +48,44 @@ def test_surround_mixer_runs_ffmpeg_with_channel_mapping(tmp_path: Path):
     assert cmd[ac_idx + 1] == "6"
     assert any("pan=5.1" in arg for arg in cmd)
     assert any("loudnorm=I=-23.0" in arg for arg in cmd)
+
+
+def test_real_5point1_mixing_mono_dialogue_stereo_music(tmp_path: Path):
+    import math
+    import struct
+    import wave
+    from aidub.media.ffmpeg_ops import probe
+
+    # 1. Create real mono dialogue
+    dia = tmp_path / "dia_mono.wav"
+    with wave.open(str(dia), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(44100)
+        frames = bytearray()
+        for i in range(44100):
+            v = int(12000 * math.sin(2 * math.pi * 500 * (i / 44100)))
+            frames.extend(struct.pack("<h", v))
+        wf.writeframes(frames)
+
+    # 2. Create real stereo music
+    bg = tmp_path / "bg_stereo.wav"
+    with wave.open(str(bg), "wb") as wf:
+        wf.setnchannels(2)
+        wf.setsampwidth(2)
+        wf.setframerate(48000)
+        frames = bytearray()
+        for i in range(48000):
+            v = int(6000 * math.sin(2 * math.pi * 220 * (i / 48000)))
+            frames.extend(struct.pack("<hh", v, v))
+        wf.writeframes(frames)
+
+    out_51 = tmp_path / "out_51_real.wav"
+    res = SurroundSoundMixer.mix_5point1(dia, bg, out_51)
+
+    assert res.is_file()
+    assert res.stat().st_size > 0
+    info = probe(res)
+    audio_stream = next(s for s in info["streams"] if s["codec_type"] == "audio")
+    assert audio_stream["channels"] == 6
+

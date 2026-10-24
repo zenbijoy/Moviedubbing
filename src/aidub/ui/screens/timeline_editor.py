@@ -4661,7 +4661,13 @@ if _QT:
             if dialog.exec() != QDialog.DialogCode.Accepted:
                 return
 
-            target_lang, quality_profile = dialog.get_settings()
+            advanced = dialog.get_advanced_settings()
+            target_lang = advanced.get("target_lang", "bn")
+            quality_profile = advanced.get("quality_profile", "quality")
+            self._current_project_data["isometric_alignment"] = advanced.get("isometric_alignment", True)
+            self._current_project_data["acoustic_preset"] = advanced.get("acoustic_preset", "none")
+            self._current_project_data["broadcast_spec"] = advanced.get("broadcast_spec", "netflix")
+            self._current_project_data["embed_c2pa_provenance"] = advanced.get("embed_c2pa_provenance", True)
             self._run_agentic_dub(target_lang=target_lang, quality_profile=quality_profile)
 
         def _run_agentic_dub(

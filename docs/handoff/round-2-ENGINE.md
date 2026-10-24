@@ -43,10 +43,34 @@
     - **Stream 3:** Embedded Subtitles (Bilingual / Target language)
   - CLI command: `aidub export-master --video <vid> --orig-audio <orig.wav> --dubbed-audio <dub.wav> --output <out.mkv> --preset dual_audio --subtitles <sub.srt>`.
 
-### 5. Type-Flexible EdgeTTS Voice Engine
+### 5. Type-Flexible EdgeTTS Voice Engine & Multilingual Voice Catalog
 * **File:** `src/aidub/adapters/voice/edge_tts_adapter.py`
 * **Details:**
   - Sanitizes and automatically formats `rate` and `pitch` parameters (accepting `int` like `0`, `+10`, `-5` or strings like `"+0%"`, `"+5Hz"`), preventing `edge-tts` `validate_string_param` crashes.
+  - Expanded `_LANGUAGE_VOICES` to provide verified high-fidelity neural voices for all 14 localization languages selectable in `DubDialog` (Bengali, Hindi, Spanish, French, German, Japanese, Mandarin, Arabic, Portuguese, Russian, Korean, Italian, Turkish, English), preventing runtime crashes when selecting non-default target languages.
+
+### 6. 5.1 Surround Mixing Channel Normalization
+* **File:** `src/aidub/media/surround_mixer.py`
+* **Details:**
+  - Standardized dialogue and background inputs to stereo `48000Hz` before `amerge` (`aformat=sample_rates=48000:channel_layouts=stereo`).
+  - Guarantees exactly 4 input channels (`c0`..`c3`) for `pan=5.1`, eliminating FFmpeg `Input channel 3 is out of range` failures when mixing mono dialogue with stereo music beds.
+
+### 7. Global Multi-Script Syllable Alignment Engine
+* **File:** `src/aidub/media/syllable_alignment.py`
+* **Details:**
+  - Added dedicated syllable and mora counting engines for Devanagari (`\u0900-\u097F` for Hindi/Marathi/Nepali) and CJK (`\u4E00-\u9FFF`, `\u3040-\u30FF`, `\uAC00-\uD7AF` for Mandarin/Japanese/Korean) alongside existing Bengali and English engines.
+  - Ensures accurate speech rate calculation, rhythm match scoring, and WSOLA duration fitting across all world localization languages.
+
+### 8. End-to-End Self-Contained Google Colab GPU Pipeline
+* **File:** `src/aidub/cloud/colab_accelerator.py`
+* **Details:**
+  - Enhanced the generated Colab notebook with complete, runnable code cells for audio extraction, Faster-Whisper GPU transcription, Demucs stem separation, Edge-TTS localized synthesis, dynamic sidechain ducking, and MP4 video remuxing.
+
+### 9. DubbingEngineWorker Output Path Safety & UI Settings Wire-up
+* **Files:** `src/aidub/ui/workers.py`, `src/aidub/ui/screens/timeline_editor.py`
+* **Details:**
+  - Resolved missing `out_path = self._available_output_path()` variable assignment in `DubbingEngineWorker.run()`.
+  - Wired `DubDialog.get_advanced_settings()` into `timeline_editor.py` so that user-selected isometric alignment, convolution reverb presets, broadcast QC specs, and C2PA provenance are preserved in project state.
 
 ---
 

@@ -12,7 +12,6 @@ import logging
 import math
 import wave
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 from pydantic import Field
