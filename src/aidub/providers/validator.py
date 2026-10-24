@@ -85,12 +85,38 @@ class LlmResponseValidator:
 
 
 def _extract_json(text: str) -> Any:
-    """Extract JSON from raw text, stripping markdown code fences if present."""
+    """Extract JSON from raw text, stripping markdown code fences or preambles if present."""
+    import re
+
     stripped = text.strip()
-    if stripped.startswith("```"):
-        lines = stripped.split("\n")
-        inner = "\n".join(lines[1:-1]) if len(lines) > 2 else stripped
-        return json.loads(inner)
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError:
+        pass
+
+    fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", stripped, re.IGNORECASE)
+    if fence_match:
+        try:
+            return json.loads(fence_match.group(1).strip())
+        except json.JSONDecodeError:
+            pass
+
+    brace_start = stripped.find("{")
+    brace_end = stripped.rfind("}")
+    if brace_start != -1 and brace_end > brace_start:
+        try:
+            return json.loads(stripped[brace_start : brace_end + 1])
+        except json.JSONDecodeError:
+            pass
+
+    bracket_start = stripped.find("[")
+    bracket_end = stripped.rfind("]")
+    if bracket_start != -1 and bracket_end > bracket_start:
+        try:
+            return json.loads(stripped[bracket_start : bracket_end + 1])
+        except json.JSONDecodeError:
+            pass
+
     return json.loads(stripped)
 
 

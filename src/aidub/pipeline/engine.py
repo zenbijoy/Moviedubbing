@@ -21,7 +21,16 @@ from aidub.application.translation_pipeline import (
 )
 from aidub.contracts.base import Identifier
 from aidub.media.assemble import assemble_timeline, fit_to_slot
-from aidub.media.ffmpeg_ops import duration, extract_audio, mix, mux, probe, to_16k_mono
+from aidub.media.ffmpeg_ops import (
+    _ffmpeg_exe,
+    _run,
+    duration,
+    extract_audio,
+    mix,
+    mux,
+    probe,
+    to_16k_mono,
+)
 from aidub.media.stem_separator import separate_stems
 from aidub.pipeline.config import PipelineConfig
 from aidub.pipeline.errors import ErrorKind, PipelineError
@@ -84,6 +93,7 @@ class DubbingEngine:
         cancel_requested: Callable[[], bool] | None = None,
     ) -> None:
         self.cfg = config
+        self.cfg.output.parent.mkdir(parents=True, exist_ok=True)
         self.work_dir = Path(config.work_dir or config.output.parent / f"{config.output.stem}_work")
         self.work_dir.mkdir(parents=True, exist_ok=True)
         self.manifest = PipelineManifest.load(self.work_dir)
@@ -223,11 +233,14 @@ class DubbingEngine:
                 "The output path must not point to the original source movie.",
             )
         if self.cfg.output.exists():
-            raise PipelineError(
-                ErrorKind.USAGE,
-                "output_already_exists",
-                f"Refusing to replace an existing output file: {self.cfg.output}",
-            )
+            if getattr(self.cfg, "overwrite", False):
+                self.cfg.output.unlink()
+            else:
+                raise PipelineError(
+                    ErrorKind.USAGE,
+                    "output_already_exists",
+                    f"Refusing to replace an existing output file: {self.cfg.output}. Pass --overwrite to replace it.",
+                )
         self._validate_prerequisites()
         self._prepare_manifest()
         info = probe(self.cfg.input)

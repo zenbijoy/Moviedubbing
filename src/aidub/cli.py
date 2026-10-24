@@ -502,6 +502,7 @@ def _handle_dub(
         lipsync_tier=getattr(arguments, "lipsync_tier", "preview_fast"),
         asr_model=arguments.asr_model,
         voice_name=arguments.voice_name,
+        overwrite=getattr(arguments, "overwrite", False),
     )
 
     engine = DubbingEngine(cfg)
@@ -715,3 +716,7 @@ __all__ = [
     "build_parser",
     "main",
 ]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

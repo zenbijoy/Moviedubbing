@@ -20,24 +20,25 @@ classifiers = [
 ]
 dependencies = [
   "chardet>=5.2,<6",
-  "demucs>=4.0,<5",
-  "edge-tts>=6.1,<8",
-  "faster-whisper>=1.0,<2",
-  "google-generativeai>=0.8,<1",
-  "librosa>=0.10,<1",
   "numpy>=2.0,<3",
-  "openai>=1.50,<2",
   "psutil>=6.0,<8",
-  "pyannote-audio>=3.1,<4",
   "pydantic>=2.12,<3",
   "pydantic-settings>=2.10,<3",
-  "pyloudnorm>=0.1.1,<1",
   "soundfile>=0.12,<1",
   "structlog>=25.4,<26",
   "typing-extensions>=4.15,<5",
 ]
 
 [project.optional-dependencies]
+ai = [
+  "demucs>=4.0,<5",
+  "edge-tts>=6.1,<8",
+  "faster-whisper>=1.0,<2",
+  "librosa>=0.10,<1",
+  "pyannote.audio>=3.1,<4",
+  "pyloudnorm>=0.1.1,<1",
+  "torch>=2.2,<3",
+]
 asr = [
   "faster-whisper>=1.0,<2",
 ]
@@ -66,7 +67,7 @@ persistence = [
   "sqlalchemy>=2.0.41,<3",
 ]
 all = [
-  "aidub-studio[asr,desktop,diarization,llm,persistence,separation,tts]",
+  "aidub-studio[ai,asr,desktop,diarization,llm,persistence,separation,tts]",
 ]
 dev = [
   "hypothesis>=6.136,<7",
@@ -130,6 +131,10 @@ filterwarnings = [
   "error",
   "ignore::ResourceWarning",
   "ignore::pytest.PytestUnraisableExceptionWarning",
+]
+markers = [
+  "e2e: end-to-end integration and dubbing pipeline tests",
+  "slow_net: tests that require network access or take a long time over network",
 ]
 
 [tool.coverage.run]

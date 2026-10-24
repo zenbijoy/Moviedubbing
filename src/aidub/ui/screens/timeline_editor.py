@@ -699,7 +699,12 @@ if _QT:
                 self._video_widget.clear()
             self.media_stack.setCurrentWidget(self._video_widget)
             if self._player is not None:
-                self._player.setSource(QUrl.fromLocalFile(str(path.resolve())))
+                try:
+                    self._player.setSource(QUrl.fromLocalFile(str(path.resolve())))
+                except Exception as exc:
+                    logger.warning("Native player setSource failed: %s", exc)
+                    self._software_preview = True
+                    self._request_software_frame(0.0)
             else:
                 self._request_software_frame(0.0)
 
@@ -715,14 +720,18 @@ if _QT:
             if status in ready_statuses and not self._priming_video:
                 self._priming_video = True
                 self._prime_target_ms = min(
-                    5_000,
+                    500,
                     max(0, self._player.duration() - 1),
                 )
                 if self._audio_output is not None:
                     self._prime_restore_muted = self._audio_output.isMuted()
                     self._audio_output.setMuted(True)
                 self._player.setPosition(self._prime_target_ms)
-                self._player.play()
+                QTimer.singleShot(1000, self._check_first_frame_fallback)
+
+        def _check_first_frame_fallback(self) -> None:
+            if self._last_video_image is None and self._media_path:
+                self._request_software_frame(0.0)
 
         def _on_player_error(self, _error: object, error_string: str) -> None:
             self._finish_video_prime()
@@ -785,21 +794,27 @@ if _QT:
         def _update_video_surface(self) -> None:
             if self._video_widget is None or self._last_video_image is None:
                 return
+            widget_size = self._video_widget.size()
+            if widget_size.width() <= 1 or widget_size.height() <= 1:
+                return
             pixmap = QPixmap.fromImage(self._last_video_image)
             mode = self._fit_combo.currentText() if self._fit_combo is not None else "Fit"
             if mode == "Fit":
                 scaled = pixmap.scaled(
-                    self._video_widget.size(),
+                    widget_size,
                     Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
+                    Qt.TransformationMode.FastTransformation,
                 )
             else:
-                percent = int(mode.rstrip("%"))
+                try:
+                    percent = int(mode.rstrip("%"))
+                except ValueError:
+                    percent = 100
                 scaled = pixmap.scaled(
                     max(1, round(pixmap.width() * percent / 100)),
                     max(1, round(pixmap.height() * percent / 100)),
                     Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
+                    Qt.TransformationMode.FastTransformation,
                 )
             self._video_widget.setPixmap(scaled)
 
@@ -1881,7 +1896,10 @@ if _QT:
         def set_clips(self, clips_list: list[ClipTuple], duration_sec: float = 10.0) -> None:
             self._clips_data = list(clips_list)
             self._duration_sec = max(1.0, duration_sec)
-            self._px_per_sec = PX_PER_SEC_DEFAULT
+            if self._duration_sec <= 60.0:
+                self._px_per_sec = PX_PER_SEC_DEFAULT
+            else:
+                self._px_per_sec = max(0.5, min(PX_PER_SEC_DEFAULT, 3600.0 / self._duration_sec))
             self._build_scene()
 
         def set_playhead(self, sec: float) -> None:
@@ -1928,15 +1946,21 @@ if _QT:
             )
             sc.addLine(QLineF(0, RULER_HEIGHT, w, RULER_HEIGHT), QPen(QColor("#1E2838"), 1))
 
-            # Ruler Timecodes
+            # Ruler Timecodes: Ensure tick spacing is at least 80 pixels
+            min_pixel_spacing = 80.0
+            candidate_intervals = (
+                1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1_800, 3_600, 7_200
+            )
             tick_interval = next(
                 (
                     interval
-                    for interval in (1, 2, 5, 10, 30, 60, 120, 300, 600, 1_800)
-                    if interval * self._px_per_sec >= 72
+                    for interval in candidate_intervals
+                    if interval * self._px_per_sec >= min_pixel_spacing
                 ),
                 3_600,
             )
+            if tick_interval * self._px_per_sec < min_pixel_spacing:
+                tick_interval = max(60, int(min_pixel_spacing / max(0.01, self._px_per_sec)))
             tick_seconds = range(0, int(self._duration_sec) + 1, tick_interval)
             for second in tick_seconds:
                 x = second * self._px_per_sec
@@ -1987,15 +2011,25 @@ if _QT:
                 if tid == "V1" and self._video_thumbnail is not None:
                     thumbnail = self._video_thumbnail.scaledToHeight(
                         max(1, round(ch - 6)),
-                        Qt.TransformationMode.SmoothTransformation,
+                        Qt.TransformationMode.FastTransformation,
                     )
                     thumb_x = x + 3
+                    max_thumbs = 15
+                    thumb_count = 0
                     thumbnail_limit = min(x + cw - 3, x + max(1_800, self.viewport().width() * 2))
-                    while thumb_x < thumbnail_limit:
+                    step = max(
+                        thumbnail.width() + 2,
+                        int((thumbnail_limit - thumb_x) / max_thumbs)
+                        if (thumbnail_limit - thumb_x) > max_thumbs * thumbnail.width()
+                        else thumbnail.width() + 2,
+                    )
+                    step = max(1, step)
+                    while thumb_x < thumbnail_limit and thumb_count < max_thumbs:
                         thumb_item = sc.addPixmap(thumbnail)
                         thumb_item.setPos(thumb_x, cy + 3)
                         thumb_item.setOpacity(0.72)
-                        thumb_x += max(1, thumbnail.width() + 2)
+                        thumb_x += step
+                        thumb_count += 1
 
                 txt = sc.addText(label, QFont("Segoe UI Variable", 8, QFont.Weight.Bold))
                 txt.setDefaultTextColor(QColor("#F7F9FC"))
@@ -4256,6 +4290,8 @@ if _QT:
             self.inspector_panel.clear_quality_report()
             self.ai_overlay.set_state(self._automation_state)
             self._persist_automation_state()
+            lipsync_enabled = bool(self._current_project_data.get("lipsync", True))
+            lipsync_tier = str(self._current_project_data.get("lipsync_tier", "preview_fast"))
             self._dubbing_worker = DubbingEngineWorker(
                 input_path,
                 self._automation_state.target_language,
@@ -4263,6 +4299,8 @@ if _QT:
                 self,
                 voice_name=self._selected_voice_name,
                 character_voices=self._current_project_data.get("character_voices"),
+                lipsync=lipsync_enabled,
+                lipsync_tier=lipsync_tier,
             )
             self._dubbing_worker.progress_updated.connect(self._on_dubbing_progress)
             self._dubbing_worker.dubbing_completed.connect(self._on_dubbing_completed)
@@ -4451,7 +4489,19 @@ if _QT:
                 "Localized master rendered · operator review ready",
                 quality_passed=False,
             )
-            self._show_status(f"Master created: {result.get('output_file', '')}")
+            master_file = str(result.get("output_file", ""))
+            self._show_status(f"Master created: {master_file}")
+
+            # Automatically load the newly created dubbed video in the Program Monitor
+            dubbed_video = str(result.get("lipsynced_video") or result.get("output_file") or "")
+            if dubbed_video and Path(dubbed_video).is_file():
+                try:
+                    self.monitor_panel.load_media(dubbed_video)
+                    self.monitor_panel.prog_title_lbl.setText(
+                        f"Program: {Path(dubbed_video).stem} [DUBBED MASTER]"
+                    )
+                except Exception as exc:
+                    logger.debug("Failed auto-loading dubbed master in monitor: %s", exc)
 
         def _on_dubbing_failed(self, error: str) -> None:
             current = next(
@@ -4472,6 +4522,19 @@ if _QT:
                 self._persist_automation_state()
             self.ai_overlay.set_failed(f"Automation stopped · {error}")
             self._show_status(f"Dubbing job failed: {error}")
+            try:
+                QMessageBox.critical(
+                    self,
+                    "Dubbing Pipeline Notice",
+                    f"The automated dubbing pipeline encountered an issue:\n\n{error}\n\n"
+                    "Remediation steps:\n"
+                    "• Verify that the movie has audible speech.\n"
+                    "• Check FFmpeg installation.\n"
+                    "• If using external AI models, verify your API keys (e.g. GEMINI_API_KEY).\n"
+                    "• Check destination disk permissions.",
+                )
+            except Exception:
+                pass
 
         def _on_dubbing_cancelled(self) -> None:
             self.ai_overlay.set_failed("Automation cancelled safely · revision preserved")

@@ -17,6 +17,7 @@ class DubbingCheckResult:
     ok: bool
     detail: str
     fix: str = ""
+    optional: bool = False
 
 
 @dataclass
@@ -37,16 +38,29 @@ class DubbingDiagnosticReport:
     def total_count(self) -> int:
         return len(self.checks)
 
+    @property
+    def required_passed(self) -> bool:
+        return all(c.ok for c in self.checks if not getattr(c, "optional", False))
+
     def render(self) -> str:
         lines = ["=== aidub dubbing pipeline readiness ==="]
         for check in self.checks:
-            status = "[OK]  " if check.ok else "[MISS]"
+            if check.ok:
+                status = "[OK]  "
+            elif getattr(check, "optional", False):
+                status = "[OPT] "
+            else:
+                status = "[MISS]"
             lines.append(f"{status} {check.name:<22} {check.detail}")
             if not check.ok and check.fix:
                 lines.append(f"        Fix: {check.fix}")
         if self.all_passed:
             lines.append(
                 f"=== {self.passed_count} of {self.total_count} checks passed — pipeline READY ==="
+            )
+        elif self.required_passed:
+            lines.append(
+                f"=== {self.passed_count} of {self.total_count} checks passed — core pipeline READY (optional fallbacks active) ==="
             )
         else:
             lines.append(
@@ -157,6 +171,7 @@ def _check_pyannote_token() -> DubbingCheckResult:
             "Set PYANNOTE_TOKEN=<hf-token> in .env; "
             "accept model at https://hf.co/pyannote/speaker-diarization-3.1"
         ),
+        optional=True,
     )
 
 
@@ -267,6 +282,7 @@ def _check_lipsync() -> DubbingCheckResult:
             "Set AIDUB_MUSETALK_COMMAND or AIDUB_LATENTSYNC_COMMAND in .env "
             "with {video}, {audio}, and {output} placeholders (e.g. 'python LatentSync/inference.py --video {video} --audio {audio} --output {output}')"
         ),
+        optional=True,
     )
 
 

@@ -264,3 +264,46 @@ def test_razor_edit_is_undoable() -> None:
     finally:
         screen.close()
         app.processEvents()
+
+
+def test_long_movie_canvas_scaling_prevents_memory_explosion() -> None:
+    app = QApplication.instance() or QApplication([])
+    screen = TimelineScreen()
+    try:
+        # Simulate loading a 2-hour (7,200s) feature movie
+        duration_sec = 7_200.0
+        movie_clips: list[tuple[str, float, float, str, float | None]] = [
+            ("V1", 0.0, duration_sec, "feature_film.mkv", None),
+            ("A1", 0.0, duration_sec, "feature_film.mkv", None),
+        ]
+        screen.canvas_view.set_clips(movie_clips, duration_sec)
+        app.processEvents()
+
+        # Canvas scene width should be bounded around 3,600 - 4,000 px, NOT 500,000 px
+        scene_rect = screen.canvas_view.scene().sceneRect()
+        assert scene_rect.width() <= 4_500.0
+        assert screen.canvas_view._px_per_sec <= 2.0
+
+        # Number of scene items should remain moderate (< 150 items, not 14,000+)
+        assert len(screen.canvas_view.scene().items()) < 150
+    finally:
+        screen.close()
+        app.processEvents()
+
+
+def test_monitor_panel_surface_update_safe() -> None:
+    app = QApplication.instance() or QApplication([])
+    screen = TimelineScreen()
+    try:
+        from PySide6.QtGui import QColor, QImage
+
+        # Test feeding an image to update_video_surface
+        img = QImage(1920, 1080, QImage.Format.Format_RGB32)
+        img.fill(QColor(10, 20, 30))
+        screen.monitor_panel._last_video_image = img
+        screen.monitor_panel._update_video_surface()
+        app.processEvents()
+        assert screen.monitor_panel._video_widget.pixmap() is not None
+    finally:
+        screen.close()
+        app.processEvents()

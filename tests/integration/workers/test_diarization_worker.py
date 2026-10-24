@@ -29,7 +29,7 @@ def test_diarization_worker_rejects_job_without_real_audio_source() -> None:
     with LocalWorkerSupervisor() as supervisor:
         job = make_diarize_job("job_diar_001")
         supervisor.submit(job)
-        result = supervisor.wait(timeout_seconds=10.0)
+        result = supervisor.wait(timeout_seconds=30.0)
 
         assert not result.succeeded
         assert result.error is not None

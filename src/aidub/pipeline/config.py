@@ -28,6 +28,7 @@ class PipelineConfig:
     voice_name: str | None = None
     character_voices: dict[str, str] | None = None
     max_stretch: float = 2.0
+    overwrite: bool = False
 
 
 __all__ = ["PipelineConfig"]

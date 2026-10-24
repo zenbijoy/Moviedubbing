@@ -765,7 +765,9 @@ if _QT:
                     event.ignore()
                     return
                 self.studio.cancel_active_job()
-            if self._telemetry_worker.isRunning():
+            if hasattr(self, "_jobs_timer"):
+                self._jobs_timer.stop()
+            if hasattr(self, "_telemetry_worker") and self._telemetry_worker.isRunning():
                 self._telemetry_worker.quit()
                 self._telemetry_worker.wait(4_000)
             self._unsubscribe_locale()

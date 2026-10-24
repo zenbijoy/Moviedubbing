@@ -34,6 +34,8 @@ def dub_movie_to_bangla(argv: Sequence[str] | None = None) -> int:
         forwarded.extend(("--input", str(source)))
     if not any(arg in {"-o", "--output"} or arg.startswith("--output=") for arg in forwarded):
         forwarded.extend(("--output", str(DEFAULT_OUTPUT)))
+    if not any(arg in {"--overwrite", "-f"} for arg in forwarded):
+        forwarded.append("--overwrite")
     return main(["dub", *forwarded])
 
 

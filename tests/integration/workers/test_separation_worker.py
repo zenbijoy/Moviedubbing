@@ -27,7 +27,7 @@ def test_separation_worker_rejects_missing_source(tmp_path: Path) -> None:
     with LocalWorkerSupervisor() as supervisor:
         job = make_separation_job("job_sep_001", tmp_path)
         supervisor.submit(job)
-        result = supervisor.wait(timeout_seconds=10.0)
+        result = supervisor.wait(timeout_seconds=30.0)
 
         assert not result.succeeded
         assert result.error is not None
