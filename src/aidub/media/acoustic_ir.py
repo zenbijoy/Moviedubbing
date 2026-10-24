@@ -78,19 +78,20 @@ class AcousticIRConvolutionEngine:
         decay_constant = rt60 / 6.907755
         decay_envelope = np.exp(-time_axis / max(1e-4, decay_constant))
 
-        # Diffuse tail begins after early reflections (~50ms)
-        diffuse_start_idx = int(sample_rate * 0.05)
+        # Diffuse tail begins after early reflections (~35ms)
+        diffuse_start_idx = int(sample_rate * 0.035)
         np.random.seed(42)  # Deterministic seed for reproducible acoustics
         noise = np.random.normal(0.0, 1.0, num_samples).astype(np.float32)
 
+        # Scale diffuse tail with Direct-to-Reverberant Ratio (DRR ~ 12 dB)
+        drr_linear = 0.05 / math.sqrt(max(1.0, rt60))
         if diffuse_start_idx < num_samples:
             ir[diffuse_start_idx:] += (
-                0.25 * noise[diffuse_start_idx:] * decay_envelope[diffuse_start_idx:]
+                drr_linear * noise[diffuse_start_idx:] * decay_envelope[diffuse_start_idx:]
             )
 
-        # 4. Air absorption damping (1-pole low-pass filter at ~4.5 kHz)
-        # Higher frequencies are absorbed faster in air
-        cutoff_hz = 4500.0
+        # 4. Air absorption damping (1-pole low-pass filter at ~6 kHz)
+        cutoff_hz = 6000.0
         rc = 1.0 / (2.0 * math.pi * cutoff_hz)
         dt = 1.0 / sample_rate
         alpha = dt / (rc + dt)
