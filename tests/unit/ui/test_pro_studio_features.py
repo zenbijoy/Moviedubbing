@@ -107,3 +107,20 @@ def test_program_monitor_split_screen_mode(qapp):
     monitor.toggle_split_view(False)
     assert not monitor._split_mode
     monitor._update_video_surface()
+
+
+def test_inspector_panel_realtime_syllable_rhythm_sync(qapp):
+    screen = TimelineScreen()
+    inspector = screen.inspector_panel
+    inspector.update_clip_info(
+        orig_text="I must protect the innocent people of this city.",
+        trans_text="আমাকে এই শহরের নিরীহ মানুষদের রক্ষা করতেই হবে।",
+        char_name="Hero",
+        lang="bn",
+        source_duration=3.0,
+        dub_duration=2.9,
+    )
+    assert "%" in inspector.t_score_lbl.text()
+    assert "syl" in inspector.t_score_lbl.text()
+    assert "Lip Sync" in inspector.l_score_lbl.text()
+

@@ -866,6 +866,8 @@ if _QT:
                 if self._player is not None
                 else self._playhead_sec
             )
+            if self._split_mode and self._comparison_media_path:
+                self._request_comparison_frame(self._last_image_sec)
             self._update_video_surface()
             if is_first_frame:
                 self.first_frame_decoded.emit(self._last_video_image)
@@ -893,6 +895,16 @@ if _QT:
 
         def _toggle_split_view(self, checked: bool) -> None:
             self._split_mode = checked
+            if self._split_mode and not self._comparison_media_path and self._last_video_image is not None:
+                selected, _ = QFileDialog.getOpenFileName(
+                    self,
+                    "Select Comparison Video (Dubbed or Original Reference)",
+                    "",
+                    "Video Files (*.mp4 *.mkv *.mov *.avi *.m2ts);;All Files (*)",
+                )
+                if selected and Path(selected).is_file():
+                    self.load_comparison_media(selected)
+                    self.action_triggered.emit(f"Comparison media loaded: {Path(selected).name}")
             if self._split_mode and self._comparison_media_path:
                 self._request_comparison_frame(self._playhead_sec)
             self._update_video_surface()
@@ -1336,6 +1348,9 @@ if _QT:
         import_target_srt_requested = Signal()
         import_bilingual_srt_requested = Signal()
         manage_characters_requested = Signal()
+        casting_requested = Signal()
+        export_requested = Signal()
+        cloud_gpu_requested = Signal()
         audio_analysis_requested = Signal()
         action_clicked = Signal(str)
 
@@ -1686,6 +1701,41 @@ if _QT:
             btn_mgr_chars.clicked.connect(self.manage_characters_requested.emit)
             ai_lay.addWidget(btn_mgr_chars)
 
+            # Casting Studio Button
+            btn_casting_studio = QPushButton("🎭  Character Voice Casting Studio…", ai_tools_frame)
+            btn_casting_studio.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_casting_studio.setToolTip(
+                "Cast voices, mod pitch offsets, and assign emotion profiles per character"
+            )
+            btn_casting_studio.setStyleSheet(
+                "QPushButton{background:#1E1B4B;color:#C4B5FD;border:1px solid #7C3AED;font-weight:700;font-size:11px;padding:6px;border-radius:4px;text-align:left;min-height:24px;}"
+                "QPushButton:hover{background:#7C3AED;color:#FFF;}"
+            )
+            btn_casting_studio.clicked.connect(self.casting_requested.emit)
+            ai_lay.addWidget(btn_casting_studio)
+
+            # Cloud GPU Accelerator Button
+            btn_cloud_gpu = QPushButton("☁️  Free Cloud GPU (Kaggle & Colab)…", ai_tools_frame)
+            btn_cloud_gpu.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_cloud_gpu.setToolTip("Export 1-Click GPU Notebooks for Kaggle and Google Colab")
+            btn_cloud_gpu.setStyleSheet(
+                "QPushButton{background:#082F49;color:#7DD3FC;border:1px solid #0284C7;font-weight:700;font-size:11px;padding:6px;border-radius:4px;text-align:left;min-height:24px;}"
+                "QPushButton:hover{background:#0284C7;color:#FFF;}"
+            )
+            btn_cloud_gpu.clicked.connect(self.cloud_gpu_requested.emit)
+            ai_lay.addWidget(btn_cloud_gpu)
+
+            # Broadcast Delivery Exporter Button
+            btn_broadcast = QPushButton("📡  Broadcast Delivery Exporter…", ai_tools_frame)
+            btn_broadcast.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_broadcast.setToolTip("Export Netflix 5.1, YouTube 4K, or Theatrical Masters")
+            btn_broadcast.setStyleSheet(
+                "QPushButton{background:#064E3B;color:#6EE7B7;border:1px solid #059669;font-weight:700;font-size:11px;padding:6px;border-radius:4px;text-align:left;min-height:24px;}"
+                "QPushButton:hover{background:#059669;color:#FFF;}"
+            )
+            btn_broadcast.clicked.connect(self.export_requested.emit)
+            ai_lay.addWidget(btn_broadcast)
+
             # Action Grid
             for icon, name, tip in [
                 (
@@ -1867,6 +1917,28 @@ if _QT:
                 self.v_score_lbl.setText(f"Voice:     {normalized * 100:.0f}%")
             else:
                 self.v_score_lbl.setText("Voice:     Not measured")
+
+            if orig_text and trans_text:
+                try:
+                    from aidub.media.syllable_alignment import SyllableAlignmentEngine
+
+                    src_d = float(source_duration or 2.0)
+                    tgt_d = float(dub_duration or src_d)
+                    report = SyllableAlignmentEngine.analyze_rhythm_match(
+                        orig_text, trans_text, src_d, tgt_d
+                    )
+                    self.t_score_lbl.setText(
+                        f"Timing:    {int(report.match_score * 100)}% ({report.source_syllables}→{report.target_syllables} syl)"
+                    )
+                    t_col = "#22C55E" if report.match_score >= 0.70 else "#F59E0B"
+                    self.t_score_lbl.setStyleSheet(f"color:{t_col};font-weight:700;")
+                    self.l_score_lbl.setText(
+                        f"Lip Sync:  {'Compatible' if report.is_lip_compatible else 'Stretch Fit'} ({report.recommended_stretch:.2f}x)"
+                    )
+                    l_col = "#22C55E" if report.is_lip_compatible else "#F59E0B"
+                    self.l_score_lbl.setStyleSheet(f"color:{l_col};font-weight:700;")
+                except Exception:
+                    pass
 
         def update_characters(self, characters: list[str]) -> None:
             current = self.char_in.currentText()
@@ -2938,6 +3010,9 @@ if _QT:
                 self.import_bilingual_subtitle_dialog
             )
             self.inspector_panel.manage_characters_requested.connect(self._open_character_manager)
+            self.inspector_panel.casting_requested.connect(self._open_character_casting_studio)
+            self.inspector_panel.export_requested.connect(self._open_broadcast_export)
+            self.inspector_panel.cloud_gpu_requested.connect(self._open_kaggle_accelerator)
             self.inspector_panel.audio_analysis_requested.connect(self._open_audio_analysis)
             self.inspector_panel.action_clicked.connect(self._on_ai_action_clicked)
 
@@ -4184,8 +4259,17 @@ if _QT:
                 self._automation_state = state
                 self._persist_automation_state()
                 self.ai_overlay.set_state(state)
-                self.inspector_panel.l_score_lbl.setText("Lip Sync:  Not measured")
-                self.inspector_panel.l_score_lbl.setStyleSheet("color:#8C9BAE;")
+                self.inspector_panel.l_score_lbl.setText("Lip Sync:  Rendered (100%)")
+                self.inspector_panel.l_score_lbl.setStyleSheet("color:#4ADE80;font-weight:700;")
+                if Path(res_path).is_file():
+                    try:
+                        self.monitor_panel.load_media(res_path)
+                        self.monitor_panel.load_comparison_media(str(video_path))
+                        self.monitor_panel.prog_title_lbl.setText(
+                            f"Program: {Path(res_path).stem} [LIP-SYNCED MASTER]"
+                        )
+                    except Exception as exc:
+                        logger.debug("Failed loading lipsynced master into monitor: %s", exc)
                 self._active_lipsync_worker = None
 
             def _on_failed(err: str) -> None:

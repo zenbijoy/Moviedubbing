@@ -193,7 +193,7 @@ class EDLFCPXMLAdapter:
             f'      <project name="{escape(timeline.name)}">',
             f'        <sequence format="r1" duration="{seq_duration_str}" tcStart="0s" tcFormat="NDF">',
             "          <spine>",
-        ]
+        ])
 
         # Populate Spine with clips
         offset_ms = 0
