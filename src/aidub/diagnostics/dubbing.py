@@ -188,7 +188,7 @@ def _check_demucs() -> DubbingCheckResult:
         name="demucs",
         ok=False,
         detail="NOT INSTALLED",
-        fix="uv add 'demucs>=4.0,<5'",
+        fix="Install demucs (uv add 'demucs>=4.0,<5') or pass --fast to skip music separation",
     )
 
 

@@ -123,7 +123,6 @@ class DubbingEngine:
             )
         if self.cfg.keep_music:
             required_names.add("demucs")
-        # Check pyannote if explicitly configured with an auth token
         if self.cfg.diarize and (os.environ.get("PYANNOTE_TOKEN") or os.environ.get("HF_TOKEN")):
             required_names.update({"pyannote", "pyannote token"})
 
@@ -173,7 +172,7 @@ class DubbingEngine:
                 raise PipelineError(
                     ErrorKind.DEPENDENCY,
                     "translation_provider_unavailable",
-                    f"The configured translation provider is unavailable: {exc}",
+                    f"No translation provider configured ({exc}). Set GEMINI_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY in .env or environment.",
                 ) from exc
 
     def _prepare_manifest(self) -> None:
@@ -258,7 +257,14 @@ class DubbingEngine:
         if not self.manifest.is_stage_completed("extract_audio"):
             self._progress("extract_audio", 8, "Extracting production audio")
             with _timed("extract_audio", bench) as timing:
-                extract_audio(self.cfg.input, wav_hq, sr=44100, ac=2)
+                try:
+                    extract_audio(self.cfg.input, wav_hq, sr=44100, ac=2)
+                except Exception as exc:
+                    raise PipelineError(
+                        ErrorKind.INTERNAL,
+                        "audio_extraction_failed",
+                        f"Failed to extract audio from source media: {exc}",
+                    ) from exc
             self.manifest.mark_stage("extract_audio", True, duration_ms=timing["duration_ms"])
             self.manifest.save()
         else:
@@ -271,7 +277,14 @@ class DubbingEngine:
             if not self.manifest.is_stage_completed("separate_stems"):
                 self._progress("separate_stems", 16, "Separating dialogue, music and effects")
                 with _timed("separate_stems", bench) as timing:
-                    vocals, music = separate_stems(wav_hq, self.work_dir)
+                    try:
+                        vocals, music = separate_stems(wav_hq, self.work_dir)
+                    except Exception as exc:
+                        raise PipelineError(
+                            ErrorKind.DEPENDENCY,
+                            "stem_separation_failed",
+                            f"Stem separation (Demucs) failed: {exc}. Install demucs or pass --fast to skip music separation.",
+                        ) from exc
                 self.manifest.mark_stage("separate_stems", True, duration_ms=timing["duration_ms"])
                 self.manifest.save()
             else:
@@ -295,8 +308,15 @@ class DubbingEngine:
             if not self.manifest.is_stage_completed("diarize"):
                 self._progress("diarize", 27, "Detecting speakers and reference windows")
                 with _timed("diarize", bench) as timing:
-                    adapter = PyannoteDiarizationAdapter()
-                    spk_turns, n_speakers, _ref_windows = adapter.turns(str(vocals16))
+                    try:
+                        adapter = PyannoteDiarizationAdapter()
+                        spk_turns, n_speakers, _ref_windows = adapter.turns(str(vocals16))
+                    except Exception as exc:
+                        raise PipelineError(
+                            ErrorKind.DEPENDENCY,
+                            "diarization_failed",
+                            f"Speaker diarization failed: {exc}. Set PYANNOTE_TOKEN or pass --fast to skip diarization.",
+                        ) from exc
                 self.manifest.mark_stage("diarize", True, duration_ms=timing["duration_ms"])
                 self.manifest.save()
             else:
@@ -310,11 +330,18 @@ class DubbingEngine:
         if not self.manifest.is_stage_completed("asr"):
             self._progress("asr", 36, "Transcribing dialogue with timestamps")
             with _timed("asr", bench) as timing:
-                asr = FasterWhisperAdapter(FasterWhisperOptions(model_size=self.cfg.asr_model))
-                if spk_turns and n_speakers > 1:
-                    segs = asr.transcribe_turns(str(vocals16), spk_turns, str(self.work_dir))
-                else:
-                    segs = asr.transcribe_file(str(vocals16))
+                try:
+                    asr = FasterWhisperAdapter(FasterWhisperOptions(model_size=self.cfg.asr_model))
+                    if spk_turns and n_speakers > 1:
+                        segs = asr.transcribe_turns(str(vocals16), spk_turns, str(self.work_dir))
+                    else:
+                        segs = asr.transcribe_file(str(vocals16))
+                except Exception as exc:
+                    raise PipelineError(
+                        ErrorKind.DEPENDENCY,
+                        "asr_failed",
+                        f"Speech recognition (Faster-Whisper model '{self.cfg.asr_model}') failed: {exc}. Ensure model weights are available.",
+                    ) from exc
 
                 if self.cfg.dub and not _has_speech(segs, total_dur):
                     raise PipelineError(
@@ -357,18 +384,25 @@ class DubbingEngine:
                         raise PipelineError(
                             ErrorKind.DEPENDENCY,
                             "translation_provider_missing",
-                            "A real translation provider is required before translating dialogue.",
+                            "No translation provider configured. Set GEMINI_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY in .env or environment.",
                         )
-                    translated = TranslationPipeline(self.router).translate_batch(
-                        lines,
-                        TranslationContext(
-                            source_language=(
-                                self.cfg.src_lang if self.cfg.src_lang != "auto" else "en-US"
+                    try:
+                        translated = TranslationPipeline(self.router).translate_batch(
+                            lines,
+                            TranslationContext(
+                                source_language=(
+                                    self.cfg.src_lang if self.cfg.src_lang != "auto" else "en-US"
+                                ),
+                                target_language=self.cfg.tgt_lang,
+                                scene_summary="Feature-film dialogue requiring natural spoken localization.",
                             ),
-                            target_language=self.cfg.tgt_lang,
-                            scene_summary="Feature-film dialogue requiring natural spoken localization.",
-                        ),
-                    )
+                        )
+                    except Exception as exc:
+                        raise PipelineError(
+                            ErrorKind.DEPENDENCY,
+                            "translation_failed",
+                            f"Translation provider failed: {exc}. Check your network connection and API key quota.",
+                        ) from exc
                     for segment, result in zip(segs, translated, strict=True):
                         translated_text = result.translated_text.strip()
                         if not translated_text:
@@ -480,18 +514,25 @@ class DubbingEngine:
                                     pitch=eff_pitch,
                                 )
 
-                            emo_res, vr_report = emotion_engine.synthesize_verified_line(
-                                text=tgt_text,
-                                output_path=raw_seg_wav,
-                                synth_fn=_synth_cb,
-                                utterance_id=str(start_time),
-                                character_name=char_name,
-                                audio_path=vocals16 if vocals16.is_file() else None,
-                                start_s=start_time,
-                                end_s=end_time,
-                                scene_context=f"Cinematic dialogue for {char_name}",
-                                target_duration_s=target_dur,
-                            )
+                            try:
+                                emo_res, vr_report = emotion_engine.synthesize_verified_line(
+                                    text=tgt_text,
+                                    output_path=raw_seg_wav,
+                                    synth_fn=_synth_cb,
+                                    utterance_id=str(start_time),
+                                    character_name=char_name,
+                                    audio_path=vocals16 if vocals16.is_file() else None,
+                                    start_s=start_time,
+                                    end_s=end_time,
+                                    scene_context=f"Cinematic dialogue for {char_name}",
+                                    target_duration_s=target_dur,
+                                )
+                            except Exception as exc:
+                                raise PipelineError(
+                                    ErrorKind.RETRYABLE,
+                                    "tts_failed",
+                                    f"Speech synthesis (Edge-TTS) failed: {exc}. Check your internet connection.",
+                                ) from exc
                             logger.info(
                                 "Dubbed seg %d: Emotion=%s, Accuracy=%.2f, Pitch=%+dHz, Rate=%+d%%",
                                 i,
@@ -532,7 +573,14 @@ class DubbingEngine:
             if not self.manifest.is_stage_completed("assemble"):
                 self._progress("assemble", 77, "Fitting dialogue to editorial timing")
                 with _timed("assemble", bench) as timing:
-                    assemble_timeline(placed_segments, total_dur, dub_vocals)
+                    try:
+                        assemble_timeline(placed_segments, total_dur, dub_vocals)
+                    except Exception as exc:
+                        raise PipelineError(
+                            ErrorKind.INTERNAL,
+                            "assemble_failed",
+                            f"Dialogue timeline assembly failed: {exc}",
+                        ) from exc
                 self.manifest.mark_stage("assemble", True, duration_ms=timing["duration_ms"])
                 self.manifest.save()
             else:
@@ -544,8 +592,15 @@ class DubbingEngine:
         if music and music.exists() and dub_vocals.exists():
             self._progress("mix", 86, "Mixing dialogue against original stems")
             with _timed("mix", bench):
-                mix(dub_vocals, music, final_audio_wav)
-                mix(dub_vocals, music, final_audio_m4a)
+                try:
+                    mix(dub_vocals, music, final_audio_wav)
+                    mix(dub_vocals, music, final_audio_m4a)
+                except Exception as exc:
+                    raise PipelineError(
+                        ErrorKind.INTERNAL,
+                        "mix_failed",
+                        f"Audio mixing failed: {exc}",
+                    ) from exc
             final_audio = final_audio_wav
         elif dub_vocals.exists():
             final_audio = dub_vocals
@@ -615,7 +670,14 @@ class DubbingEngine:
         final_video = self.cfg.output
         self._progress("mux", 94, "Packaging localized master")
         with _timed("mux", bench) as timing:
-            mux(video_for_mux, final_audio, final_video)
+            try:
+                mux(video_for_mux, final_audio, final_video)
+            except Exception as exc:
+                raise PipelineError(
+                    ErrorKind.INTERNAL,
+                    "mux_failed",
+                    f"Video muxing failed: {exc}",
+                ) from exc
         if not final_video.is_file() or final_video.stat().st_size == 0:
             raise PipelineError(
                 ErrorKind.INTERNAL,
