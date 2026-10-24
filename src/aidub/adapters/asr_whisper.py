@@ -245,15 +245,37 @@ class FasterWhisperAdapter(SpeechRecognizer):
         source = Path(audio_path)
         if not source.is_file():
             raise FileNotFoundError(f"ASR source audio does not exist: {source}")
-        segments, _info = self._model().transcribe(
-            str(source),
-            beam_size=self.options.beam_size,
-            vad_filter=self.options.vad_filter,
-            word_timestamps=self.options.word_timestamps,
-            language=self.options.language,
-        )
+        try:
+            segments, _info = self._model().transcribe(
+                str(source),
+                beam_size=self.options.beam_size,
+                vad_filter=self.options.vad_filter,
+                word_timestamps=self.options.word_timestamps,
+                language=self.options.language,
+            )
+            raw_segments = list(segments)
+        except RuntimeError as exc:
+            logger.warning(
+                "Faster-Whisper transcription failed (%s); retrying with CPU int8 fallback", exc
+            )
+            import faster_whisper
+
+            self._model_instance = faster_whisper.WhisperModel(
+                self.options.model_size,
+                device="cpu",
+                compute_type="int8",
+            )
+            segments, _info = self._model_instance.transcribe(
+                str(source),
+                beam_size=self.options.beam_size,
+                vad_filter=self.options.vad_filter,
+                word_timestamps=self.options.word_timestamps,
+                language=self.options.language,
+            )
+            raw_segments = list(segments)
+
         results: list[dict[str, Any]] = []
-        for segment in segments:
+        for segment in raw_segments:
             start = float(segment.start)
             end = float(segment.end)
             text = str(segment.text).strip()
@@ -317,8 +339,13 @@ def _has_speech(segs: list[dict[str, Any]], total_duration_s: float) -> bool:
     variety = len(set(all_words)) / len(all_words)
     coverage = speech_dur / total_duration_s
 
-    logger.debug("ASR speech check: variety=%.2f, coverage=%.2f", variety, coverage)
-    return variety >= 0.35 and coverage >= 0.10
+    logger.debug(
+        "ASR speech check: variety=%.2f, coverage=%.2f, speech_dur=%.2f",
+        variety,
+        coverage,
+        speech_dur,
+    )
+    return variety >= 0.35 and (coverage >= 0.04 or speech_dur >= 4.0)
 
 
 __all__ = ["FasterWhisperAdapter", "FasterWhisperOptions", "_has_speech"]

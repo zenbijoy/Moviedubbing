@@ -548,7 +548,31 @@ class DubbingEngine:
                 mix(dub_vocals, music, final_audio_m4a)
             final_audio = final_audio_wav
         elif dub_vocals.exists():
-            final_audio = dub_vocals
+            self._progress("mix", 86, "Preparing dialogue master track")
+            with _timed("mix", bench):
+                import shutil
+
+                if not final_audio_wav.is_file() or final_audio_wav.resolve() != dub_vocals.resolve():
+                    shutil.copyfile(str(dub_vocals), str(final_audio_wav))
+                if not final_audio_m4a.is_file() or final_audio_m4a.stat().st_size == 0:
+                    _run(
+                        [
+                            _ffmpeg_exe(),
+                            "-y",
+                            "-i",
+                            str(dub_vocals),
+                            "-c:a",
+                            "aac",
+                            "-b:a",
+                            "192k",
+                            "-ar",
+                            "44100",
+                            "-ac",
+                            "2",
+                            str(final_audio_m4a),
+                        ]
+                    )
+            final_audio = final_audio_wav
         else:
             final_audio = wav_hq
 
@@ -648,7 +672,7 @@ class DubbingEngine:
             dubbed_video=str(final_video),
             lipsynced_video=str(lipsynced_video) if lipsynced_video else "",
             bench_json=str(bench_file),
-            transcript_json=str(self.work_dir / "utterance_metadata_bn.json"),
+            transcript_json=str(store._get_filename()),
         )
 
 
