@@ -384,7 +384,7 @@ def dynamic_sidechain_mix(
         f"[0:a]aformat=channel_layouts=stereo,volume={voice_gain:.2f}[voc];"
         "[1:a]aformat=channel_layouts=stereo[mus];"
         f"[mus][voc]sidechaincompress=threshold={threshold_linear:.5f}:ratio={ducking_ratio:.1f}:attack={attack_ms:.1f}:release={release_ms:.1f}:level_sc=1[ducked_mus];"
-        "[voc][ducked_mus]amix=inputs=2:duration=first:dropout_transition=0:weights=1 1:normalize=0[mix];"
+        "[voc][ducked_mus]amix=inputs=2:duration=longest:dropout_transition=0:weights=1 1:normalize=0[mix];"
         "[mix]alimiter=limit=0.95:level=true[out]"
     )
 
