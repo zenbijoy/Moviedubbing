@@ -36,6 +36,7 @@ class PipelineConfig:
         if self.fast:
             self.keep_music = False
             self.diarize = False
+            self.lipsync = False
             if self.asr_model == "large-v3":
                 self.asr_model = "base"
 
