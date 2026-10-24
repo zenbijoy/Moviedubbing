@@ -254,25 +254,49 @@ class FasterWhisperAdapter(SpeechRecognizer):
                 language=self.options.language,
             )
             raw_segments = list(segments)
-        except RuntimeError as exc:
+        except (RuntimeError, Exception) as exc:
             logger.warning(
                 "Faster-Whisper transcription failed (%s); retrying with CPU int8 fallback", exc
             )
             import faster_whisper
 
-            self._model_instance = faster_whisper.WhisperModel(
-                self.options.model_size,
-                device="cpu",
-                compute_type="int8",
+            fallback_model = (
+                "base"
+                if any(w in str(exc).lower() for w in ("malloc", "memory", "alloc", "oom"))
+                else self.options.model_size
             )
-            segments, _info = self._model_instance.transcribe(
-                str(source),
-                beam_size=self.options.beam_size,
-                vad_filter=self.options.vad_filter,
-                word_timestamps=self.options.word_timestamps,
-                language=self.options.language,
-            )
-            raw_segments = list(segments)
+            try:
+                self._model_instance = faster_whisper.WhisperModel(
+                    fallback_model,
+                    device="cpu",
+                    compute_type="int8",
+                )
+                segments, _info = self._model_instance.transcribe(
+                    str(source),
+                    beam_size=self.options.beam_size,
+                    vad_filter=self.options.vad_filter,
+                    word_timestamps=self.options.word_timestamps,
+                    language=self.options.language,
+                )
+                raw_segments = list(segments)
+            except Exception as exc2:
+                if fallback_model != "base":
+                    logger.warning("Retry with %s failed (%s); falling back to base", fallback_model, exc2)
+                    self._model_instance = faster_whisper.WhisperModel(
+                        "base",
+                        device="cpu",
+                        compute_type="int8",
+                    )
+                    segments, _info = self._model_instance.transcribe(
+                        str(source),
+                        beam_size=self.options.beam_size,
+                        vad_filter=self.options.vad_filter,
+                        word_timestamps=self.options.word_timestamps,
+                        language=self.options.language,
+                    )
+                    raw_segments = list(segments)
+                else:
+                    raise
 
         results: list[dict[str, Any]] = []
         for segment in raw_segments:

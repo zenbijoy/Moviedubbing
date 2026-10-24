@@ -508,6 +508,7 @@ def _handle_dub(
         lipsync_tier=getattr(arguments, "lipsync_tier", "preview_fast"),
         asr_model=arguments.asr_model,
         voice_name=arguments.voice_name,
+        voice_engine=getattr(arguments, "voice_engine", "chatterbox"),
         overwrite=getattr(arguments, "overwrite", False),
     )
 
@@ -522,6 +523,42 @@ def _handle_dub(
             stdout.write(f"Lip-synced video: {outputs.lipsynced_video}\n")
         stdout.write(f"Bilingual SRT: {outputs.bilingual_srt}\n")
 
+    return EXIT_OK
+
+
+def _handle_kaggle(
+    arguments: argparse.Namespace,
+    dependencies: CliDependencies,
+    stdout: TextIO = sys.stdout,
+    stderr: TextIO = sys.stderr,
+) -> int:
+    del dependencies, stderr
+    from aidub.cloud.kaggle_accelerator import (
+        KaggleClient,
+        KaggleNotebookBuilder,
+    )
+
+    if getattr(arguments, "check", False):
+        client = KaggleClient()
+        ok, msg = client.check_connection()
+        stdout.write(f"Kaggle Connection: {'[OK]' if ok else '[FAILED]'} {msg}\n")
+        return EXIT_OK if ok else EXIT_FAILURE
+
+    out_nb = getattr(arguments, "export_notebook", None)
+    if out_nb:
+        dest = KaggleNotebookBuilder.export_to_file(
+            out_nb,
+            target_language=arguments.target_lang,
+            voice_engine=arguments.voice_engine,
+        )
+        stdout.write(f"✓ Kaggle GPU dubbing notebook created: {dest}\n")
+        return EXIT_OK
+
+    stdout.write(
+        "Kaggle Cloud Accelerator:\n"
+        "  --check               Test Kaggle API credentials\n"
+        "  --export-notebook <p> Generate GPU dubbing notebook (.ipynb)\n"
+    )
     return EXIT_OK
 
 
@@ -641,6 +678,12 @@ def build_parser() -> argparse.ArgumentParser:
         dest="overwrite",
         help="overwrite existing output file if present",
     )
+    dub.add_argument(
+        "--voice-engine",
+        choices=["chatterbox", "edge_tts", "elevenlabs", "rvc"],
+        default="chatterbox",
+        help="AI voice synthesis engine: chatterbox (default), edge_tts, elevenlabs, or rvc",
+    )
     dub.add_argument("--json", action="store_true", dest="output_json")
     dub.set_defaults(handler=_handle_dub)
 
@@ -689,6 +732,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="arguments passed to Qt after an optional -- separator",
     )
     gui.set_defaults(handler=_handle_gui)
+
+    kaggle = commands.add_parser("kaggle", help="Kaggle free Cloud GPU accelerator tools")
+    kaggle.add_argument("--export-notebook", type=Path, help="export a ready-to-run Kaggle GPU dubbing notebook (.ipynb)")
+    kaggle.add_argument("--check", action="store_true", help="verify Kaggle API credentials and connectivity")
+    kaggle.add_argument("--target-lang", default="bn", help="target language for dubbing notebook (default: bn)")
+    kaggle.add_argument("--voice-engine", default="chatterbox", help="voice engine for notebook (default: chatterbox)")
+    kaggle.set_defaults(handler=_handle_kaggle)
     return parser
 
 

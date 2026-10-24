@@ -127,6 +127,8 @@ if _QT:
 
         home_requested = Signal()
         workspace_selected = Signal(str)
+        kaggle_requested = Signal()
+        voice_model_requested = Signal()
 
         _WORKSPACES = ("Ingest", "Dubbing", "Review", "Delivery")
 
@@ -174,6 +176,31 @@ if _QT:
                 self._buttons[workspace] = button
 
             layout.addStretch(1)
+
+            # Pro Studio Quick Actions: Voice Model & Kaggle GPU
+            voice_btn = QPushButton("🎙️ Voice Model", self)
+            voice_btn.setToolTip("Configure AI Voice Engine (Chatterbox AI, Edge-TTS, RVC)")
+            voice_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            voice_btn.setFixedHeight(26)
+            voice_btn.setStyleSheet(
+                "QPushButton{background:#1E1B4B;color:#C4B5FD;border:1px solid #4338CA;"
+                "border-radius:4px;padding:0 10px;font-size:11px;font-weight:700;margin-right:8px;}"
+                "QPushButton:hover{background:#312E81;color:#EDE9FE;border-color:#6366F1;}"
+            )
+            voice_btn.clicked.connect(self.voice_model_requested.emit)
+            layout.addWidget(voice_btn)
+
+            kaggle_btn = QPushButton("☁️ Kaggle GPU", self)
+            kaggle_btn.setToolTip("Accelerate Dubbing with Free Kaggle NVIDIA T4 GPU (Ctrl+K)")
+            kaggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            kaggle_btn.setFixedHeight(26)
+            kaggle_btn.setStyleSheet(
+                "QPushButton{background:#082F49;color:#7DD3FC;border:1px solid #0369A1;"
+                "border-radius:4px;padding:0 10px;font-size:11px;font-weight:700;margin-right:12px;}"
+                "QPushButton:hover{background:#0C4A6E;color:#BAE6FD;border-color:#0284C7;}"
+            )
+            kaggle_btn.clicked.connect(self.kaggle_requested.emit)
+            layout.addWidget(kaggle_btn)
 
         def _select_workspace(self, workspace: str) -> None:
             for name, button in self._buttons.items():
@@ -582,14 +609,27 @@ if _QT:
             try:
                 from PySide6.QtMultimedia import (
                     QAudioOutput,
+                    QMediaDevices,
                     QMediaPlayer,
                     QVideoSink,
                 )
 
-                self._audio_output = QAudioOutput(self)
-                self._audio_output.setVolume(0.82)
+                audio_devices = QMediaDevices.audioOutputs()
+                if audio_devices:
+                    self._audio_output = QAudioOutput(self)
+                    self._audio_output.setVolume(0.82)
+                else:
+                    self._audio_output = None
+                    QTimer.singleShot(
+                        0,
+                        lambda: self.action_triggered.emit(
+                            "No audio output device detected; running video preview without audio"
+                        ),
+                    )
+
                 self._player = QMediaPlayer(self)
-                self._player.setAudioOutput(self._audio_output)
+                if self._audio_output is not None:
+                    self._player.setAudioOutput(self._audio_output)
                 self._video_sink = QVideoSink(self)
                 self._video_sink.videoFrameChanged.connect(self._on_video_frame_changed)
                 self._player.setVideoSink(self._video_sink)
@@ -1685,6 +1725,8 @@ if _QT:
             if score is not None:
                 normalized = max(0.0, min(1.0, score / 100 if score > 1 else score))
                 self.v_score_lbl.setText(f"Voice:     {normalized * 100:.0f}%")
+            else:
+                self.v_score_lbl.setText("Voice:     Not measured")
 
         def update_characters(self, characters: list[str]) -> None:
             current = self.char_in.currentText()
@@ -2765,6 +2807,8 @@ if _QT:
             self.ai_overlay.cancel_requested.connect(self._cancel_agentic_dub)
             self.stage_bar.home_requested.connect(self._show_home_dashboard)
             self.stage_bar.workspace_selected.connect(self._on_workspace_selected)
+            self.stage_bar.kaggle_requested.connect(self._open_kaggle_accelerator)
+            self.stage_bar.voice_model_requested.connect(self._open_voice_model_selector)
             self.navigation_rail.route_requested.connect(self._on_navigation_route)
             self.tool_palette.tool_selected.connect(self.canvas_view.set_tool)
             self.tool_palette.tool_selected.connect(
@@ -2780,6 +2824,79 @@ if _QT:
             show_home = getattr(window, "show_home", None)
             if callable(show_home):
                 show_home()
+
+        def _open_kaggle_accelerator(self) -> None:
+            from aidub.ui.dialogs.cloud_accelerator_dialog import KaggleAcceleratorDialog
+
+            source_path = str(self._current_project_data.get("file_path", ""))
+            voice_engine = str(self._current_project_data.get("voice_engine", "chatterbox"))
+            dlg = KaggleAcceleratorDialog(
+                self,
+                movie_path=source_path,
+                target_language=self._automation_state.target_language or "bn",
+                voice_engine=voice_engine,
+                enable_lipsync=bool(self._current_project_data.get("lipsync", True)),
+            )
+            dlg.exec()
+
+        def _open_voice_model_selector(self) -> None:
+            from aidub.ui.dialogs.voice_model_dialog import VoiceModelDialog
+
+            current_engine = str(self._current_project_data.get("voice_engine", "chatterbox"))
+            dlg = VoiceModelDialog(
+                self,
+                current_engine=current_engine,
+                target_language=self._automation_state.target_language or "bn",
+            )
+            if dlg.exec():
+                new_engine = dlg.get_selected_engine()
+                new_emotion = dlg.get_selected_emotion()
+                self._current_project_data["voice_engine"] = new_engine
+                self._current_project_data["voice_emotion"] = new_emotion
+                self._show_status(f"AI Voice Model: {new_engine.upper()} (Emotion: {new_emotion})")
+
+        def keyPressEvent(self, event: Any) -> None:  # noqa: N802
+            # Modifier shortcuts (Ctrl+...)
+            if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+                if event.key() == Qt.Key.Key_K:
+                    self._open_kaggle_accelerator()
+                    event.accept()
+                    return
+                if event.key() == Qt.Key.Key_D:
+                    self._run_agentic_dub()
+                    event.accept()
+                    return
+                if event.key() == Qt.Key.Key_I:
+                    self.import_media_dialog()
+                    event.accept()
+                    return
+
+            # Space toggles playback (industry NLE standard)
+            if event.key() == Qt.Key.Key_Space:
+                if hasattr(self, "monitor_panel") and self.monitor_panel:
+                    self.monitor_panel._toggle_play()
+                event.accept()
+                return
+
+            # Bare J, K, L shuttle keys
+            if event.key() == Qt.Key.Key_J:
+                if hasattr(self, "monitor_panel") and self.monitor_panel:
+                    self.monitor_panel._on_step_back()
+                event.accept()
+                return
+            if event.key() == Qt.Key.Key_K:
+                if hasattr(self, "monitor_panel") and self.monitor_panel:
+                    if self.monitor_panel._is_playing:
+                        self.monitor_panel._toggle_play()
+                event.accept()
+                return
+            if event.key() == Qt.Key.Key_L:
+                if hasattr(self, "monitor_panel") and self.monitor_panel:
+                    self.monitor_panel._on_step_forward()
+                event.accept()
+                return
+
+            super().keyPressEvent(event)
 
         def _on_workspace_selected(self, workspace: str) -> None:
             if workspace == "Ingest":
@@ -3769,8 +3886,10 @@ if _QT:
         def _on_ai_action_clicked(self, action_name: str) -> None:
             if action_name in {"Auto-Detect Characters", "Auto-Detect Movie Characters"}:
                 self.auto_detect_characters()
-            elif action_name == "Select Dub Voice":
-                self._select_dub_voice()
+            elif action_name in {"Select Dub Voice", "Voice Model", "AI Voice Engine", "Chatterbox"}:
+                self._open_voice_model_selector()
+            elif action_name in {"Kaggle GPU", "Cloud GPU Accelerator", "Kaggle Accelerator"}:
+                self._open_kaggle_accelerator()
             elif action_name in {"Audio Analysis", "Audio Analysis & Diagnostics"}:
                 self._open_audio_analysis()
             elif action_name in {"Manage Characters", "Character & Speaker Manager"}:
@@ -3897,8 +4016,8 @@ if _QT:
                 self._automation_state = state
                 self._persist_automation_state()
                 self.ai_overlay.set_state(state)
-                self.inspector_panel.l_score_lbl.setText("Lip Sync:  92%")
-                self.inspector_panel.l_score_lbl.setStyleSheet("color:#22C55E;font-weight:700;")
+                self.inspector_panel.l_score_lbl.setText("Lip Sync:  Not measured")
+                self.inspector_panel.l_score_lbl.setStyleSheet("color:#8C9BAE;")
                 self._active_lipsync_worker = None
 
             def _on_failed(err: str) -> None:
@@ -4256,7 +4375,49 @@ if _QT:
             )
             self._show_status(f"Timed take saved: {output_path}")
 
-        def _run_agentic_dub(self) -> None:
+        def open_dub_dialog(self) -> None:
+            """Prompt the user for target language (Bengali default) and Fast/Quality profile, then start dubbing."""
+            if self._dubbing_worker is not None and self._dubbing_worker.isRunning():
+                self._show_status("A dubbing job is already running")
+                return
+
+            input_path = Path(str(self._current_project_data.get("file_path", "")))
+            if not input_path.is_file():
+                selected, _selected_filter = QFileDialog.getOpenFileName(
+                    self,
+                    "Select Source Movie for Automated Dubbing",
+                    self._default_asset_directory(),
+                    "Movie Files (*.mkv *.mp4 *.mov *.avi *.m2ts);;All Files (*)",
+                )
+                if not selected:
+                    return
+                input_path = Path(selected)
+                self.load_project_data(
+                    {
+                        "name": self._current_project_data.get("name", input_path.stem),
+                        "file_path": str(input_path),
+                        "target_language": self._automation_state.target_language or "bn",
+                        "quality_profile": self._automation_state.quality_profile or "quality",
+                    }
+                )
+
+            from aidub.ui.dub_dialog import DubDialog
+
+            current_lang = self._automation_state.target_language or "bn"
+            current_profile = self._automation_state.quality_profile or "quality"
+            dialog = DubDialog(self, current_lang=current_lang, current_profile=current_profile)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+
+            target_lang, quality_profile = dialog.get_settings()
+            self._run_agentic_dub(target_lang=target_lang, quality_profile=quality_profile)
+
+        def _run_agentic_dub(
+            self,
+            *,
+            target_lang: str | None = None,
+            quality_profile: str | None = None,
+        ) -> None:
             if self._dubbing_worker is not None and self._dubbing_worker.isRunning():
                 return
             input_path = Path(str(self._current_project_data.get("file_path", "")))
@@ -4274,30 +4435,35 @@ if _QT:
                     {
                         "name": self._current_project_data.get("name", input_path.stem),
                         "file_path": str(input_path),
-                        "target_language": self._automation_state.target_language,
-                        "quality_profile": self._automation_state.quality_profile,
+                        "target_language": target_lang or self._automation_state.target_language or "bn",
+                        "quality_profile": quality_profile or self._automation_state.quality_profile or "quality",
                     }
                 )
+
+            lang = target_lang or self._automation_state.target_language or "bn"
+            profile = quality_profile or self._automation_state.quality_profile or "quality"
 
             from aidub.ui.workers import DubbingEngineWorker
 
             self._automation_state = create_automation_plan(
                 str(self._current_project_data.get("name", input_path.stem)),
                 source_path=str(input_path.resolve()),
-                target_language=self._automation_state.target_language,
-                quality_profile=self._automation_state.quality_profile,
+                target_language=lang,
+                quality_profile=profile,
             )
             self.inspector_panel.clear_quality_report()
             self.ai_overlay.set_state(self._automation_state)
             self._persist_automation_state()
             lipsync_enabled = bool(self._current_project_data.get("lipsync", True))
             lipsync_tier = str(self._current_project_data.get("lipsync_tier", "preview_fast"))
+            voice_engine = str(self._current_project_data.get("voice_engine", "chatterbox"))
             self._dubbing_worker = DubbingEngineWorker(
                 input_path,
-                self._automation_state.target_language,
-                self._automation_state.quality_profile,
+                lang,
+                profile,
                 self,
                 voice_name=self._selected_voice_name,
+                voice_engine=voice_engine,
                 character_voices=self._current_project_data.get("character_voices"),
                 lipsync=lipsync_enabled,
                 lipsync_tier=lipsync_tier,
@@ -4309,6 +4475,9 @@ if _QT:
             self._dubbing_worker.finished.connect(lambda: setattr(self, "_dubbing_worker", None))
             self.ai_overlay.set_progress("Preparing autonomous production graph…", 1)
             self._show_status("Agentic dubbing job started · background execution enabled")
+            win = self.window()
+            if hasattr(win, "update_dub_progress"):
+                win.update_dub_progress("ingest", 1, "Starting dubbing pipeline…")
             self._dubbing_worker.start()
 
         def _cancel_agentic_dub(self) -> None:
@@ -4382,10 +4551,14 @@ if _QT:
                         progress=percent,
                         detail=message,
                     )
+            stage_name = pipeline_stage.replace("_skipped", "").replace("_", " ").upper()
             self._automation_state = state
             self._persist_automation_state()
-            self.ai_overlay.set_progress(message, percent)
-            self._show_status(f"Agent · {percent}% · {message}")
+            self.ai_overlay.set_progress(f"[{stage_name}] {message}", percent)
+            self._show_status(f"Stage: {stage_name} ({percent}%) · {message}")
+            win = self.window()
+            if hasattr(win, "update_dub_progress"):
+                win.update_dub_progress(stage_name, percent, message)
 
         def _on_dubbing_completed(self, result: dict[str, Any]) -> None:
             generated = tuple(
@@ -4443,10 +4616,8 @@ if _QT:
                             progress=100,
                             detail=f"Lip-sync synthesized: {Path(lipsynced).name}",
                         )
-                        self.inspector_panel.l_score_lbl.setText("Lip Sync:  92%")
-                        self.inspector_panel.l_score_lbl.setStyleSheet(
-                            "color:#22C55E;font-weight:700;"
-                        )
+                        self.inspector_panel.l_score_lbl.setText("Lip Sync:  Not measured")
+                        self.inspector_panel.l_score_lbl.setStyleSheet("color:#8C9BAE;")
                     else:
                         state = state.update_stage(
                             item.stage,
@@ -4500,8 +4671,13 @@ if _QT:
                     self.monitor_panel.prog_title_lbl.setText(
                         f"Program: {Path(dubbed_video).stem} [DUBBED MASTER]"
                     )
+                    self.monitor_panel.source_lbl.setText(f"Dubbed: {Path(dubbed_video).name}")
+                    self._show_status(f"Dubbed video loaded in Program monitor: {Path(dubbed_video).name}")
                 except Exception as exc:
                     logger.debug("Failed auto-loading dubbed master in monitor: %s", exc)
+            win = self.window()
+            if hasattr(win, "set_dub_completed"):
+                win.set_dub_completed(True, dubbed_video or master_file)
 
         def _on_dubbing_failed(self, error: str) -> None:
             current = next(
@@ -4522,6 +4698,9 @@ if _QT:
                 self._persist_automation_state()
             self.ai_overlay.set_failed(f"Automation stopped · {error}")
             self._show_status(f"Dubbing job failed: {error}")
+            win = self.window()
+            if hasattr(win, "set_dub_completed"):
+                win.set_dub_completed(False, error)
             try:
                 from aidub.ui.dub_dialog import DubbingErrorDialog
 
@@ -4550,6 +4729,9 @@ if _QT:
         def _on_dubbing_cancelled(self) -> None:
             self.ai_overlay.set_failed("Automation cancelled safely · revision preserved")
             self._show_status("Dubbing job cancelled; completed stage artifacts remain resumable")
+            win = self.window()
+            if hasattr(win, "set_dub_completed"):
+                win.set_dub_completed(False, "Cancelled")
 
         def _persist_automation_state(self) -> None:
             self.stage_bar.set_state(self._automation_state)
@@ -4629,16 +4811,22 @@ if _QT:
                         return
                     self._show_status("Select or import a playable voice take before previewing")
                     return
-            from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+            from PySide6.QtMultimedia import QAudioOutput, QMediaDevices, QMediaPlayer
 
             if self._take_audio_player is None:
-                self._take_audio_output = QAudioOutput(self)
-                self._take_audio_output.setVolume(1.0)
-                self._take_audio_player = QMediaPlayer(self)
-                self._take_audio_player.setAudioOutput(self._take_audio_output)
-                self._take_audio_player.errorOccurred.connect(
-                    lambda _error, message: self._show_status(f"Take playback failed: {message}")
-                )
+                audio_devices = QMediaDevices.audioOutputs()
+                if audio_devices:
+                    self._take_audio_output = QAudioOutput(self)
+                    self._take_audio_output.setVolume(1.0)
+                    self._take_audio_player = QMediaPlayer(self)
+                    self._take_audio_player.setAudioOutput(self._take_audio_output)
+                    self._take_audio_player.errorOccurred.connect(
+                        lambda _error, message: self._show_status(f"Take playback failed: {message}")
+                    )
+                else:
+                    self._take_audio_output = None
+                    self._show_status("No audio output device detected; cannot preview voice take")
+                    return
             if self._take_audio_output is not None:
                 self._take_audio_output.setVolume(1.0)
                 self._take_audio_output.setMuted(False)
@@ -4819,8 +5007,11 @@ if _QT:
                 self, "Export Complete", f"Subtitles exported successfully:\n{save_path}"
             )
 
-        def run_auto_dub(self) -> None:
-            self._run_agentic_dub()
+        def run_auto_dub(self, *, prompt_dialog: bool = False) -> None:
+            if prompt_dialog:
+                self.open_dub_dialog()
+            else:
+                self._run_agentic_dub()
 
         def cancel_active_job(self) -> None:
             self._cancel_agentic_dub()

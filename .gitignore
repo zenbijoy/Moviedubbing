@@ -51,3 +51,6 @@ keys.json
 *.keys.json
 /work/
 mypy_output.txt
+*_work/
+work_*/
+out_*/

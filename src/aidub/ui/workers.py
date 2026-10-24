@@ -120,6 +120,7 @@ if _QT:
             *,
             output_path: str | Path | None = None,
             voice_name: str | None = None,
+            voice_engine: str = "chatterbox",
             character_voices: dict[str, str] | None = None,
             lipsync: bool = False,
             lipsync_tier: str = "preview_fast",
@@ -130,6 +131,7 @@ if _QT:
             self.quality_profile = quality_profile
             self.output_path = Path(output_path) if output_path else None
             self.voice_name = voice_name
+            self.voice_engine = voice_engine
             self.character_voices = dict(character_voices or {})
             self.lipsync = lipsync
             self.lipsync_tier = lipsync_tier
@@ -162,6 +164,7 @@ if _QT:
                     lipsync=self.lipsync,
                     lipsync_tier=self.lipsync_tier,
                     voice_name=self.voice_name,
+                    voice_engine=self.voice_engine,
                     character_voices=self.character_voices,
                 )
 

@@ -23,8 +23,10 @@ try:
         QMainWindow,
         QMenuBar,
         QMessageBox,
+        QProgressBar,
         QPushButton,
         QStackedWidget,
+        QToolBar,
         QVBoxLayout,
     )
 
@@ -192,7 +194,8 @@ if _QT:
 
             self.menu_bar = QMenuBar(self)
             self.menu_bar.setNativeMenuBar(False)
-            self.menu_bar.setFixedWidth(440)
+            self.menu_bar.setMinimumWidth(440)
+            self.menu_bar.setMaximumWidth(540)
             self.menu_bar.setStyleSheet(
                 "QMenuBar{background:transparent;color:#C4CAD4;font-size:11px;}"
                 "QMenuBar::item{padding:5px 8px;background:transparent;}"
@@ -203,6 +206,21 @@ if _QT:
                 "QMenu::separator{height:1px;background:#283446;margin:4px 8px;}"
             )
             layout.addWidget(self.menu_bar)
+
+            self.dub_btn = QPushButton("🎙 Dub", self)
+            self.dub_btn.setToolTip("Dub Movie (pick language & Fast/Quality profile) — Ctrl+Enter")
+            self.dub_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.dub_btn.setStyleSheet(
+                "QPushButton {"
+                "  background: #2563EB; color: #FFF; border: none; border-radius: 4px;"
+                "  padding: 4px 14px; font-size: 11px; font-weight: 800;"
+                "}"
+                "QPushButton:hover { background: #3B82F6; }"
+                "QPushButton:disabled { background: #1C2431; color: #64748B; }"
+            )
+            self.dub_btn.clicked.connect(window.open_dub_dialog)
+            layout.addWidget(self.dub_btn)
+
             layout.addStretch(1)
 
             self.project_label = QLabel("Untitled - Bengali Dub ⌄", self)
@@ -348,6 +366,7 @@ if _QT:
             self.resize(1_600, 960)
             self.chrome = _StudioChrome(self)
             self.setMenuWidget(self.chrome)
+            self._build_toolbar()
             self._build_menus()
             self.studio.project_loaded.connect(self._on_project_loaded)
             self._jobs_timer = QTimer(self)
@@ -360,6 +379,112 @@ if _QT:
             self._telemetry_worker.completed.connect(self.chrome.set_telemetry)
             self._telemetry_worker.start()
             self._apply_locale(self._locale_service.locale)
+
+        def _build_toolbar(self) -> None:
+            toolbar = QToolBar("Main Dubbing Toolbar", self)
+            toolbar.setObjectName("MainToolBar")
+            toolbar.setMovable(False)
+            toolbar.setStyleSheet(
+                "QToolBar#MainToolBar {"
+                "  background: #0B0E14;"
+                "  border-bottom: 1px solid #1E2838;"
+                "  spacing: 8px;"
+                "  padding: 4px 14px;"
+                "}"
+                "QToolBar#MainToolBar QToolButton {"
+                "  background: #18202D;"
+                "  color: #F7F9FC;"
+                "  border: 1px solid #2B384E;"
+                "  border-radius: 4px;"
+                "  padding: 5px 14px;"
+                "  font-size: 11px;"
+                "  font-weight: 700;"
+                "}"
+                "QToolBar#MainToolBar QToolButton:hover {"
+                "  background: #2563EB;"
+                "  border-color: #3B82F6;"
+                "}"
+                "QToolBar#MainToolBar QToolButton:disabled {"
+                "  color: #64748B;"
+                "  background: #0F141C;"
+                "  border-color: #1A222E;"
+                "}"
+            )
+            self.dub_action = toolbar.addAction("Dub")
+            self.dub_action.setToolTip("Dub Movie (pick language & Fast/Quality profile) — Ctrl+Enter")
+            self.dub_action.setShortcut(QKeySequence("Ctrl+Enter"))
+            self.dub_action.triggered.connect(self.open_dub_dialog)
+
+            self.cancel_action = toolbar.addAction("Cancel")
+            self.cancel_action.setToolTip("Cancel Active Dubbing Job — Esc")
+            self.cancel_action.setEnabled(False)
+            self.cancel_action.triggered.connect(self.cancel_dub_job)
+
+            toolbar.addSeparator()
+
+            self.toolbar_stage_label = QLabel("", toolbar)
+            self.toolbar_stage_label.setStyleSheet("color:#38BDF8;font-size:11px;font-weight:600;padding:0 6px;")
+            self.toolbar_stage_label.setVisible(False)
+            toolbar.addWidget(self.toolbar_stage_label)
+
+            self.toolbar_progress_bar = QProgressBar(toolbar)
+            self.toolbar_progress_bar.setRange(0, 100)
+            self.toolbar_progress_bar.setValue(0)
+            self.toolbar_progress_bar.setFixedWidth(200)
+            self.toolbar_progress_bar.setFixedHeight(14)
+            self.toolbar_progress_bar.setTextVisible(True)
+            self.toolbar_progress_bar.setStyleSheet(
+                "QProgressBar{background:#111722;border:1px solid #283446;border-radius:3px;text-align:center;color:#E2E8F0;font-size:10px;font-weight:700;}"
+                "QProgressBar::chunk{background:#2563EB;border-radius:2px;}"
+            )
+            self.toolbar_progress_bar.setVisible(False)
+            toolbar.addWidget(self.toolbar_progress_bar)
+
+            self.addToolBar(toolbar)
+            self.toolbar = toolbar
+
+        def open_dub_dialog(self) -> None:
+            self.show_studio()
+            self.studio.open_dub_dialog()
+
+        def cancel_dub_job(self) -> None:
+            self.studio.cancel_active_job()
+
+        def update_dub_progress(self, stage: str, percent: int, message: str) -> None:
+            if hasattr(self, "toolbar_progress_bar"):
+                self.toolbar_progress_bar.setVisible(True)
+                self.toolbar_progress_bar.setValue(percent)
+                self.toolbar_progress_bar.setFormat(f"{percent}%")
+            if hasattr(self, "toolbar_stage_label"):
+                self.toolbar_stage_label.setVisible(True)
+                self.toolbar_stage_label.setText(f"Stage: {stage.upper()} · {message}")
+            if hasattr(self, "cancel_action"):
+                self.cancel_action.setEnabled(True)
+            if hasattr(self, "dub_action"):
+                self.dub_action.setEnabled(False)
+            if hasattr(self.chrome, "dub_btn"):
+                self.chrome.dub_btn.setEnabled(False)
+
+        def set_dub_completed(self, success: bool, message: str = "") -> None:
+            if hasattr(self, "dub_action"):
+                self.dub_action.setEnabled(True)
+            if hasattr(self, "cancel_action"):
+                self.cancel_action.setEnabled(False)
+            if hasattr(self.chrome, "dub_btn"):
+                self.chrome.dub_btn.setEnabled(True)
+            if hasattr(self, "toolbar_progress_bar"):
+                if success:
+                    self.toolbar_progress_bar.setValue(100)
+                    self.toolbar_progress_bar.setFormat("100% · Complete")
+                else:
+                    self.toolbar_progress_bar.setVisible(False)
+            if hasattr(self, "toolbar_stage_label"):
+                if success:
+                    self.toolbar_stage_label.setText("Dubbing Complete")
+                else:
+                    self.toolbar_stage_label.setText(
+                        "Dubbing Stopped" if message == "Cancelled" else f"Failed: {message}"
+                    )
 
         def show_home(self) -> None:
             self.stack.setCurrentWidget(self.home_view)
@@ -536,6 +661,12 @@ if _QT:
             sequence_menu = menu_bar.addMenu("Sequence")
             self._add_action(
                 sequence_menu,
+                "Dub Movie…",
+                self.open_dub_dialog,
+                "Ctrl+Enter",
+            )
+            self._add_action(
+                sequence_menu,
                 "Set Target Language…",
                 self.studio.configure_target_language,
             )
@@ -543,12 +674,25 @@ if _QT:
                 sequence_menu,
                 "Auto Dub Master",
                 self.studio.run_auto_dub,
-                "Ctrl+Enter",
             )
             self._add_action(
                 sequence_menu,
                 "Cancel Active Job",
-                self.studio.cancel_active_job,
+                self.cancel_dub_job,
+                "Esc",
+            )
+
+            dub_menu = menu_bar.addMenu("Dub")
+            self._add_action(
+                dub_menu,
+                "Dub Movie…",
+                self.open_dub_dialog,
+                "Ctrl+Enter",
+            )
+            self._add_action(
+                dub_menu,
+                "Cancel Active Job",
+                self.cancel_dub_job,
                 "Esc",
             )
             sequence_menu.addSeparator()
@@ -646,9 +790,15 @@ if _QT:
                     ),
                     Command(
                         "ai.autodub",
-                        "Auto Dub Master",
-                        self.studio.run_auto_dub,
+                        "Dub Movie (Choose Settings)…",
+                        self.open_dub_dialog,
                         shortcuts=("Ctrl+Enter",),
+                    ),
+                    Command(
+                        "ai.cancel",
+                        "Cancel Active Dub Job",
+                        self.cancel_dub_job,
+                        shortcuts=("Esc",),
                     ),
                     Command(
                         "clip.rewrite",

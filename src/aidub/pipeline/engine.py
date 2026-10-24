@@ -441,6 +441,16 @@ class DubbingEngine:
                     )
                     char_map = {str(c.character_id): c for c in characters}
 
+                    use_chatterbox = getattr(self.cfg, 'voice_engine', 'chatterbox') == 'chatterbox'
+                    chatterbox_tts = None
+                    if use_chatterbox:
+                        try:
+                            from aidub.adapters.voice.chatterbox_adapter import ChatterboxAdapter
+                            chatterbox_tts = ChatterboxAdapter(allow_fallback=True)
+                        except Exception as exc:
+                            logger.info('Chatterbox initialization fallback to EdgeTTS: %s', exc)
+                            chatterbox_tts = None
+
                     tts = EdgeTTSAdapter(
                         self.cfg.voice_name or default_voice_for_language(self.cfg.tgt_lang)
                     )
@@ -506,13 +516,21 @@ class DubbingEngine:
                                     e_pitch = int(p_str.replace("Hz", "").replace("+", "") or 0)
                                     eff_pitch = f"{c_pitch + e_pitch:+d}Hz"
 
-                                tts.synthesize_to_file(
-                                    text=t_text,
-                                    output_mp3_path=out_p,
-                                    voice=current_voice,
-                                    rate=eff_rate,
-                                    pitch=eff_pitch,
-                                )
+                                if chatterbox_tts is not None:
+                                    chatterbox_tts.synthesize_to_file(
+                                        text=t_text,
+                                        output_wav_path=out_p,
+                                        voice=current_voice,
+                                        reference_audio=vocals16 if vocals16.is_file() else None,
+                                    )
+                                else:
+                                    tts.synthesize_to_file(
+                                        text=t_text,
+                                        output_mp3_path=out_p,
+                                        voice=current_voice,
+                                        rate=eff_rate,
+                                        pitch=eff_pitch,
+                                    )
 
                             try:
                                 emo_res, vr_report = emotion_engine.synthesize_verified_line(

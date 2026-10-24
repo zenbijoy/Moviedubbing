@@ -27,6 +27,7 @@ class PipelineConfig:
     # Configured analysis and speech providers.
     asr_model: str = "large-v3"
     voice_name: str | None = None
+    voice_engine: str = "chatterbox"
     character_voices: dict[str, str] | None = None
     max_stretch: float = 2.0
     overwrite: bool = False
@@ -35,6 +36,8 @@ class PipelineConfig:
         if self.fast:
             self.keep_music = False
             self.diarize = False
+            if self.asr_model == "large-v3":
+                self.asr_model = "base"
 
 
 __all__ = ["PipelineConfig"]
