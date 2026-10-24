@@ -4523,18 +4523,29 @@ if _QT:
             self.ai_overlay.set_failed(f"Automation stopped · {error}")
             self._show_status(f"Dubbing job failed: {error}")
             try:
-                QMessageBox.critical(
+                from aidub.ui.dub_dialog import DubbingErrorDialog
+
+                dialog = DubbingErrorDialog(
                     self,
-                    "Dubbing Pipeline Notice",
-                    f"The automated dubbing pipeline encountered an issue:\n\n{error}\n\n"
-                    "Remediation steps:\n"
-                    "• Verify that the movie has audible speech.\n"
-                    "• Check FFmpeg installation.\n"
-                    "• If using external AI models, verify your API keys (e.g. GEMINI_API_KEY).\n"
-                    "• Check destination disk permissions.",
+                    title="Dubbing Pipeline Error",
+                    message="The automated dubbing pipeline encountered an issue. See details below:",
+                    details=error,
                 )
+                dialog.exec()
             except Exception:
-                pass
+                try:
+                    QMessageBox.critical(
+                        self,
+                        "Dubbing Pipeline Notice",
+                        f"The automated dubbing pipeline encountered an issue:\n\n{error}\n\n"
+                        "Remediation steps:\n"
+                        "• Verify that the movie has audible speech.\n"
+                        "• Check FFmpeg installation.\n"
+                        "• If using external AI models, verify your API keys (e.g. GEMINI_API_KEY).\n"
+                        "• Check destination disk permissions.",
+                    )
+                except Exception:
+                    pass
 
         def _on_dubbing_cancelled(self) -> None:
             self.ai_overlay.set_failed("Automation cancelled safely · revision preserved")
