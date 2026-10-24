@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 from aidub import __version__
 from aidub.application import OpenedProject, ProjectPackageError, ProjectPackageService
+from aidub.pipeline.errors import PipelineError, exit_code_for_error
 from aidub.diagnostics import (
     DubbingDiagnosticReport,
     SystemDiagnosticReport,
@@ -490,14 +491,19 @@ def _handle_dub(
     if getattr(arguments, "overwrite", False) and arguments.output.is_file():
         arguments.output.unlink()
 
+    fast = getattr(arguments, "fast", False)
+    keep_music = False if fast else getattr(arguments, "keep_music", True)
+    diarize = False if fast else getattr(arguments, "diarize", True)
+
     cfg = PipelineConfig(
         input=arguments.input,
         output=arguments.output,
         src_lang=arguments.source_lang,
         tgt_lang=arguments.target_lang,
         work_dir=arguments.work_dir,
-        keep_music=arguments.keep_music,
-        diarize=arguments.diarize,
+        keep_music=keep_music,
+        diarize=diarize,
+        fast=fast,
         lipsync=getattr(arguments, "lipsync", False),
         lipsync_tier=getattr(arguments, "lipsync_tier", "preview_fast"),
         asr_model=arguments.asr_model,
@@ -597,6 +603,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--asr-model", default="large-v3", help="Faster-Whisper model size (default: large-v3)"
     )
     dub.add_argument("--voice-name", help="optional Edge TTS voice name")
+    dub.add_argument(
+        "--fast",
+        action="store_true",
+        default=False,
+        help="fast quality profile: skip diarization and music separation",
+    )
     dub.add_argument(
         "--no-music",
         action="store_false",
@@ -698,11 +710,14 @@ def main(
     except KeyboardInterrupt:
         errors.write("error: operation cancelled by operator\n")
         return 130
+    except PipelineError as error:
+        errors.write(f"error: {error.message}\n")
+        return exit_code_for_error(error)
     except (MediaProbeError, ProjectPackageError, ValidationError, OSError, ValueError) as error:
         errors.write(f"error: {error}\n")
         return EXIT_FAILURE
     except Exception as error:
-        errors.write(f"error: {type(error).__name__}: {error}\n")
+        errors.write(f"error: {error}\n")
         return EXIT_FAILURE
 
 

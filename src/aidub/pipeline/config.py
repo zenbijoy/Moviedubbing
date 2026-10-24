@@ -22,6 +22,7 @@ class PipelineConfig:
     diarize: bool = True
     lipsync: bool = False
     lipsync_tier: str = "preview_fast"
+    fast: bool = False
 
     # Configured analysis and speech providers.
     asr_model: str = "large-v3"
@@ -29,6 +30,11 @@ class PipelineConfig:
     character_voices: dict[str, str] | None = None
     max_stretch: float = 2.0
     overwrite: bool = False
+
+    def __post_init__(self) -> None:
+        if self.fast:
+            self.keep_music = False
+            self.diarize = False
 
 
 __all__ = ["PipelineConfig"]
