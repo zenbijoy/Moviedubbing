@@ -1086,4 +1086,111 @@ QFrame#ClipSubtitle {{
     border: 1px solid rgba(249,115,22,0.4);
     border-radius: 4px;
 }}
+
+/* =====================================================================
+   MODERN AI STUDIO ENHANCEMENTS (REFERENCE DESIGN SYSTEM)
+   ===================================================================== */
+QFrame#StudioCard {{
+    background: #111722;
+    border: 1px solid #1F2937;
+    border-radius: 12px;
+}}
+
+QFrame#StudioCard:hover {{
+    border-color: #374151;
+}}
+
+QPushButton#PrimaryHeroBtn {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #E11D48, stop:1 #D946EF);
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 700;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+}}
+
+QPushButton#PrimaryHeroBtn:hover {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #F43F5E, stop:1 #E879F9);
+}}
+
+QPushButton#SecondaryActionBtn {{
+    background: #1A2230;
+    color: #E2E8F0;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid #2B3547;
+    border-radius: 6px;
+    padding: 7px 14px;
+}}
+
+QPushButton#SecondaryActionBtn:hover {{
+    background: #232D40;
+    border-color: #3E4D68;
+    color: #FFFFFF;
+}}
+
+QPushButton#AccentActionBtn {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4F46E5, stop:1 #7C3AED);
+    color: #FFFFFF;
+    font-size: 12px;
+    font-weight: 700;
+    border: none;
+    border-radius: 6px;
+    padding: 7px 16px;
+}}
+
+QPushButton#AccentActionBtn:hover {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366F1, stop:1 #8B5CF6);
+}}
+
+QFrame#DropZone {{
+    background: rgba(17, 24, 39, 0.6);
+    border: 2px dashed #374151;
+    border-radius: 10px;
+    padding: 18px;
+}}
+
+QFrame#DropZone:hover {{
+    border-color: #E11D48;
+    background: rgba(225, 29, 72, 0.05);
+}}
+
+QFrame#DemoPlayerCard {{
+    background: #0E131F;
+    border: 1px solid #1E2738;
+    border-radius: 10px;
+    padding: 12px;
+}}
+
+QLabel#FormatBadge {{
+    background: #161F2E;
+    color: #94A3B8;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid #243044;
+    border-radius: 4px;
+    padding: 2px 8px;
+}}
+
+QFrame#DialogueCard {{
+    background: #111722;
+    border: 1px solid #1E2738;
+    border-radius: 8px;
+    padding: 10px 14px;
+}}
+
+QFrame#DialogueCard[active="true"] {{
+    border: 2px solid #8B5CF6;
+    background: #151828;
+}}
+
+QLabel#SpeakerPill {{
+    background: #1D4ED8;
+    color: #FFFFFF;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 4px;
+    padding: 2px 8px;
+}}
 """

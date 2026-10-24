@@ -512,7 +512,23 @@ def _handle_dub(
         overwrite=getattr(arguments, "overwrite", False),
     )
 
-    engine = DubbingEngine(cfg)
+    import time
+
+    start_time = time.time()
+
+    def _cli_progress(stage: str, percent: int, message: str) -> None:
+        elapsed = time.time() - start_time
+        mins, secs = divmod(int(elapsed), 60)
+        bar_len = 20
+        filled = int(bar_len * percent / 100)
+        bar = "█" * filled + "░" * (bar_len - filled)
+        stdout.write(f"[{mins:02d}:{secs:02d}] [{bar}] {percent:3d}% | [{stage}] {message}\n")
+        stdout.flush()
+
+    engine = DubbingEngine(
+        cfg,
+        progress_callback=_cli_progress if not getattr(arguments, "output_json", False) else None,
+    )
     outputs = engine.run()
 
     if arguments.output_json:
@@ -544,6 +560,64 @@ def _handle_kaggle(
         stdout.write(f"Kaggle Connection: {'[OK]' if ok else '[FAILED]'} {msg}\n")
         return EXIT_OK if ok else EXIT_FAILURE
 
+    if getattr(arguments, "run", False) or getattr(arguments, "input", None):
+        import re
+        from aidub.cloud.cloud_sync_bridge import CloudSyncEngine
+
+        client = KaggleClient()
+        if not client.is_configured:
+            stdout.write("Error: Kaggle credentials not configured. Please set KAGGLE_USERNAME and KAGGLE_KEY in environment or ~/.kaggle/kaggle.json\n")
+            return EXIT_FAILURE
+
+        inp_video = getattr(arguments, "input", None)
+        raw_name = inp_video.stem if inp_video else "feature"
+        slug = re.sub(r"[^a-z0-9-]", "", f"aidub-{raw_name}".lower())[:50] or "aidub-job"
+        title = f"AIDub GPU - {raw_name[:40]}"
+        tgt_l = getattr(arguments, "target_lang", "bn")
+        v_eng = getattr(arguments, "voice_engine", "chatterbox")
+        nb_data = KaggleNotebookBuilder.create_dubbing_notebook(
+            movie_filename=inp_video.name if inp_video else "movie.mp4",
+            target_language=tgt_l,
+            voice_engine=v_eng,
+            enable_lipsync=True,
+        )
+        stdout.write(f"⚡ Pushing autonomous movie dubbing notebook to Kaggle GPU (@{client.creds.username}/{slug})...\n")
+        ok, res_url = client.push_kernel(
+            kernel_slug=slug,
+            title=title,
+            notebook_data=nb_data,
+            enable_gpu=True,
+            is_private=True,
+        )
+        if not ok:
+            stdout.write(f"Kaggle push failed: {res_url}\n")
+            return EXIT_FAILURE
+
+        stdout.write(f"✓ Kernel live at {res_url}\nPolling Kaggle T4 GPU execution status...\n")
+
+        def _prog(pct: int, msg: str) -> None:
+            stdout.write(f"[{pct:3d}%] {msg}\n")
+            stdout.flush()
+
+        w_dir = inp_video.parent if inp_video else Path.cwd()
+        sync_res = CloudSyncEngine.poll_and_sync_kaggle_job(
+            client=client,
+            kernel_slug=slug,
+            project_work_dir=w_dir,
+            progress_cb=_prog,
+        )
+        if not sync_res.success:
+            stdout.write(f"Cloud job failed: {sync_res.error_message}\n")
+            return EXIT_FAILURE
+
+        stdout.write(
+            f"✓ Cloud GPU Dubbing Master Synced Successfully!\n"
+            f"  Video: {sync_res.dubbed_video_path}\n"
+            f"  Audio: {sync_res.dubbed_audio_path}\n"
+            f"  Subtitles: {sync_res.subtitle_path}\n"
+        )
+        return EXIT_OK
+
     out_nb = getattr(arguments, "export_notebook", None)
     if out_nb:
         dest = KaggleNotebookBuilder.export_to_file(
@@ -557,6 +631,8 @@ def _handle_kaggle(
     stdout.write(
         "Kaggle Cloud Accelerator:\n"
         "  --check               Test Kaggle API credentials\n"
+        "  --run                 Launch autonomous movie dubbing on Kaggle GPU\n"
+        "  --input <p>           Input movie path to accelerate on cloud GPU\n"
         "  --export-notebook <p> Generate GPU dubbing notebook (.ipynb)\n"
     )
     return EXIT_OK
@@ -739,9 +815,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     dub.add_argument(
         "--lipsync-tier",
-        choices=["preview_fast", "cinema_quality"],
+        choices=["studio_viseme", "preview_fast", "cinema_quality"],
         default="preview_fast",
-        help="lip-sync rendering tier: preview_fast (MuseTalk) or cinema_quality (LatentSync)",
+        help="lip-sync rendering tier: studio_viseme (local visual viseme), preview_fast (MuseTalk) or cinema_quality (LatentSync)",
     )
     dub.add_argument(
         "--overwrite",
@@ -752,9 +828,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     dub.add_argument(
         "--voice-engine",
-        choices=["chatterbox", "edge_tts", "elevenlabs", "rvc"],
-        default="chatterbox",
-        help="AI voice synthesis engine: chatterbox (default), edge_tts, elevenlabs, or rvc",
+        choices=["gemini_tts", "chatterbox", "edge_tts", "elevenlabs", "rvc"],
+        default="gemini_tts",
+        help="AI voice synthesis engine: gemini_tts (default expressive human voice), chatterbox, edge_tts, elevenlabs, or rvc",
     )
     dub.add_argument("--json", action="store_true", dest="output_json")
     dub.set_defaults(handler=_handle_dub)
@@ -810,6 +886,8 @@ def build_parser() -> argparse.ArgumentParser:
     kaggle.add_argument("--check", action="store_true", help="verify Kaggle API credentials and connectivity")
     kaggle.add_argument("--target-lang", default="bn", help="target language for dubbing notebook (default: bn)")
     kaggle.add_argument("--voice-engine", default="chatterbox", help="voice engine for notebook (default: chatterbox)")
+    kaggle.add_argument("--run", action="store_true", help="push and run dubbing kernel on Kaggle GPU and sync output")
+    kaggle.add_argument("--input", "-i", type=Path, help="source movie video path for Kaggle GPU dubbing")
     kaggle.set_defaults(handler=_handle_kaggle)
 
     retake_cmd = commands.add_parser("retake", help="ADR single-line dialogue re-synthesis and timeline retake")

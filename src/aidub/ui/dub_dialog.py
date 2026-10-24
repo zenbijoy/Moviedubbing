@@ -19,6 +19,7 @@ try:
         QCheckBox,
         QComboBox,
         QDialog,
+        QFrame,
         QGroupBox,
         QHBoxLayout,
         QLabel,
@@ -172,6 +173,27 @@ if _QT:
             adv_lay = QVBoxLayout(advanced_group)
             adv_lay.setSpacing(10)
 
+            # Voice Generation Engine
+            adv_lay.addWidget(QLabel("Voice Generation Engine:", advanced_group))
+            self.voice_engine_combo = QComboBox(advanced_group)
+            self.voice_engine_combo.addItem("Studio Expressive (Gemini Flash AI - Human Emotion)", "gemini_tts")
+            self.voice_engine_combo.addItem("Microsoft Edge Neural TTS (Standard Fast)", "edge_tts")
+            adv_lay.addWidget(self.voice_engine_combo)
+
+            # Visual Lip-Sync Controls
+            self.lipsync_chk = QCheckBox(
+                "AI Visual Lip-Sync (Synchronize Mouth Movement to Dubbed Speech)", advanced_group
+            )
+            self.lipsync_chk.setChecked(True)
+            self.lipsync_chk.setStyleSheet("color: #E2E8F0; font-size: 12px; font-weight: bold;")
+            adv_lay.addWidget(self.lipsync_chk)
+
+            self.lipsync_tier_combo = QComboBox(advanced_group)
+            self.lipsync_tier_combo.addItem("Studio Viseme (Local Real-Time Mouth Sync)", "studio_viseme")
+            self.lipsync_tier_combo.addItem("LatentSync (Cinema Quality Diffusion)", "cinema_quality")
+            self.lipsync_tier_combo.addItem("MuseTalk (Fast Neural Preview)", "preview_fast")
+            adv_lay.addWidget(self.lipsync_tier_combo)
+
             self.isometric_chk = QCheckBox(
                 "Isometric Lip-Sync Alignment (Match Syllable Count & Jaw Cadence)", advanced_group
             )
@@ -255,60 +277,83 @@ if _QT:
                 "acoustic_preset": str(self.reverb_combo.currentData() or "none"),
                 "broadcast_spec": str(self.qc_combo.currentData() or "netflix"),
                 "embed_c2pa_provenance": self.c2pa_chk.isChecked(),
+                "lipsync": self.lipsync_chk.isChecked(),
+                "lipsync_tier": str(self.lipsync_tier_combo.currentData() or "studio_viseme"),
+                "voice_engine": str(self.voice_engine_combo.currentData() or "gemini_tts"),
             }
 
     class DubbingErrorDialog(QDialog):
-        """Readable operator error dialog with one-click 'Copy details'."""
+        """Readable operator error dialog with one-click 'Copy details' and Cloud GPU recommendation."""
 
         def __init__(
             self,
             parent: QWidget | None = None,
             *,
-            title: str = "Dubbing Pipeline Failed",
+            title: str = "Dubbing Pipeline Diagnostic",
             message: str = "",
             details: str = "",
         ) -> None:
             super().__init__(parent)
             self.setWindowTitle(title)
             self.setModal(True)
-            self.setMinimumSize(520, 360)
+            self.setMinimumSize(560, 420)
             self.details_text = details or message or "No details provided"
 
             self.setStyleSheet(
-                "QDialog { background: #0D1118; color: #F7F9FC; }"
-                "QLabel { color: #F7F9FC; }"
+                "QDialog { background: #0D121D; color: #F8FAFC; }"
+                "QLabel { color: #F8FAFC; }"
                 "QPlainTextEdit {"
-                "  background: #080B10; color: #E2E8F0; border: 1px solid #283446;"
-                "  border-radius: 4px; font-family: 'Cascadia Mono', Consolas, monospace;"
-                "  font-size: 11px; padding: 8px;"
+                "  background: #080C14; color: #E2E8F0; border: 1px solid #1E2738;"
+                "  border-radius: 6px; font-family: 'Cascadia Mono', Consolas, monospace;"
+                "  font-size: 11px; padding: 10px;"
                 "}"
             )
 
             layout = QVBoxLayout(self)
-            layout.setContentsMargins(20, 20, 20, 20)
-            layout.setSpacing(14)
+            layout.setContentsMargins(24, 24, 24, 24)
+            layout.setSpacing(16)
 
             # Warning Header
             hdr_layout = QHBoxLayout()
             err_icon = QLabel("⚠️", self)
-            err_icon.setStyleSheet("font-size: 24px;")
+            err_icon.setStyleSheet("font-size: 28px;")
             hdr_layout.addWidget(err_icon)
 
             hdr_text = QVBoxLayout()
             self.title_lbl = QLabel(title, self)
-            self.title_lbl.setStyleSheet("font-size: 15px; font-weight: 800; color: #EF4444;")
-            self.msg_lbl = QLabel(message or "An unexpected pipeline error occurred.", self)
+            self.title_lbl.setStyleSheet("font-size: 16px; font-weight: 800; color: #F43F5E;")
+            self.msg_lbl = QLabel(
+                message or "A step in the dubbing pipeline requires attention or hardware calibration.", self
+            )
             self.msg_lbl.setWordWrap(True)
-            self.msg_lbl.setStyleSheet("color: #9CA3AF; font-size: 12px;")
+            self.msg_lbl.setStyleSheet("color: #94A3B8; font-size: 12px; margin-top: 2px;")
             hdr_text.addWidget(self.title_lbl)
             hdr_text.addWidget(self.msg_lbl)
             hdr_layout.addLayout(hdr_text)
             hdr_layout.addStretch()
             layout.addLayout(hdr_layout)
 
+            # Helpful Hint Card
+            hint_card = QFrame(self)
+            hint_card.setStyleSheet(
+                "QFrame{background:rgba(225,29,72,0.08);border:1px solid rgba(225,29,72,0.25);border-radius:8px;padding:10px;}"
+            )
+            hint_lay = QVBoxLayout(hint_card)
+            hint_t = QLabel("💡 Recommended Pro Solutions:", hint_card)
+            hint_t.setStyleSheet("font-size:11px;font-weight:700;color:#FB7185;")
+            hint_d = QLabel(
+                "1. If video lip-sync is missing on your laptop, the studio automatically dubs audio in high-fidelity.\n"
+                "2. For full 4K neural lip-sync & Demucs stem separation, use the 1-Click Free Cloud GPU (Colab / Kaggle).",
+                hint_card,
+            )
+            hint_d.setStyleSheet("color:#CBD5E1;font-size:11px;line-height:1.4;")
+            hint_lay.addWidget(hint_t)
+            hint_lay.addWidget(hint_d)
+            layout.addWidget(hint_card)
+
             # Technical Details Box
-            det_title = QLabel("Technical Details / Error Trace:", self)
-            det_title.setStyleSheet("font-size: 11px; font-weight: 700; color: #8C9BAE;")
+            det_title = QLabel("Technical Details & Traceback:", self)
+            det_title.setStyleSheet("font-size: 11px; font-weight: 700; color: #64748B;")
             layout.addWidget(det_title)
 
             self.details_edit = QPlainTextEdit(self)
@@ -318,14 +363,23 @@ if _QT:
 
             # Button Row
             btn_row = QHBoxLayout()
+            self.cloud_btn = QPushButton("☁️  Run on Free Cloud GPU", self)
+            self.cloud_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.cloud_btn.setStyleSheet(
+                "QPushButton{background:#0284C7;color:#FFF;border:none;border-radius:6px;padding:8px 14px;font-weight:700;font-size:11px;}"
+                "QPushButton:hover{background:#0EA5E9;}"
+            )
+            self.cloud_btn.clicked.connect(self._open_cloud_gpu)
+            btn_row.addWidget(self.cloud_btn)
+
             self.copy_btn = QPushButton("Copy details", self)
             self.copy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self.copy_btn.setStyleSheet(
                 "QPushButton {"
-                "  background: #1C2431; color: #38BDF8; border: 1px solid #283446;"
-                "  border-radius: 4px; padding: 7px 16px; font-weight: 700;"
+                "  background: #1A2230; color: #38BDF8; border: 1px solid #2B384E;"
+                "  border-radius: 6px; padding: 8px 16px; font-weight: 700; font-size: 11px;"
                 "}"
-                "QPushButton:hover { background: #283446; color: #7DD3FC; }"
+                "QPushButton:hover { background: #232D40; color: #7DD3FC; }"
             )
             self.copy_btn.clicked.connect(self._copy_details)
             btn_row.addWidget(self.copy_btn)
@@ -337,7 +391,7 @@ if _QT:
             close_btn.setStyleSheet(
                 "QPushButton {"
                 "  background: #2563EB; color: #FFF; border: none;"
-                "  border-radius: 4px; padding: 7px 20px; font-weight: 700;"
+                "  border-radius: 6px; padding: 8px 22px; font-weight: 700; font-size: 12px;"
                 "}"
                 "QPushButton:hover { background: #3B82F6; }"
             )
@@ -354,6 +408,16 @@ if _QT:
             self.copy_btn.setStyleSheet(
                 "QPushButton {"
                 "  background: #064E3B; color: #34D399; border: 1px solid #059669;"
-                "  border-radius: 4px; padding: 7px 16px; font-weight: 700;"
+                "  border-radius: 6px; padding: 8px 16px; font-weight: 700;"
                 "}"
             )
+
+        def _open_cloud_gpu(self) -> None:
+            self.accept()
+            p = self.parent()
+            if p and hasattr(p, "_open_kaggle_accelerator"):
+                p._open_kaggle_accelerator()
+            elif p and hasattr(p, "window"):
+                w = p.window()
+                if hasattr(w, "studio") and hasattr(w.studio, "_open_kaggle_accelerator"):
+                    w.studio._open_kaggle_accelerator()

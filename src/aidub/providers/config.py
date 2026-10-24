@@ -38,7 +38,7 @@ class ProviderConfig(ContractModel):
     # Google Gemini
     gemini_api_key: str = ""
     gemini_api_keys: list[str] = field(default_factory=list)
-    gemini_model: str = "gemini-3.5-flash"
+    gemini_model: str = "gemini-2.0-flash"
 
     # OpenAI / ChatGPT
     openai_api_key: str = ""
@@ -153,7 +153,7 @@ class ProviderConfig(ContractModel):
             openrouter_site_url=os.getenv("OPENROUTER_SITE_URL", ""),
             gemini_api_key=gem_key,
             gemini_api_keys=gem_keys,
-            gemini_model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
+            gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
             openai_api_key=os.getenv("OPENAI_API_KEY", ""),
             openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
             openai_base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),

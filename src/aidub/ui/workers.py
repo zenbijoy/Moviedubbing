@@ -120,10 +120,10 @@ if _QT:
             *,
             output_path: str | Path | None = None,
             voice_name: str | None = None,
-            voice_engine: str = "chatterbox",
+            voice_engine: str = "gemini_tts",
             character_voices: dict[str, str] | None = None,
-            lipsync: bool = False,
-            lipsync_tier: str = "preview_fast",
+            lipsync: bool = True,
+            lipsync_tier: str = "studio_viseme",
         ) -> None:
             super().__init__(parent)
             self.input_path = Path(input_path)
@@ -155,7 +155,25 @@ if _QT:
                 from aidub.pipeline.engine import DubbingEngine, PipelineCancelled
 
                 out_path = self._available_output_path()
+                import os
                 is_fast = self.quality_profile == "fast"
+                effective_lipsync = False if is_fast else self.lipsync
+                if effective_lipsync:
+                    if self.lipsync_tier == "cinema_quality" and not os.environ.get("AIDUB_LATENTSYNC_COMMAND"):
+                        self.progress_updated.emit(
+                            "lipsync_notice",
+                            2,
+                            "Notice: AIDUB_LATENTSYNC_COMMAND not configured; using Studio Viseme Lip-Sync.",
+                        )
+                        self.lipsync_tier = "studio_viseme"
+                    elif self.lipsync_tier == "preview_fast" and not os.environ.get("AIDUB_MUSETALK_COMMAND"):
+                        self.progress_updated.emit(
+                            "lipsync_notice",
+                            2,
+                            "Notice: AIDUB_MUSETALK_COMMAND not configured; using Studio Viseme Lip-Sync.",
+                        )
+                        self.lipsync_tier = "studio_viseme"
+
                 cfg = PipelineConfig(
                     input=self.input_path,
                     output=out_path,
@@ -163,7 +181,7 @@ if _QT:
                     keep_music=not is_fast,
                     diarize=not is_fast,
                     fast=is_fast,
-                    lipsync=False if is_fast else self.lipsync,
+                    lipsync=effective_lipsync,
                     lipsync_tier=self.lipsync_tier,
                     voice_name=self.voice_name,
                     voice_engine=self.voice_engine,
@@ -685,6 +703,67 @@ if _QT:
                 logger.exception("RenderExportWorker failed: %s", exc)
                 self.render_failed.emit(str(exc))
 
+    class UtteranceRetakeWorker(QThread):
+        """Worker thread for running targeted single-utterance ADR retake and ripple edit."""
+
+        retake_progress = Signal(int, str)  # percent, status message
+        retake_completed = Signal(object)  # RetakeResult
+        retake_failed = Signal(str)  # error message
+
+        def __init__(
+            self,
+            work_dir: Path | str,
+            utterance_index: int,
+            new_target_text: str,
+            *,
+            target_language: str = "bn",
+            voice_name: str | None = None,
+            rate_percent: int = 0,
+            pitch_hz: int = 0,
+            optimize_isometric: bool = False,
+            acoustic_preset: str | None = None,
+            ripple_edit: bool = False,
+            parent: Any = None,
+        ) -> None:
+            super().__init__(parent)
+            self.work_dir = Path(work_dir)
+            self.utterance_index = utterance_index
+            self.new_target_text = new_target_text
+            self.target_language = target_language
+            self.voice_name = voice_name
+            self.rate_percent = rate_percent
+            self.pitch_hz = pitch_hz
+            self.optimize_isometric = optimize_isometric
+            self.acoustic_preset = acoustic_preset
+            self.ripple_edit = ripple_edit
+
+        def run(self) -> None:
+            try:
+                from aidub.pipeline.retake import UtteranceRetakeService
+
+                service = UtteranceRetakeService(
+                    self.work_dir, target_language=self.target_language
+                )
+
+                def _cb(pct: int, msg: str) -> None:
+                    self.retake_progress.emit(pct, msg)
+
+                result = service.retake_utterance(
+                    utterance_index=self.utterance_index,
+                    new_target_text=self.new_target_text,
+                    voice_name=self.voice_name,
+                    rate_percent=self.rate_percent,
+                    pitch_hz=self.pitch_hz,
+                    optimize_isometric=self.optimize_isometric,
+                    acoustic_preset=self.acoustic_preset,
+                    ripple_edit=self.ripple_edit,
+                    progress_cb=_cb,
+                )
+                self.retake_completed.emit(result)
+            except Exception as exc:
+                logger.exception("UtteranceRetakeWorker failed: %s", exc)
+                self.retake_failed.emit(str(exc))
+
 
 __all__ = [
     "AIAssistantWorker",
@@ -697,4 +776,5 @@ __all__ = [
     "SpeechTranscriptionWorker",
     "TTSPreviewWorker",
     "TimingFitWorker",
+    "UtteranceRetakeWorker",
 ]

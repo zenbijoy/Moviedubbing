@@ -229,6 +229,26 @@ class EDLFCPXMLAdapter:
         )
         return "\n".join(xml)
 
+    @classmethod
+    def generate_cmx3600_edl(
+        cls, timeline: OTIOTimeline, start_timecode_ms: int = 3600000, fps: float | None = None
+    ) -> str:
+        """Convenience classmethod for EDL generation."""
+        adapter = cls()
+        eff_tl = timeline
+        if fps is not None and fps != timeline.frame_rate:
+            eff_tl = timeline.model_copy(update={"frame_rate": fps})
+        return adapter.export_cmx3600_edl(eff_tl, start_timecode_ms=start_timecode_ms)
+
+    @classmethod
+    def generate_fcpxml(cls, timeline: OTIOTimeline, fps: float | None = None) -> str:
+        """Convenience classmethod for FCPXML generation."""
+        adapter = cls()
+        eff_tl = timeline
+        if fps is not None and fps != timeline.frame_rate:
+            eff_tl = timeline.model_copy(update={"frame_rate": fps})
+        return adapter.export_fcpxml(eff_tl)
+
 
 __all__ = [
     "EDLFCPXMLAdapter",

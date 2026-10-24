@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-import pytest
+from unittest.mock import patch
 
+import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QApplication
 
 from aidub.ui.dialogs.broadcast_export_dialog import BroadcastExportDialog
@@ -54,10 +54,20 @@ def test_broadcast_export_dialog_presets(qapp, tmp_path: Path):
         video_path=str(vid),
         audio_path=str(aud),
     )
-    assert dlg.preset_combo.count() >= 4
+    assert dlg.preset_combo.count() >= 5
 
-    # Change preset to Netflix 5.1
-    dlg.preset_combo.setCurrentIndex(1)
+    # Check 1-Click Studio Master Bundle (Default Index 0)
+    dlg.preset_combo.setCurrentIndex(0)
+    assert "STUDIO MASTER" in dlg.spec_card.text().upper() or "C2PA" in dlg.spec_card.text().upper()
+
+    # Find and select Netflix preset
+    netflix_idx = -1
+    for idx in range(dlg.preset_combo.count()):
+        if "netflix" in dlg.preset_combo.itemText(idx).lower():
+            netflix_idx = idx
+            break
+    assert netflix_idx >= 0
+    dlg.preset_combo.setCurrentIndex(netflix_idx)
     assert "NETFLIX" in dlg.spec_card.text().upper()
     assert "-23.0 LUFS" in dlg.spec_card.text()
 

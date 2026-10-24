@@ -7,7 +7,7 @@ import math
 import struct
 import wave
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -92,3 +92,65 @@ def test_retake_service_successful_replacement(tmp_path: Path) -> None:
     # Verify subtitles updated
     srt_content = Path(result.subtitle_path).read_text(encoding="utf-8")
     assert "স্বাগতম প্রিয় বন্ধু" in srt_content
+
+
+def test_retake_service_isometric_and_acoustic_preset(tmp_path: Path) -> None:
+    store = UtteranceStore("bn", tmp_path)
+    segs = [
+        {"start": 1.0, "end": 2.5, "text": "I think that", "tgt": "আমার মনে হয় যে", "speaker": 0},
+    ]
+    store.save_utterances(segs)
+    _make_dummy_wav(tmp_path / "seg_000_fit.wav", duration_s=1.5)
+
+    service = UtteranceRetakeService(tmp_path, target_language="bn")
+
+    def _mock_synth(text: str, output_mp3_path: Path, **kwargs: object) -> None:
+        _make_dummy_wav(output_mp3_path, duration_s=1.5)
+
+    with patch("aidub.pipeline.retake.EdgeTTSAdapter.synthesize_to_file", side_effect=_mock_synth):
+        result: RetakeResult = service.retake_utterance(
+            utterance_index=0,
+            new_target_text="আমার মনে হয় যে আমরা সফল হব",
+            optimize_isometric=True,
+            acoustic_preset="living_room",
+        )
+
+    assert result.success is True
+    assert result.isometric_score is not None
+    assert result.isometric_score > 0.0
+    assert result.acoustic_preset_applied == "living_room"
+    assert Path(result.dubbed_vocals_path).is_file()
+
+
+def test_retake_service_ripple_edit(tmp_path: Path) -> None:
+    store = UtteranceStore("bn", tmp_path)
+    segs = [
+        {"start": 1.0, "end": 2.0, "text": "Short line", "tgt": "ছোট লাইন", "speaker": 0},
+        {"start": 3.0, "end": 4.5, "text": "Next line", "tgt": "পরের লাইন", "speaker": 1},
+        {"start": 6.0, "end": 7.0, "text": "Final line", "tgt": "শেষ লাইন", "speaker": 0},
+    ]
+    store.save_utterances(segs)
+    _make_dummy_wav(tmp_path / "seg_000_fit.wav", duration_s=1.0)
+    _make_dummy_wav(tmp_path / "seg_001_fit.wav", duration_s=1.5)
+    _make_dummy_wav(tmp_path / "seg_002_fit.wav", duration_s=1.0)
+
+    service = UtteranceRetakeService(tmp_path, target_language="bn")
+
+    # Mock synth to produce 2.5s duration instead of 1.0s (delta = +1.5s)
+    def _mock_synth(text: str, output_mp3_path: Path, **kwargs: object) -> None:
+        _make_dummy_wav(output_mp3_path, duration_s=2.5)
+
+    with patch("aidub.pipeline.retake.EdgeTTSAdapter.synthesize_to_file", side_effect=_mock_synth):
+        result: RetakeResult = service.retake_utterance(
+            utterance_index=0,
+            new_target_text="একটি দীর্ঘ ব্যাখ্যাপূর্ণ সংলাপ যা বেশি সময় নেয়",
+            ripple_edit=True,
+        )
+
+    assert result.success is True
+    assert result.ripple_shift_s > 0.0
+
+    loaded_utterances, _ = store.load_utterances()
+    # Check that segment 1 and 2 were shifted downstream
+    assert loaded_utterances[1]["start"] > 3.0
+    assert loaded_utterances[2]["start"] > 6.0

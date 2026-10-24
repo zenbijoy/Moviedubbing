@@ -239,6 +239,7 @@ class FasterWhisperAdapter(SpeechRecognizer):
         self,
         audio_path: str | Path,
         turns: list[tuple[float, float, int]] | None = None,
+        progress_callback: Any | None = None,
     ) -> list[dict[str, Any]]:
         """Transcribe an actual audio file and preserve model timestamps."""
 
@@ -253,7 +254,15 @@ class FasterWhisperAdapter(SpeechRecognizer):
                 word_timestamps=self.options.word_timestamps,
                 language=self.options.language,
             )
-            raw_segments = list(segments)
+            total_dur_info = float(getattr(_info, "duration", 0.0))
+            raw_segments = []
+            for s in segments:
+                raw_segments.append(s)
+                if progress_callback is not None:
+                    try:
+                        progress_callback(float(s.end), total_dur_info, str(s.text).strip())
+                    except Exception:
+                        pass
         except (RuntimeError, Exception) as exc:
             logger.warning(
                 "Faster-Whisper transcription failed (%s); retrying with CPU int8 fallback", exc

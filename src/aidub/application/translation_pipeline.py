@@ -156,14 +156,18 @@ class TranslationPipeline:
 
         for i in range(0, len(lines), chunk_size):
             chunk = lines[i : i + chunk_size]
-            numbered = "\n".join(f"{j + 1}. {line.text}" for j, line in enumerate(chunk))
+            numbered = "\n".join(
+                f"{j + 1}. [Duration: {line.duration_ms}ms, Budget: {max(2, round(line.duration_ms / 1000.0 * 5.4))} syllables] {line.text}"
+                for j, line in enumerate(chunk)
+            )
 
             prompt = (
-                f"You are localizing a movie transcript from {context.source_language} to {context.target_language}.\n"
-                f"Translate each numbered line into natural spoken {context.target_language}.\n"
-                f"Keep each line about the same length as the source so it fits timing.\n\n"
+                f"You are an expert Hollywood ADR dubbing translator localizing film dialogue from {context.source_language} to natural cinematic {context.target_language}.\n"
+                f"CRITICAL LIP-SYNC DUBBING RULE: Each translated dialogue line MUST fit the exact spoken duration of the original actor's visual mouth movement.\n"
+                f"Match the indicated syllable budget closely so speech starts when the mouth opens and finishes when the mouth closes.\n"
+                f"Use natural, emotional, idiomatic spoken dialogue (Dhaka/modern standard for Bengali), never stiff or bookish phrasing.\n\n"
                 f"Numbered lines:\n{numbered}\n\n"
-                f'Return JSON: {{"translations": ["line 1 translation", "line 2 translation", ...]}}'
+                f'Return JSON only: {{"translations": ["line 1 translation", "line 2 translation", ...]}}'
             )
 
             request = LlmRequest(
@@ -183,8 +187,10 @@ class TranslationPipeline:
 
                 for j, line in enumerate(chunk):
                     txt = translated_texts[j] if j < len(translated_texts) else line.text
-                    word_count = len(txt.split())
-                    est_ms = word_count * 200
+                    # Estimate duration based on Bengali phonetic syllable rate (~185ms/syl)
+                    from aidub.media.syllable_alignment import SyllableAlignmentEngine
+                    syl_count = SyllableAlignmentEngine.count_syllables(txt, context.target_language)
+                    est_ms = round(syl_count * 185)
                     delta_pct = abs(est_ms - line.duration_ms) / max(line.duration_ms, 1)
 
                     results.append(

@@ -35,12 +35,17 @@ class PipelineOutputs:
     origin_srt: str = ""
     target_srt: str = ""
     bilingual_srt: str = ""
+    bilingual_ass: str = ""
     dubbed_vocals: str = ""
     dubbed_audio: str = ""
     dubbed_video: str = ""
     lipsynced_video: str = ""
     bench_json: str = ""
     transcript_json: str = ""
+    qc_certificate_json: str = ""
+    qc_certificate_txt: str = ""
+    fcpxml_path: str = ""
+    edl_path: str = ""
 
 
 @dataclass

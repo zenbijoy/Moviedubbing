@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
 
 from aidub.media.broadcast_exporter import (
     PRESET_CONFIGS,
@@ -24,13 +23,12 @@ from aidub.media.broadcast_exporter import (
 logger = logging.getLogger(__name__)
 
 try:
-    from PySide6.QtCore import QThread, Qt, Signal
+    from PySide6.QtCore import Qt, QThread, Signal
     from PySide6.QtWidgets import (
         QCheckBox,
         QComboBox,
         QDialog,
         QFileDialog,
-        QFrame,
         QGroupBox,
         QHBoxLayout,
         QLabel,
@@ -79,7 +77,21 @@ if _QT:
                 def progress_cb(pct: int, msg: str) -> None:
                     self.progress_signal.emit(pct, msg)
 
-                if self.music_path and Path(self.music_path).is_file():
+                if self.preset == "studio_master_bundle":
+                    from aidub.export.studio_master_exporter import StudioMasterExporter
+
+                    w_dir = Path(self.video_path).parent if self.video_path else Path.cwd()
+                    bundle_res = StudioMasterExporter.export_master_bundle(
+                        work_dir=w_dir,
+                        output_dir=self.output_path,
+                        source_video_path=self.video_path,
+                        dubbed_audio_path=self.audio_path,
+                        original_audio_path=self.music_path,
+                        subtitle_path=self.subtitle_path,
+                        progress_cb=progress_cb,
+                    )
+                    out = str(bundle_res.package_dir)
+                elif self.music_path and Path(self.music_path).is_file():
                     out = BroadcastMasterExporter.export_cinematic_surround_master(
                         video_path=self.video_path,
                         dialogue_path=self.audio_path,
@@ -171,6 +183,7 @@ if _QT:
             pg_lay = QVBoxLayout(preset_group)
 
             self.preset_combo = QComboBox(self)
+            self.preset_combo.addItem("📦 1-Click Studio Master Bundle (Dual-Audio MKV + Broadcast QC + FCPXML/EDL + C2PA)", "studio_master_bundle")
             self.preset_combo.addItem("YouTube / Web 4K UHD (-14 LUFS, AAC 384k, Faststart)", BroadcastPreset.YOUTUBE_4K)
             self.preset_combo.addItem("Netflix Specification (5.1 Surround, EBU R128 -23 LUFS, AC3 640k)", BroadcastPreset.NETFLIX_51)
             self.preset_combo.addItem("Theatrical Master Archive (High Bitrate 5.1 E-AC3 768k)", BroadcastPreset.THEATRICAL_MASTER)
@@ -207,7 +220,8 @@ if _QT:
             dest_group = QGroupBox("Output Destination", self)
             dg_lay = QHBoxLayout(dest_group)
 
-            self.dest_edit = QLineEdit(str(Path(video_path).parent / default_output_name if video_path else Path.cwd() / default_output_name), self)
+            default_out = str(Path(video_path).parent / "master_delivery_package" if video_path else Path.cwd() / "master_delivery_package")
+            self.dest_edit = QLineEdit(default_out, self)
             dg_lay.addWidget(self.dest_edit, 1)
 
             browse_btn = QPushButton("Browse...", self)
@@ -267,9 +281,29 @@ if _QT:
 
         def _on_preset_changed(self) -> None:
             self._update_spec_display()
+            preset_enum = self.preset_combo.currentData()
+            parent_dir = Path(self.video_path).parent if self.video_path else Path.cwd()
+            if preset_enum == "studio_master_bundle":
+                self.dest_edit.setText(str(parent_dir / "master_delivery_package"))
+                self.export_btn.setText("📦  Generate 1-Click Studio Master Bundle")
+            else:
+                if self.dest_edit.text().endswith("master_delivery_package"):
+                    self.dest_edit.setText(str(parent_dir / "broadcast_master.mp4"))
+                self.export_btn.setText("🚀  Render Broadcast Master")
 
         def _update_spec_display(self) -> None:
             preset_enum = self.preset_combo.currentData()
+            if preset_enum == "studio_master_bundle":
+                text = (
+                    "<b>Profile:</b> 1-Click Complete Enterprise Studio Master Deliverables<br>"
+                    "<b>Container:</b> Multi-Track Dual-Audio MKV Master (Original + Localized Dialogue + Subtitles)<br>"
+                    "<b>Broadcast QC:</b> Certified ITU-R BS.1770-4 / EBU R128 (-24 LUFS / -1.0 dBTP)<br>"
+                    "<b>NLE Interchange:</b> Final Cut Pro XML (FCPXML 1.10+) & CMX3600 EDL<br>"
+                    "<b>Provenance & Security:</b> C2PA Digital Content Credentials (HMAC-SHA256 Signed)"
+                )
+                self.spec_card.setText(text)
+                return
+
             cfg = PRESET_CONFIGS.get(preset_enum, PRESET_CONFIGS[BroadcastPreset.YOUTUBE_4K])
             text = (
                 f"<b>Profile:</b> {cfg.description}<br>"
@@ -283,12 +317,20 @@ if _QT:
 
         def _browse_dest(self) -> None:
             cur = self.dest_edit.text()
-            chosen, _ = QFileDialog.getSaveFileName(
-                self,
-                "Select Master Destination",
-                cur,
-                "MP4 Video (*.mp4);;MKV Video (*.mkv);;MOV Master (*.mov);;All Files (*)",
-            )
+            preset_enum = self.preset_combo.currentData()
+            if preset_enum == "studio_master_bundle":
+                chosen = QFileDialog.getExistingDirectory(
+                    self,
+                    "Select Studio Master Package Directory",
+                    cur or str(Path.cwd()),
+                )
+            else:
+                chosen, _ = QFileDialog.getSaveFileName(
+                    self,
+                    "Select Master Destination",
+                    cur,
+                    "MP4 Video (*.mp4);;MKV Video (*.mkv);;MOV Master (*.mov);;All Files (*)",
+                )
             if chosen:
                 self.dest_edit.setText(chosen)
 
@@ -334,10 +376,26 @@ if _QT:
             self.status_lbl.setText(f"✓ Master Complete: {Path(out_file).name}")
             self.export_btn.setEnabled(True)
             self.cancel_btn.setEnabled(True)
+            preset_enum = self.preset_combo.currentData()
+            if preset_enum == "studio_master_bundle":
+                msg = (
+                    f"✓ 1-Click Studio Master Delivery Package successfully generated at:\n{out_file}\n\n"
+                    "Includes:\n"
+                    "• Multi-Track Dual-Audio MKV Master\n"
+                    "• ITU-R BS.1770-4 Certified Broadcast QC Report (JSON & TXT)\n"
+                    "• NLE Timelines: Final Cut Pro XML (FCPXML 1.10+) & CMX3600 EDL\n"
+                    "• Cryptographic C2PA Digital Content Credentials Manifest\n"
+                    "• Package Delivery Inventory with SHA-256 Checksums"
+                )
+            else:
+                msg = (
+                    f"✓ Broadcast master successfully rendered to:\n{out_file}\n\n"
+                    "Compliant with EBU R128 & target distribution standards."
+                )
             QMessageBox.information(
                 self,
                 "Master Delivery Exported",
-                f"✓ Broadcast master successfully rendered to:\n{out_file}\n\nCompliant with EBU R128 & target distribution standards.",
+                msg,
             )
             self.accept()
 

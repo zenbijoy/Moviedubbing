@@ -23,6 +23,7 @@ from aidub.speech.runtime import RecognitionRuntime
 class LipSyncQualityTier(StrEnum):
     PREVIEW_FAST = "preview_fast"  # Tier 1 (e.g. MuseTalk) for rapid NLE timeline preview
     CINEMA_QUALITY = "cinema_quality"  # Tier 2 (e.g. LatentSync) for final high-res delivery
+    STUDIO_VISEME = "studio_viseme"  # Universal local viseme & speech-envelope lip synchronizer
 
 
 class LipSyncOptions(ContractModel):
@@ -87,11 +88,29 @@ def run_configured_lipsync(
         raise FileNotFoundError(f"lip-sync target audio does not exist: {target_audio}")
     command_template = os.environ.get(command_environment_variable, "").strip()
     if not command_template:
-        raise RuntimeError(
-            f"{command_environment_variable} is not configured; set it to the installed "
-            "model command using {video}, {audio}, and {output} placeholders. "
-            "No lip-sync output was created."
+        import logging
+        logging.getLogger(__name__).info(
+            "%s not configured; using native viseme speech-envelope lip synchronizer for %s",
+            command_environment_variable,
+            output_path.name,
         )
+        from aidub.media.viseme_lipsync import VisemeLipSyncEngine
+
+        viseme_engine = VisemeLipSyncEngine(
+            feather_margin_px=opts.feather_margin_px,
+        )
+        viseme_engine.synthesize_lip_sync(
+            source_video_path=source_video,
+            target_audio_path=target_audio,
+            output_video_path=output_path,
+            work_dir=output_path.parent,
+        )
+        metadata = probe(output_path)
+        format_duration = float(metadata.get("format", {}).get("duration") or 0.0)
+        fps_val = opts.fps
+        rendered_frames = max(1, round(format_duration * fps_val))
+        return rendered_frames, round(format_duration * 1_000)
+
 
     opts = options or LipSyncOptions()
     format_vars = {

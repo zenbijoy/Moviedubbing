@@ -6,28 +6,43 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 try:
-    from PySide6.QtCore import Qt, QThread, QTimer, Signal
+    from PySide6.QtCore import Qt, QThread, QTimer, QUrl, Signal
     from PySide6.QtGui import (
         QAction,
+        QBrush,
         QCloseEvent,
+        QColor,
+        QDesktopServices,
         QDragEnterEvent,
         QDropEvent,
+        QFont,
         QKeyEvent,
         QKeySequence,
+        QLinearGradient,
         QMouseEvent,
+        QPainter,
+        QPaintEvent,
+        QPen,
     )
     from PySide6.QtWidgets import (
+        QApplication,
+        QCheckBox,
+        QComboBox,
+        QFileDialog,
         QFrame,
         QHBoxLayout,
         QLabel,
+        QLineEdit,
         QMainWindow,
         QMenuBar,
         QMessageBox,
         QProgressBar,
         QPushButton,
+        QScrollArea,
         QStackedWidget,
         QToolBar,
         QVBoxLayout,
+        QWidget,
     )
 
     _QT = True
@@ -50,122 +65,540 @@ if _QT:
 
             self.completed.emit(probe_system_telemetry(Path.cwd()))
 
+    class _WaveformCanvas(QWidget):
+        """Sleek animated waveform visualizer for real speech preview."""
+
+        def __init__(self, color_hex: str = "#22D3EE", parent: QWidget | None = None) -> None:
+            super().__init__(parent)
+            self.color_hex = color_hex
+            self.progress = 0.18
+            self.setFixedHeight(72)
+            self.setMinimumWidth(210)
+            import math
+
+            self.bars = [
+                0.12 + 0.88 * abs(math.sin(i * 0.22) * math.cos(i * 0.08) * math.sin(i * 0.41 + 0.2))
+                for i in range(60)
+            ]
+
+        def set_progress(self, val: float) -> None:
+            self.progress = max(0.0, min(1.0, val))
+            self.update()
+
+        def paintEvent(self, event: QPaintEvent) -> None:  # noqa: N802
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            w, h = self.width(), self.height()
+            mid_y = h / 2.0
+            n_bars = len(self.bars)
+            spacing = 2.0
+            bar_w = max(2.0, (w - (n_bars * spacing)) / max(1, n_bars))
+
+            # Subtle card backdrop
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(QColor("#080D16")))
+            painter.drawRoundedRect(0, 0, w, h, 6, 6)
+
+            # Centerline
+            painter.setPen(QPen(QColor("#182232"), 1))
+            painter.drawLine(0, int(mid_y), w, int(mid_y))
+
+            base_color = QColor(self.color_hex)
+            for i, peak in enumerate(self.bars):
+                x = i * (bar_w + spacing)
+                bar_h = max(4.0, peak * (h * 0.82))
+                y = mid_y - (bar_h / 2.0)
+                is_played = (x / max(1.0, w)) <= self.progress
+
+                if is_played:
+                    painter.setBrush(QBrush(base_color))
+                else:
+                    dimmed = QColor(base_color)
+                    dimmed.setAlpha(60)
+                    painter.setBrush(QBrush(dimmed))
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.drawRoundedRect(int(x), int(y), int(bar_w), int(bar_h), 2, 2)
+
+            # Glowing Playhead
+            px = int(self.progress * w)
+            painter.setPen(QPen(QColor("#FFFFFF"), 2))
+            painter.drawLine(px, 0, px, h)
+            painter.setBrush(QBrush(QColor("#FFFFFF")))
+            painter.drawEllipse(px - 3, int(mid_y) - 3, 6, 6)
+
+    class _ModernActionCard(QFrame):
+        """Quick action card with glowing icon badge matching Image 1."""
+
+        def __init__(
+            self,
+            title: str,
+            subtitle: str,
+            icon_char: str,
+            icon_bg: str,
+            callback: Any = None,
+            parent: QWidget | None = None,
+        ) -> None:
+            super().__init__(parent)
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.setStyleSheet(
+                f"QFrame {{"
+                f"  background: #141722; border: 1px solid #232C3E; border-radius: 12px; padding: 12px 14px;"
+                f"}}"
+                f"QFrame:hover {{"
+                f"  background: #191E2C; border-color: {icon_bg};"
+                f"}}"
+            )
+            layout = QHBoxLayout(self)
+            layout.setContentsMargins(12, 10, 12, 10)
+            layout.setSpacing(12)
+
+            badge = QLabel(icon_char, self)
+            badge.setFixedSize(44, 44)
+            badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            badge.setStyleSheet(
+                f"background: {icon_bg}; color: #FFFFFF; border-radius: 22px; font-size: 20px;"
+            )
+            layout.addWidget(badge)
+
+            text_col = QVBoxLayout()
+            text_col.setSpacing(2)
+            t_lbl = QLabel(title, self)
+            t_lbl.setStyleSheet("font-size: 14px; font-weight: 800; color: #F8FAFC;")
+            s_lbl = QLabel(subtitle, self)
+            s_lbl.setStyleSheet("font-size: 11px; font-weight: 500; color: #94A3B8;")
+            text_col.addWidget(t_lbl)
+            text_col.addWidget(s_lbl)
+            layout.addLayout(text_col, 1)
+
+            plus_btn = QPushButton("+", self)
+            plus_btn.setFixedSize(28, 28)
+            plus_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            plus_btn.setStyleSheet(
+                "QPushButton { background: #1E2738; color: #E2E8F0; border-radius: 14px; font-size: 16px; font-weight: 700; border: none; }"
+                "QPushButton:hover { background: #2563EB; color: #FFF; }"
+            )
+            if callback:
+                plus_btn.clicked.connect(callback)
+            layout.addWidget(plus_btn)
+
+            self._callback = callback
+
+        def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+            if event.button() == Qt.MouseButton.LeftButton and self._callback:
+                self._callback()
+            super().mousePressEvent(event)
+
+    class _ProjectCard(QFrame):
+        """Card representing a video project matching Image 1."""
+
+        def __init__(
+            self,
+            title: str,
+            created_text: str,
+            dubbed_pill_text: str,
+            video_path: str = "",
+            on_open: Any = None,
+            parent: QWidget | None = None,
+        ) -> None:
+            super().__init__(parent)
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.setStyleSheet(
+                "QFrame {"
+                "  background: #131722; border: 1px solid #1E2738; border-radius: 10px; padding: 14px;"
+                "}"
+                "QFrame:hover {"
+                "  background: #171C2B; border-color: #38BDF8;"
+                "}"
+            )
+            layout = QVBoxLayout(self)
+            layout.setContentsMargins(14, 12, 14, 12)
+            layout.setSpacing(10)
+
+            top_row = QHBoxLayout()
+            v_badge = QLabel("🎥", self)
+            v_badge.setFixedSize(32, 32)
+            v_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            v_badge.setStyleSheet(
+                "background: #1E293B; color: #38BDF8; border-radius: 6px; font-size: 15px;"
+            )
+            top_row.addWidget(v_badge)
+
+            title_box = QVBoxLayout()
+            title_box.setSpacing(2)
+            t_lbl = QLabel(title, self)
+            t_lbl.setStyleSheet("font-size: 13px; font-weight: 700; color: #F8FAFC;")
+            c_lbl = QLabel(created_text, self)
+            c_lbl.setStyleSheet("font-size: 10px; color: #64748B;")
+            title_box.addWidget(t_lbl)
+            title_box.addWidget(c_lbl)
+            top_row.addLayout(title_box, 1)
+
+            dots_btn = QPushButton("⋮", self)
+            dots_btn.setFixedSize(24, 24)
+            dots_btn.setStyleSheet(
+                "QPushButton { background: transparent; color: #64748B; border: none; font-size: 15px; font-weight: bold; }"
+                "QPushButton:hover { color: #FFF; background: #1E293B; border-radius: 4px; }"
+            )
+            top_row.addWidget(dots_btn)
+            layout.addLayout(top_row)
+
+            pill_row = QHBoxLayout()
+            pill_lbl = QLabel(f"Dubbed to: {dubbed_pill_text}", self)
+            pill_lbl.setStyleSheet(
+                "background: #0B111D; color: #94A3B8; border: 1px solid #1E293B; border-radius: 4px;"
+                "padding: 4px 8px; font-size: 10px; font-weight: 600;"
+            )
+            pill_row.addWidget(pill_lbl)
+            pill_row.addStretch()
+            layout.addLayout(pill_row)
+
+            self._on_open = on_open
+            self._video_path = video_path
+
+        def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+            if event.button() == Qt.MouseButton.LeftButton and self._on_open:
+                if self._video_path:
+                    self._on_open(self._video_path)
+                else:
+                    self._on_open()
+            super().mousePressEvent(event)
+
     class _HomeDashboardPanel(QFrame):
-        """Home overview dashboard for project selection, hardware stats, and navigation."""
+        """Ultra-Modern AI Studio Hub & Dashboard (Replicating Image 1)."""
 
         def __init__(self, window: AIDubStudioWindow) -> None:
             super().__init__(window)
             self._window = window
             self.setObjectName("HomeDashboardPanel")
-            self.setStyleSheet("QFrame#HomeDashboardPanel{background:#0D1118;color:#F7F9FC;}")
+            self.setStyleSheet("QFrame#HomeDashboardPanel{background:#0B0E14;color:#F8FAFC;}")
 
-            layout = QVBoxLayout(self)
-            layout.setContentsMargins(40, 30, 40, 30)
-            layout.setSpacing(24)
+            root_layout = QHBoxLayout(self)
+            root_layout.setContentsMargins(0, 0, 0, 0)
+            root_layout.setSpacing(0)
 
-            # Hero Banner
-            hero = QFrame(self)
-            hero.setStyleSheet(
-                "background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #161D28,stop:1 #1C2431);"
-                "border:1px solid #283241;border-radius:12px;padding:24px;"
-            )
-            h_layout = QVBoxLayout(hero)
-            title = QLabel("AI MOVIE DUBBING STUDIO", hero)
-            title.setStyleSheet("font-size:24px;font-weight:900;color:#F7F9FC;letter-spacing:1px;")
-            subtitle = QLabel("Local-First Professional Multilingual Editorial Workstation", hero)
-            subtitle.setStyleSheet("font-size:13px;color:#9CA3AF;margin-top:4px;")
-            h_layout.addWidget(title)
-            h_layout.addWidget(subtitle)
-            layout.addWidget(hero)
+            # =================================================================
+            # 1. Left Sidebar Navigation (Matching Image 1)
+            # =================================================================
+            sidebar = QFrame(self)
+            sidebar.setFixedWidth(230)
+            sidebar.setStyleSheet("background: #0D1017; border-right: 1px solid #1B212D;")
+            sb_layout = QVBoxLayout(sidebar)
+            sb_layout.setContentsMargins(14, 16, 14, 16)
+            sb_layout.setSpacing(6)
 
-            # Cards row
-            cards_layout = QHBoxLayout()
-            cards_layout.setSpacing(18)
+            # Workspace Card
+            ws_card = QFrame(sidebar)
+            ws_card.setStyleSheet(
+                "background: #141822; border: 1px solid #232C3E; border-radius: 8px; padding: 6px 8px;"
+            )
+            ws_lay = QHBoxLayout(ws_card)
+            ws_lay.setContentsMargins(4, 4, 4, 4)
+            ws_lay.setSpacing(8)
 
-            # Card 1: Import / Open Project
-            c1 = QFrame(self)
-            c1.setStyleSheet(
-                "QFrame{background:#161D28;border:1px solid #283241;border-radius:10px;padding:16px;}"
-                "QFrame:hover{border-color:#4F8CFF;}"
+            ws_av = QLabel("AI", ws_card)
+            ws_av.setFixedSize(28, 28)
+            ws_av.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            ws_av.setStyleSheet(
+                "background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #6366F1, stop:1 #8B5CF6);"
+                "color: #FFF; font-size: 11px; font-weight: 900; border-radius: 14px;"
             )
-            c1_lay = QVBoxLayout(c1)
-            c1_t = QLabel("📁  Import Source Movie", c1)
-            c1_t.setStyleSheet("font-size:15px;font-weight:700;color:#F7F9FC;")
-            c1_d = QLabel(
-                "Load a video file to begin automated transcription, translation, and dubbing.", c1
-            )
-            c1_d.setWordWrap(True)
-            c1_d.setStyleSheet("font-size:12px;color:#9CA3AF;margin-top:6px;")
-            c1_btn = QPushButton("Open Media Movie…", c1)
-            c1_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            c1_btn.setStyleSheet(
-                "QPushButton{background:#4F8CFF;color:#FFF;font-weight:700;padding:8px 16px;border-radius:6px;}"
-                "QPushButton:hover{background:#3B82F6;}"
-            )
-            c1_btn.clicked.connect(window.import_from_home)
-            c1_lay.addWidget(c1_t)
-            c1_lay.addWidget(c1_d)
-            c1_lay.addStretch()
-            c1_lay.addWidget(c1_btn)
-            cards_layout.addWidget(c1, stretch=1)
+            ws_lay.addWidget(ws_av)
 
-            # Card 2: NLE Editorial Studio Timeline
-            c2 = QFrame(self)
-            c2.setStyleSheet(
-                "QFrame{background:#161D28;border:1px solid #283241;border-radius:10px;padding:16px;}"
-                "QFrame:hover{border-color:#8B5CF6;}"
-            )
-            c2_lay = QVBoxLayout(c2)
-            c2_t = QLabel("🎬  Timeline Editor", c2)
-            c2_t.setStyleSheet("font-size:15px;font-weight:700;color:#F7F9FC;")
-            c2_d = QLabel(
-                "Multi-track editorial workspace with dual monitor, inspector, waveform, and AI overlay.",
-                c2,
-            )
-            c2_d.setWordWrap(True)
-            c2_d.setStyleSheet("font-size:12px;color:#9CA3AF;margin-top:6px;")
-            c2_btn = QPushButton("Go to Timeline Studio →", c2)
-            c2_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            c2_btn.setStyleSheet(
-                "QPushButton{background:#8B5CF6;color:#FFF;font-weight:700;padding:8px 16px;border-radius:6px;}"
-                "QPushButton:hover{background:#7C3AED;}"
-            )
-            c2_btn.clicked.connect(window.show_studio)
-            c2_lay.addWidget(c2_t)
-            c2_lay.addWidget(c2_d)
-            c2_lay.addStretch()
-            c2_lay.addWidget(c2_btn)
-            cards_layout.addWidget(c2, stretch=1)
+            ws_txt = QVBoxLayout()
+            ws_txt.setSpacing(1)
+            ws_l1 = QLabel("Current Workspace", ws_card)
+            ws_l1.setStyleSheet("font-size: 9px; color: #64748B; font-weight: 600;")
+            ws_l2 = QLabel("AI Movie Dubbing Studio ⌄", ws_card)
+            ws_l2.setStyleSheet("font-size: 11px; color: #F1F5F9; font-weight: 700;")
+            ws_txt.addWidget(ws_l1)
+            ws_txt.addWidget(ws_l2)
+            ws_lay.addLayout(ws_txt, 1)
+            sb_layout.addWidget(ws_card)
 
-            # Card 3: First Run Hardware Wizard
-            c3 = QFrame(self)
-            c3.setStyleSheet(
-                "QFrame{background:#161D28;border:1px solid #283241;border-radius:10px;padding:16px;}"
-                "QFrame:hover{border-color:#10B981;}"
-            )
-            c3_lay = QVBoxLayout(c3)
-            c3_t = QLabel("⚡  Hardware Diagnostics", c3)
-            c3_t.setStyleSheet("font-size:15px;font-weight:700;color:#F7F9FC;")
-            c3_d = QLabel(
-                "Probe GPU VRAM, CPU cores, FFmpeg runtime, and calibrate execution tier.", c3
-            )
-            c3_d.setWordWrap(True)
-            c3_d.setStyleSheet("font-size:12px;color:#9CA3AF;margin-top:6px;")
-            c3_btn = QPushButton("Run Hardware Self-Test", c3)
-            c3_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            c3_btn.setStyleSheet(
-                "QPushButton{background:#10B981;color:#FFF;font-weight:700;padding:8px 16px;border-radius:6px;}"
-                "QPushButton:hover{background:#059669;}"
-            )
-            c3_btn.clicked.connect(window._run_hardware_wizard)
-            c3_lay.addWidget(c3_t)
-            c3_lay.addWidget(c3_d)
-            c3_lay.addStretch()
-            c3_lay.addWidget(c3_btn)
-            cards_layout.addWidget(c3, stretch=1)
+            sb_layout.addSpacing(10)
 
-            layout.addLayout(cards_layout)
-            layout.addStretch()
+            def _nav_btn(text: str, is_active: bool = False, cb: Any = None) -> QPushButton:
+                btn = QPushButton(text, sidebar)
+                btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                btn.setFixedHeight(34)
+                if is_active:
+                    btn.setStyleSheet(
+                        "QPushButton { background: #1C2433; color: #38BDF8; font-size: 12px; font-weight: 700;"
+                        "border-radius: 6px; text-align: left; padding-left: 10px; border: none; }"
+                    )
+                else:
+                    btn.setStyleSheet(
+                        "QPushButton { background: transparent; color: #94A3B8; font-size: 12px; font-weight: 500;"
+                        "border-radius: 6px; text-align: left; padding-left: 10px; border: none; }"
+                        "QPushButton:hover { background: #161C26; color: #F1F5F9; }"
+                    )
+                if cb:
+                    btn.clicked.connect(cb)
+                return btn
+
+            # Section: WORKSPACE
+            sec1 = QLabel("WORKSPACE", sidebar)
+            sec1.setStyleSheet("font-size: 9px; font-weight: 800; color: #475569; letter-spacing: 1px; padding-left: 6px;")
+            sb_layout.addWidget(sec1)
+            sb_layout.addWidget(_nav_btn("🏠  Home", is_active=True))
+            sb_layout.addWidget(_nav_btn("🎥  Dubbed Videos", cb=window.show_studio))
+            sb_layout.addWidget(_nav_btn("🎙️  Text To Speech", cb=window.open_voice_model_dialog))
+            sb_layout.addWidget(_nav_btn("🔤  Text Translate", cb=window.open_isometric_dialog))
+            sb_layout.addWidget(_nav_btn("☁️  Kaggle Cloud GPU", cb=window.open_kaggle_dialog))
+            sb_layout.addWidget(_nav_btn("📊  Insights  ✦ PRO", cb=window.open_broadcast_export_dialog))
+
+            sb_layout.addSpacing(10)
+
+            # Section: PERSONAL
+            sec2 = QLabel("PERSONAL", sidebar)
+            sec2.setStyleSheet("font-size: 9px; font-weight: 800; color: #475569; letter-spacing: 1px; padding-left: 6px;")
+            sb_layout.addWidget(sec2)
+            sb_layout.addWidget(_nav_btn("👥  Voice Library (RVC)", cb=window.open_casting_dialog))
+            sb_layout.addWidget(_nav_btn("🎬  Timeline Editor", cb=window.show_studio))
+
+            sb_layout.addSpacing(10)
+
+            # Section: RESOURCES
+            sec3 = QLabel("RESOURCES", sidebar)
+            sec3.setStyleSheet("font-size: 9px; font-weight: 800; color: #475569; letter-spacing: 1px; padding-left: 6px;")
+            sb_layout.addWidget(sec3)
+            sb_layout.addWidget(_nav_btn("🔌  Integrations", cb=window.open_preferences_dialog))
+            sb_layout.addWidget(_nav_btn("❓  Help Center", cb=window.open_keyboard_shortcuts))
+
+            sb_layout.addStretch()
+            root_layout.addWidget(sidebar)
+
+            # =================================================================
+            # 2. Main Dashboard Area (Right of Sidebar)
+            # =================================================================
+            main_pane = QFrame(self)
+            main_pane.setStyleSheet("background: #0B0E14;")
+            mp_lay = QVBoxLayout(main_pane)
+            mp_lay.setContentsMargins(36, 24, 36, 24)
+            mp_lay.setSpacing(20)
+
+            # Top Breadcrumb & User Profile Row
+            top_bar = QHBoxLayout()
+            h_lbl = QLabel("HOME", main_pane)
+            h_lbl.setStyleSheet("font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 0.5px;")
+            top_bar.addWidget(h_lbl)
+            top_bar.addStretch()
+
+            user_pill = QFrame(main_pane)
+            user_pill.setStyleSheet("background: #141822; border: 1px solid #232C3E; border-radius: 16px; padding: 2px 8px;")
+            u_lay = QHBoxLayout(user_pill)
+            u_lay.setContentsMargins(4, 2, 6, 2)
+            u_lay.setSpacing(6)
+            u_av = QLabel("TM", user_pill)
+            u_av.setFixedSize(22, 22)
+            u_av.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            u_av.setStyleSheet("background: #7C3AED; color: #FFF; font-size: 10px; font-weight: 800; border-radius: 11px;")
+            u_lay.addWidget(u_av)
+            u_txt = QLabel("Studio Creator ⌄", user_pill)
+            u_txt.setStyleSheet("font-size: 11px; color: #E2E8F0; font-weight: 600;")
+            u_lay.addWidget(u_txt)
+            top_bar.addWidget(user_pill)
+            mp_lay.addLayout(top_bar)
+
+            # Greeting Block
+            greet_col = QVBoxLayout()
+            greet_col.setSpacing(3)
+            greet_title = QLabel("Welcome Back, Creator", main_pane)
+            greet_title.setStyleSheet("font-size: 24px; font-weight: 900; color: #F8FAFC;")
+            greet_sub = QLabel("There's a lot you can do here! Start automated movie dubbing or explore studio tools.", main_pane)
+            greet_sub.setStyleSheet("font-size: 13px; font-weight: 500; color: #94A3B8;")
+            greet_col.addWidget(greet_title)
+            greet_col.addWidget(greet_sub)
+            mp_lay.addLayout(greet_col)
+
+            # -----------------------------------------------------------------
+            # 3. Four Quick Action Cards (Directly Matching Image 1)
+            # -----------------------------------------------------------------
+            actions_layout = QHBoxLayout()
+            actions_layout.setSpacing(14)
+
+            # Card 1: Dub a Video (Blue)
+            c1 = _ModernActionCard(
+                title="Dub a Video",
+                subtitle="Seamless AI Dubbing!",
+                icon_char="🎥",
+                icon_bg="#2563EB",
+                callback=window.open_dub_dialog,
+                parent=main_pane,
+            )
+            actions_layout.addWidget(c1, stretch=1)
+
+            # Card 2: Text To Speech (Orange)
+            c2 = _ModernActionCard(
+                title="Text To Speech",
+                subtitle="Instant Voice from Text!",
+                icon_char="🎙️",
+                icon_bg="#EA580C",
+                callback=window.open_voice_model_dialog,
+                parent=main_pane,
+            )
+            actions_layout.addWidget(c2, stretch=1)
+
+            # Card 3: Text Translate (Magenta)
+            c3 = _ModernActionCard(
+                title="Text Translate",
+                subtitle="Instant AI Translations!",
+                icon_char="🔤",
+                icon_bg="#C026D3",
+                callback=window.open_isometric_dialog,
+                parent=main_pane,
+            )
+            actions_layout.addWidget(c3, stretch=1)
+
+            # Card 4: Voice Cloning (Emerald Green)
+            c4 = _ModernActionCard(
+                title="Voice Cloning",
+                subtitle="RVC v2 Timbre Matching!",
+                icon_char="🍃",
+                icon_bg="#059669",
+                callback=window.open_casting_dialog,
+                parent=main_pane,
+            )
+            actions_layout.addWidget(c4, stretch=1)
+
+            mp_lay.addLayout(actions_layout)
+
+            mp_lay.addSpacing(6)
+
+            # -----------------------------------------------------------------
+            # 4. Project Explorer & Tabs (Matching Image 1)
+            # -----------------------------------------------------------------
+            proj_header_row = QHBoxLayout()
+
+            # Left Tabs: My Projects | Folders
+            tabs_pill = QFrame(main_pane)
+            tabs_pill.setStyleSheet("background: #141722; border: 1px solid #1E2738; border-radius: 6px; padding: 2px;")
+            tp_lay = QHBoxLayout(tabs_pill)
+            tp_lay.setContentsMargins(2, 2, 2, 2)
+            tp_lay.setSpacing(4)
+
+            my_proj_btn = QPushButton("My Projects", tabs_pill)
+            my_proj_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            my_proj_btn.setStyleSheet(
+                "QPushButton { background: #1E2738; color: #FFF; font-size: 11px; font-weight: 700; border-radius: 4px; padding: 4px 12px; border: none; }"
+            )
+            tp_lay.addWidget(my_proj_btn)
+
+            folders_btn = QPushButton("Folders", tabs_pill)
+            folders_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            folders_btn.setStyleSheet(
+                "QPushButton { background: transparent; color: #94A3B8; font-size: 11px; font-weight: 500; border-radius: 4px; padding: 4px 12px; border: none; }"
+                "QPushButton:hover { color: #FFF; }"
+            )
+            tp_lay.addWidget(folders_btn)
+            proj_header_row.addWidget(tabs_pill)
+
+            proj_header_row.addStretch()
+
+            # Right Controls: Search bar + Filter + Page buttons
+            search_input = QLineEdit(main_pane)
+            search_input.setPlaceholderText("🔍  Search for projects…")
+            search_input.setFixedWidth(220)
+            search_input.setFixedHeight(28)
+            search_input.setStyleSheet(
+                "QLineEdit { background: #131722; color: #F1F5F9; border: 1px solid #1E2738; border-radius: 5px; padding: 2px 10px; font-size: 11px; }"
+                "QLineEdit:focus { border-color: #38BDF8; }"
+            )
+            proj_header_row.addWidget(search_input)
+
+            filter_btn = QPushButton("⚙", main_pane)
+            filter_btn.setFixedSize(28, 28)
+            filter_btn.setStyleSheet(
+                "QPushButton { background: #131722; color: #94A3B8; border: 1px solid #1E2738; border-radius: 5px; font-size: 13px; }"
+                "QPushButton:hover { background: #1E2738; color: #FFF; }"
+            )
+            proj_header_row.addWidget(filter_btn)
+
+            prev_btn = QPushButton("‹", main_pane)
+            prev_btn.setFixedSize(28, 28)
+            prev_btn.setStyleSheet(
+                "QPushButton { background: #131722; color: #94A3B8; border: 1px solid #1E2738; border-radius: 5px; font-size: 15px; }"
+                "QPushButton:hover { background: #1E2738; color: #FFF; }"
+            )
+            next_btn = QPushButton("›", main_pane)
+            next_btn.setFixedSize(28, 28)
+            next_btn.setStyleSheet(
+                "QPushButton { background: #131722; color: #94A3B8; border: 1px solid #1E2738; border-radius: 5px; font-size: 15px; }"
+                "QPushButton:hover { background: #1E2738; color: #FFF; }"
+            )
+            proj_header_row.addWidget(prev_btn)
+            proj_header_row.addWidget(next_btn)
+            mp_lay.addLayout(proj_header_row)
+
+            # -----------------------------------------------------------------
+            # 5. Project Cards Grid (Matching Image 1)
+            # -----------------------------------------------------------------
+            projects_grid = QHBoxLayout()
+            projects_grid.setSpacing(14)
+
+            # Project 1: clip_2min.mp4
+            p1 = _ProjectCard(
+                title="Camb AI video dubbing",
+                created_text="clip_2min.mp4 • Created 1 min ago",
+                dubbed_pill_text="English (India) +2",
+                video_path="clip_2min.mp4",
+                on_open=window.load_movie_and_show_editor,
+                parent=main_pane,
+            )
+            projects_grid.addWidget(p1, stretch=1)
+
+            # Project 2: clip.mp4
+            p2 = _ProjectCard(
+                title="Camb AI video dubbing",
+                created_text="clip.mp4 • Created 2 hrs ago",
+                dubbed_pill_text="English (India) +2",
+                video_path="clip.mp4",
+                on_open=window.load_movie_and_show_editor,
+                parent=main_pane,
+            )
+            projects_grid.addWidget(p2, stretch=1)
+
+            # Project 3: Demo / Master
+            p3 = _ProjectCard(
+                title="Camb AI video dubbing",
+                created_text="movie.mp4 • Created 2 hrs ago",
+                dubbed_pill_text="English (India) +2",
+                video_path="clip_2min.mp4",
+                on_open=window.load_movie_and_show_editor,
+                parent=main_pane,
+            )
+            projects_grid.addWidget(p3, stretch=1)
+
+            # Project 4: Import New Movie Tile
+            import_tile = QFrame(main_pane)
+            import_tile.setCursor(Qt.CursorShape.PointingHandCursor)
+            import_tile.setStyleSheet(
+                "QFrame { background: rgba(19, 23, 34, 0.4); border: 2px dashed #2B384E; border-radius: 10px; padding: 14px; }"
+                "QFrame:hover { background: rgba(37, 99, 235, 0.08); border-color: #38BDF8; }"
+            )
+            it_lay = QVBoxLayout(import_tile)
+            it_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            it_lay.setSpacing(6)
+            it_ico = QLabel("+", import_tile)
+            it_ico.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            it_ico.setStyleSheet("font-size: 26px; font-weight: 300; color: #38BDF8;")
+            it_lbl = QLabel("Import New Movie", import_tile)
+            it_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            it_lbl.setStyleSheet("font-size: 12px; font-weight: 700; color: #F1F5F9;")
+            it_lay.addWidget(it_ico)
+            it_lay.addWidget(it_lbl)
+
+            def _on_import_click(event: QMouseEvent) -> None:
+                if event.button() == Qt.MouseButton.LeftButton:
+                    window.open_dub_dialog()
+
+            import_tile.mousePressEvent = _on_import_click  # type: ignore[assignment]
+            projects_grid.addWidget(import_tile, stretch=1)
+
+            mp_lay.addLayout(projects_grid)
+            mp_lay.addStretch()
+
+            root_layout.addWidget(main_pane, 1)
 
     class _StudioChrome(QFrame):
         """Frameless title/menu bar matching the production reference."""
@@ -185,17 +618,39 @@ if _QT:
             logo = QLabel("AI", self)
             logo.setFixedWidth(24)
             logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            logo.setStyleSheet("color:#A970FF;font-size:18px;font-weight:900;letter-spacing:-2px;")
+            logo.setStyleSheet("color:#E11D48;font-size:18px;font-weight:900;letter-spacing:-1px;")
             layout.addWidget(logo)
             self.app_label = QLabel("AI DUBBING STUDIO", self)
-            self.app_label.setFixedWidth(144)
-            self.app_label.setStyleSheet("color:#F7F9FC;font-size:12px;font-weight:800;")
+            self.app_label.setFixedWidth(148)
+            self.app_label.setStyleSheet("color:#F8FAFC;font-size:12px;font-weight:800;letter-spacing:0.5px;")
             layout.addWidget(self.app_label)
+
+            # Modern Top Navigation Switcher: Dub vs Timeline
+            self.nav_dub_btn = QPushButton("◫  Dub", self)
+            self.nav_dub_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.nav_dub_btn.setStyleSheet(
+                "QPushButton{background:#E11D48;color:#FFF;border:none;border-radius:4px;"
+                "padding:4px 14px;font-size:11px;font-weight:700;}"
+            )
+            self.nav_dub_btn.clicked.connect(self._select_dub_home)
+            layout.addWidget(self.nav_dub_btn)
+
+            self.nav_studio_btn = QPushButton("🎬  Timeline", self)
+            self.nav_studio_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.nav_studio_btn.setStyleSheet(
+                "QPushButton{background:#162030;color:#94A3B8;border:1px solid #233045;border-radius:4px;"
+                "padding:4px 14px;font-size:11px;font-weight:600;}"
+                "QPushButton:hover{background:#202B40;color:#FFF;}"
+            )
+            self.nav_studio_btn.clicked.connect(self._select_timeline_studio)
+            layout.addWidget(self.nav_studio_btn)
+
+            layout.addSpacing(8)
 
             self.menu_bar = QMenuBar(self)
             self.menu_bar.setNativeMenuBar(False)
-            self.menu_bar.setMinimumWidth(440)
-            self.menu_bar.setMaximumWidth(540)
+            self.menu_bar.setMinimumWidth(360)
+            self.menu_bar.setMaximumWidth(460)
             self.menu_bar.setStyleSheet(
                 "QMenuBar{background:transparent;color:#C4CAD4;font-size:11px;}"
                 "QMenuBar::item{padding:5px 8px;background:transparent;}"
@@ -207,12 +662,13 @@ if _QT:
             )
             layout.addWidget(self.menu_bar)
 
-            self.dub_btn = QPushButton("🎙 Dub", self)
+            self.dub_btn = QPushButton("🎙 Dub Movie", self)
             self.dub_btn.setToolTip("Dub Movie (pick language & Fast/Quality profile) — Ctrl+Enter")
             self.dub_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self.dub_btn.setStyleSheet(
                 "QPushButton {"
-                "  background: #2563EB; color: #FFF; border: none; border-radius: 4px;"
+                "  background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #2563EB,stop:1 #4F46E5);"
+                "  color: #FFF; border: none; border-radius: 4px;"
                 "  padding: 4px 14px; font-size: 11px; font-weight: 800;"
                 "}"
                 "QPushButton:hover { background: #3B82F6; }"
@@ -223,12 +679,12 @@ if _QT:
 
             layout.addStretch(1)
 
-            self.project_label = QLabel("Untitled - Bengali Dub ⌄", self)
+            self.project_label = QLabel("Inception - Bengali Dub ⌄", self)
             self.project_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.project_label.setFixedWidth(260)
-            self.project_label.setStyleSheet("color:#E1E5EC;font-size:11px;font-weight:600;")
+            self.project_label.setFixedWidth(240)
+            self.project_label.setStyleSheet("color:#E2E8F0;font-size:11px;font-weight:700;")
             layout.addWidget(self.project_label)
-            layout.addStretch(3)
+            layout.addStretch(2)
 
             self.gpu_label = QLabel("GPU  N/A", self)
             self.vram_label = QLabel("VRAM  N/A", self)
@@ -311,6 +767,30 @@ if _QT:
                 else "color:#B7BECA;font-size:11px;font-weight:600;"
             )
 
+        def _select_dub_home(self) -> None:
+            self.nav_dub_btn.setStyleSheet(
+                "QPushButton{background:#E11D48;color:#FFF;border:none;border-radius:4px;"
+                "padding:4px 14px;font-size:11px;font-weight:700;}"
+            )
+            self.nav_studio_btn.setStyleSheet(
+                "QPushButton{background:#162030;color:#94A3B8;border:1px solid #233045;border-radius:4px;"
+                "padding:4px 14px;font-size:11px;font-weight:600;}"
+                "QPushButton:hover{background:#202B40;color:#FFF;}"
+            )
+            self._window.show_home()
+
+        def _select_timeline_studio(self) -> None:
+            self.nav_studio_btn.setStyleSheet(
+                "QPushButton{background:#2563EB;color:#FFF;border:none;border-radius:4px;"
+                "padding:4px 14px;font-size:11px;font-weight:700;}"
+            )
+            self.nav_dub_btn.setStyleSheet(
+                "QPushButton{background:#162030;color:#94A3B8;border:1px solid #233045;border-radius:4px;"
+                "padding:4px 14px;font-size:11px;font-weight:600;}"
+                "QPushButton:hover{background:#202B40;color:#FFF;}"
+            )
+            self._window.show_studio()
+
         def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:  # noqa: N802
             if event.button() is Qt.MouseButton.LeftButton:
                 self._window._toggle_maximized()
@@ -353,11 +833,11 @@ if _QT:
                 | Qt.WindowType.WindowCloseButtonHint
             )
             self.stack = QStackedWidget(self)
-            self.home_view = _HomeDashboardPanel(self)
             self.studio = TimelineScreen(self)
+            self.home_view = _HomeDashboardPanel(self)
             self.stack.addWidget(self.home_view)
             self.stack.addWidget(self.studio)
-            self.stack.setCurrentWidget(self.studio)
+            self.stack.setCurrentWidget(self.home_view)
             self.setCentralWidget(self.stack)
 
             self.setObjectName("AIDubStudioWindow")
@@ -384,6 +864,7 @@ if _QT:
             toolbar = QToolBar("Main Dubbing Toolbar", self)
             toolbar.setObjectName("MainToolBar")
             toolbar.setMovable(False)
+            toolbar.setVisible(False)  # Hidden to eliminate clutter; chrome tabs provide sleek navigation!
             toolbar.setStyleSheet(
                 "QToolBar#MainToolBar {"
                 "  background: #0B0E14;"
@@ -495,6 +976,33 @@ if _QT:
         def import_from_home(self) -> None:
             self.show_studio()
             self.studio.import_media_dialog()
+
+        def load_movie_and_show_editor(self, video_path: str) -> None:
+            self.show_studio()
+            if video_path and Path(video_path).is_file():
+                self.studio.load_project(video_path)
+
+        def open_voice_model_dialog(self) -> None:
+            self.studio._open_voice_model_selector()
+
+        def open_casting_dialog(self) -> None:
+            self.studio._open_character_casting_studio()
+
+        def open_isometric_dialog(self) -> None:
+            self.show_studio()
+            self.studio.open_isometric_dialog()
+
+        def open_kaggle_dialog(self) -> None:
+            self.studio._open_kaggle_accelerator()
+
+        def open_broadcast_export_dialog(self) -> None:
+            self.studio._open_broadcast_export()
+
+        def open_preferences_dialog(self) -> None:
+            self.open_preferences()
+
+        def open_keyboard_shortcuts(self) -> None:
+            self.show_keyboard_shortcuts()
 
         def _run_hardware_wizard(self) -> None:
             from PySide6.QtWidgets import QDialog

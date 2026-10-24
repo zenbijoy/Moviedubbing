@@ -27,16 +27,23 @@ class PipelineConfig:
     # Configured analysis and speech providers.
     asr_model: str = "large-v3"
     voice_name: str | None = None
-    voice_engine: str = "chatterbox"
+    voice_engine: str = "gemini_tts"
     character_voices: dict[str, str] | None = None
+    rvc_cloning: bool = True
     max_stretch: float = 2.0
     overwrite: bool = False
+
+    # Professional Studio & Broadcast Mastering
+    isometric_alignment: bool = True
+    acoustic_preset: str = "none"
+    broadcast_spec: str = "netflix"
 
     def __post_init__(self) -> None:
         if self.fast:
             self.keep_music = False
             self.diarize = False
             self.lipsync = False
+            self.rvc_cloning = False
             if self.asr_model == "large-v3":
                 self.asr_model = "base"
 

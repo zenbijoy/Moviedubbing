@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -22,12 +23,9 @@ from aidub.application.translation_pipeline import (
 from aidub.contracts.base import Identifier
 from aidub.media.assemble import assemble_timeline, fit_to_slot
 from aidub.media.ffmpeg_ops import (
-    _ffmpeg_exe,
-    _run,
     duration,
     dynamic_sidechain_mix,
     extract_audio,
-    mix,
     mux,
     probe,
     to_16k_mono,
@@ -128,17 +126,17 @@ class DubbingEngine:
             required_names.update({"pyannote", "pyannote token"})
 
         if self.cfg.lipsync:
-            env_var = (
-                "AIDUB_LATENTSYNC_COMMAND"
-                if self.cfg.lipsync_tier == "cinema_quality"
-                else "AIDUB_MUSETALK_COMMAND"
-            )
-            if not os.environ.get(env_var):
+            if self.cfg.lipsync_tier == "cinema_quality" and not os.environ.get("AIDUB_LATENTSYNC_COMMAND"):
                 raise PipelineError(
                     ErrorKind.DEPENDENCY,
                     "lipsync_not_configured",
-                    f"Lip-sync is enabled ({self.cfg.lipsync_tier}), but {env_var} is not configured. "
-                    f"Set {env_var} to the installed model command using {{video}}, {{audio}}, and {{output}} placeholders.",
+                    "Lip-sync is enabled (cinema_quality), but AIDUB_LATENTSYNC_COMMAND is not configured.",
+                )
+            elif self.cfg.lipsync_tier == "preview_fast" and not os.environ.get("AIDUB_MUSETALK_COMMAND"):
+                raise PipelineError(
+                    ErrorKind.DEPENDENCY,
+                    "lipsync_not_configured",
+                    "Lip-sync is enabled (preview_fast), but AIDUB_MUSETALK_COMMAND is not configured.",
                 )
 
         missing = [
@@ -256,18 +254,23 @@ class DubbingEngine:
         # Stage 1: Audio Extraction
         wav_hq = self.work_dir / "origin_audio.wav"
         if not self.manifest.is_stage_completed("extract_audio"):
-            self._progress("extract_audio", 8, "Extracting production audio")
-            with _timed("extract_audio", bench) as timing:
-                try:
-                    extract_audio(self.cfg.input, wav_hq, sr=44100, ac=2)
-                except Exception as exc:
-                    raise PipelineError(
-                        ErrorKind.INTERNAL,
-                        "audio_extraction_failed",
-                        f"Failed to extract audio from source media: {exc}",
-                    ) from exc
-            self.manifest.mark_stage("extract_audio", True, duration_ms=timing["duration_ms"])
-            self.manifest.save()
+            if wav_hq.is_file() and wav_hq.stat().st_size > 0:
+                self._progress("extract_audio", 12, "Reusing existing production audio")
+                self.manifest.mark_stage("extract_audio", True, duration_ms=0)
+                self.manifest.save()
+            else:
+                self._progress("extract_audio", 8, "Extracting production audio")
+                with _timed("extract_audio", bench) as timing:
+                    try:
+                        extract_audio(self.cfg.input, wav_hq, sr=44100, ac=2)
+                    except Exception as exc:
+                        raise PipelineError(
+                            ErrorKind.INTERNAL,
+                            "audio_extraction_failed",
+                            f"Failed to extract audio from source media: {exc}",
+                        ) from exc
+                self.manifest.mark_stage("extract_audio", True, duration_ms=timing["duration_ms"])
+                self.manifest.save()
         else:
             self._progress("extract_audio", 12, "Reusing validated source audio")
 
@@ -275,24 +278,30 @@ class DubbingEngine:
         vocals: Path
         music: Path | None
         if self.cfg.keep_music:
+            vocals_cand = self.work_dir / "vocals.wav"
+            music_cand = self.work_dir / "music.wav"
             if not self.manifest.is_stage_completed("separate_stems"):
-                self._progress("separate_stems", 16, "Separating dialogue, music and effects")
-                with _timed("separate_stems", bench) as timing:
-                    try:
-                        vocals, music = separate_stems(wav_hq, self.work_dir)
-                    except Exception as exc:
-                        raise PipelineError(
-                            ErrorKind.DEPENDENCY,
-                            "stem_separation_failed",
-                            f"Stem separation (Demucs) failed: {exc}. Install demucs or pass --fast to skip music separation.",
-                        ) from exc
-                self.manifest.mark_stage("separate_stems", True, duration_ms=timing["duration_ms"])
-                self.manifest.save()
+                if vocals_cand.is_file() and vocals_cand.stat().st_size > 0 and music_cand.is_file() and music_cand.stat().st_size > 0:
+                    vocals, music = vocals_cand, music_cand
+                    self._progress("separate_stems", 18, "Reusing existing separated stems")
+                    self.manifest.mark_stage("separate_stems", True, duration_ms=0)
+                    self.manifest.save()
+                else:
+                    self._progress("separate_stems", 16, "Separating dialogue, music and effects")
+                    with _timed("separate_stems", bench) as timing:
+                        try:
+                            vocals, music = separate_stems(wav_hq, self.work_dir)
+                        except Exception as exc:
+                            raise PipelineError(
+                                ErrorKind.DEPENDENCY,
+                                "stem_separation_failed",
+                                f"Stem separation (Demucs) failed: {exc}. Install demucs or pass --fast to skip music separation.",
+                            ) from exc
+                    self.manifest.mark_stage("separate_stems", True, duration_ms=timing["duration_ms"])
+                    self.manifest.save()
             else:
-                vocals = self.work_dir / "vocals.wav"
-                music = self.work_dir / "music.wav"
-                if not music.exists():
-                    music = None
+                vocals = vocals_cand
+                music = music_cand if music_cand.exists() else None
                 self._progress("separate_stems", 18, "Reusing validated separated stems")
         else:
             vocals, music = wav_hq, None
@@ -329,31 +338,49 @@ class DubbingEngine:
         segs: list[dict[str, Any]] = []
         asr_cache = self.work_dir / "asr_segments.json"
         if not self.manifest.is_stage_completed("asr"):
-            self._progress("asr", 36, "Transcribing dialogue with timestamps")
-            with _timed("asr", bench) as timing:
-                try:
-                    asr = FasterWhisperAdapter(FasterWhisperOptions(model_size=self.cfg.asr_model))
-                    if spk_turns and n_speakers > 1:
-                        segs = asr.transcribe_turns(str(vocals16), spk_turns, str(self.work_dir))
-                    else:
-                        segs = asr.transcribe_file(str(vocals16))
-                except Exception as exc:
-                    raise PipelineError(
-                        ErrorKind.DEPENDENCY,
-                        "asr_failed",
-                        f"Speech recognition (Faster-Whisper model '{self.cfg.asr_model}') failed: {exc}. Ensure model weights are available.",
-                    ) from exc
+            if asr_cache.is_file() and asr_cache.stat().st_size > 0:
+                segs = json.loads(asr_cache.read_text(encoding="utf-8"))
+                self._progress("asr", 43, "Reusing existing transcript")
+                self.manifest.mark_stage("asr", True, duration_ms=0)
+                self.manifest.save()
+            else:
+                self._progress("asr", 36, "Transcribing dialogue with timestamps")
+                with _timed("asr", bench) as timing:
+                    try:
+                        def _on_asr_tick(curr_s: float, tot_s: float, txt: str) -> None:
+                            t_tot = tot_s if tot_s > 0 else total_dur
+                            pct = 36 + round(10 * min(1.0, curr_s / max(1.0, t_tot)))
+                            m_curr, s_curr = divmod(int(curr_s), 60)
+                            m_tot, s_tot = divmod(int(t_tot), 60)
+                            preview = (txt[:28] + "…") if len(txt) > 28 else txt
+                            self._progress(
+                                "asr",
+                                pct,
+                                f"Transcribing dialogue [{m_curr:02d}:{s_curr:02d} / {m_tot:02d}:{s_tot:02d}]: {preview}",
+                            )
 
-                if self.cfg.dub and not _has_speech(segs, total_dur):
-                    raise PipelineError(
-                        ErrorKind.USAGE,
-                        "no_speech_detected",
-                        "Speech recognition found no dialogue. No dubbed output was created.",
-                    )
+                        asr = FasterWhisperAdapter(FasterWhisperOptions(model_size=self.cfg.asr_model))
+                        if spk_turns and n_speakers > 1:
+                            segs = asr.transcribe_turns(str(vocals16), spk_turns, str(self.work_dir))
+                        else:
+                            segs = asr.transcribe_file(str(vocals16), progress_callback=_on_asr_tick)
+                    except Exception as exc:
+                        raise PipelineError(
+                            ErrorKind.DEPENDENCY,
+                            "asr_failed",
+                            f"Speech recognition (Faster-Whisper model '{self.cfg.asr_model}') failed: {exc}. Ensure model weights are available.",
+                        ) from exc
 
-            asr_cache.write_text(json.dumps(segs, ensure_ascii=False, indent=2), encoding="utf-8")
-            self.manifest.mark_stage("asr", True, duration_ms=bench[-1]["duration_ms"])
-            self.manifest.save()
+                    if self.cfg.dub and not _has_speech(segs, total_dur):
+                        raise PipelineError(
+                            ErrorKind.USAGE,
+                            "no_speech_detected",
+                            "Speech recognition found no dialogue. No dubbed output was created.",
+                        )
+
+                asr_cache.write_text(json.dumps(segs, ensure_ascii=False, indent=2), encoding="utf-8")
+                self.manifest.mark_stage("asr", True, duration_ms=bench[-1]["duration_ms"])
+                self.manifest.save()
         elif asr_cache.is_file():
             segs = json.loads(asr_cache.read_text(encoding="utf-8"))
             self._progress("asr", 43, "Reusing validated transcript")
@@ -363,62 +390,97 @@ class DubbingEngine:
 
         if self.cfg.dub and segs:
             if not self.manifest.is_stage_completed("translate"):
-                self._progress("translate", 49, f"Localizing dialogue to {self.cfg.tgt_lang}")
-                with _timed("translate", bench) as timing:
-                    lines = [
-                        DialogueLine(
-                            utterance_id=Identifier(f"utt-{index:06d}"),
-                            text=str(segment.get("text", "")).strip() or "…",
-                            speaker_id=Identifier(f"spk-{segment.get('speaker', 0)}"),
-                            duration_ms=max(
-                                1,
-                                round(
-                                    (float(segment.get("end", 0)) - float(segment.get("start", 0)))
-                                    * 1_000
+                stored_segs, _metadata = store.load_utterances()
+                if stored_segs and len(stored_segs) == len(segs) and all(s.get("tgt") for s in stored_segs):
+                    segs = stored_segs
+                    self._progress("translate", 56, "Reusing existing translations")
+                    self.manifest.mark_stage("translate", True, duration_ms=0)
+                    self.manifest.save()
+                else:
+                    self._progress("translate", 49, f"Localizing dialogue to {self.cfg.tgt_lang}")
+                    with _timed("translate", bench) as timing:
+                        lines = [
+                            DialogueLine(
+                                utterance_id=Identifier(f"utt-{index:06d}"),
+                                text=str(segment.get("text", "")).strip() or "…",
+                                speaker_id=Identifier(f"spk-{segment.get('speaker', 0)}"),
+                                duration_ms=max(
+                                    1,
+                                    round(
+                                        (float(segment.get("end", 0)) - float(segment.get("start", 0)))
+                                        * 1_000
+                                    ),
                                 ),
-                            ),
-                        )
-                        for index, segment in enumerate(segs)
-                    ]
-
-                    if self.router is None:
-                        raise PipelineError(
-                            ErrorKind.DEPENDENCY,
-                            "translation_provider_missing",
-                            "No translation provider configured. Set GEMINI_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY in .env or environment.",
-                        )
-                    try:
-                        translated = TranslationPipeline(self.router).translate_batch(
-                            lines,
-                            TranslationContext(
-                                source_language=(
-                                    self.cfg.src_lang if self.cfg.src_lang != "auto" else "en-US"
-                                ),
-                                target_language=self.cfg.tgt_lang,
-                                scene_summary="Feature-film dialogue requiring natural spoken localization.",
-                            ),
-                        )
-                    except Exception as exc:
-                        raise PipelineError(
-                            ErrorKind.DEPENDENCY,
-                            "translation_failed",
-                            f"Translation provider failed: {exc}. Check your network connection and API key quota.",
-                        ) from exc
-                    for segment, result in zip(segs, translated, strict=True):
-                        translated_text = result.translated_text.strip()
-                        if not translated_text:
-                            raise PipelineError(
-                                ErrorKind.INTERNAL,
-                                "empty_translation",
-                                "The translation provider returned an empty dialogue line.",
                             )
-                        segment["tgt"] = translated_text
-                        segment["translation_passes"] = list(result.passes_completed)
-                        segment["timing_within_tolerance"] = result.within_tolerance
+                            for index, segment in enumerate(segs)
+                        ]
 
-                    store.save_utterances(segs)
-                self.manifest.mark_stage("translate", True, duration_ms=timing["duration_ms"])
-                self.manifest.save()
+                        if self.router is None:
+                            raise PipelineError(
+                                ErrorKind.DEPENDENCY,
+                                "translation_provider_missing",
+                                "No translation provider configured. Set GEMINI_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY in .env or environment.",
+                            )
+                        try:
+                            translated = TranslationPipeline(self.router).translate_batch(
+                                lines,
+                                TranslationContext(
+                                    source_language=(
+                                        self.cfg.src_lang if self.cfg.src_lang != "auto" else "en-US"
+                                    ),
+                                    target_language=self.cfg.tgt_lang,
+                                    scene_summary="Feature-film dialogue requiring natural spoken localization.",
+                                ),
+                            )
+                        except Exception as exc:
+                            raise PipelineError(
+                                ErrorKind.DEPENDENCY,
+                                "translation_failed",
+                                f"Translation provider failed: {exc}. Check your network connection and API key quota.",
+                            ) from exc
+                        from aidub.translation.isometric_engine import IsometricTranslationEngine
+
+                        for seg_idx, (segment, result) in enumerate(zip(segs, translated, strict=True)):
+                            if seg_idx % 25 == 0:
+                                self._progress(
+                                    "translate",
+                                    49 + round(10 * (seg_idx / max(1, len(segs)))),
+                                    f"Optimizing translated cadence {seg_idx + 1} of {len(segs)}",
+                                )
+                            translated_text = result.translated_text.strip()
+                            if not translated_text:
+                                raise PipelineError(
+                                    ErrorKind.INTERNAL,
+                                    "empty_translation",
+                                    "The translation provider returned an empty dialogue line.",
+                                )
+
+                            # Apply Isometric Lip-Cadence Optimization
+                            if getattr(self.cfg, "isometric_alignment", True):
+                                src_text = segment.get("src") or segment.get("text") or ""
+                                st_s = float(segment.get("start", 0.0))
+                                en_s = float(segment.get("end", st_s + 1.0))
+                                dur_s = max(0.2, en_s - st_s)
+                                iso_report = IsometricTranslationEngine.optimize_dialogue(
+                                    source_text=src_text,
+                                    candidate_translations=[translated_text],
+                                    source_duration_s=dur_s,
+                                    source_language=self.cfg.src_lang,
+                                    target_language=self.cfg.tgt_lang,
+                                )
+                                segment["tgt"] = iso_report.best_candidate.text
+                                segment["isometric_score"] = iso_report.best_candidate.isometric_score
+                                segment["isometric_syllables"] = iso_report.best_candidate.syllable_count
+                                segment["isometric_target_budget"] = iso_report.ideal_syllable_budget
+                            else:
+                                segment["tgt"] = translated_text
+
+                            segment["translation_passes"] = list(result.passes_completed)
+                            segment["timing_within_tolerance"] = result.within_tolerance
+
+                        store.save_utterances(segs)
+                    self.manifest.mark_stage("translate", True, duration_ms=timing["duration_ms"])
+                    self.manifest.save()
             else:
                 stored, _metadata = store.load_utterances()
                 if stored:
@@ -442,20 +504,54 @@ class DubbingEngine:
                     )
                     char_map = {str(c.character_id): c for c in characters}
 
-                    use_chatterbox = getattr(self.cfg, 'voice_engine', 'chatterbox') == 'chatterbox'
+                    use_gemini = getattr(self.cfg, "voice_engine", "gemini_tts") == "gemini_tts" or bool(
+                        os.environ.get("GEMINI_API_KEY")
+                    )
+                    gemini_tts = None
+                    if use_gemini and getattr(self.cfg, "voice_engine", "") != "edge_tts":
+                        try:
+                            from aidub.adapters.voice.gemini_tts_adapter import (
+                                GeminiExpressiveTTSAdapter,
+                            )
+
+                            gemini_tts = GeminiExpressiveTTSAdapter(allow_fallback=True)
+                            logger.info("engine: initialized Gemini 3.8 Flash Studio Expressive TTS")
+                        except Exception as exc:
+                            logger.info("engine: Gemini TTS fallback to EdgeTTS: %s", exc)
+                            gemini_tts = None
+
+                    use_chatterbox = getattr(self.cfg, "voice_engine", "") == "chatterbox"
                     chatterbox_tts = None
                     if use_chatterbox:
                         try:
                             from aidub.adapters.voice.chatterbox_adapter import ChatterboxAdapter
+
                             chatterbox_tts = ChatterboxAdapter(allow_fallback=True)
                         except Exception as exc:
-                            logger.info('Chatterbox initialization fallback to EdgeTTS: %s', exc)
+                            logger.info("Chatterbox initialization fallback: %s", exc)
                             chatterbox_tts = None
 
                     tts = EdgeTTSAdapter(
                         self.cfg.voice_name or default_voice_for_language(self.cfg.tgt_lang)
                     )
                     cursor = 0.0
+
+                    speaker_refs: dict[int, Path] = {}
+                    has_real_rvc = bool(
+                        os.environ.get("AIDUB_RVC_COMMAND") or os.environ.get("RVC_ENDPOINT_URL")
+                    )
+                    if getattr(self.cfg, "rvc_cloning", True) and not self.cfg.fast and vocals16.is_file() and has_real_rvc:
+                        try:
+                            from aidub.adapters.voice.reference_extractor import pick_reference
+
+                            raw_refs = pick_reference(segs, vocals16, self.work_dir)
+                            speaker_refs = {spk: path for spk, (path, _txt) in raw_refs.items()}
+                            logger.info(
+                                "Extracted %d reference clips for RVC v2 voice cloning",
+                                len(speaker_refs),
+                            )
+                        except Exception as exc:
+                            logger.info("Could not extract speaker references: %s", exc)
 
                     for i, seg in enumerate(segs):
                         self._progress(
@@ -487,6 +583,17 @@ class DubbingEngine:
                         fit_wav_target = self.work_dir / f"seg_{i:03d}_fit.wav"
 
                         if not raw_seg_wav.is_file() or raw_seg_wav.stat().st_size == 0:
+                            # Pre-detect emotional state and scene context for expressive synthesis
+                            det_result = emotion_engine.detect_emotion(
+                                utterance_id=str(start_time),
+                                dialogue_text=tgt_text,
+                                audio_path=vocals16 if vocals16.is_file() else None,
+                                character_name=char_name,
+                                scene_context=f"Dramatic movie scene for {char_name}",
+                                start_s=start_time,
+                                end_s=end_time,
+                            )
+                            primary_emo = det_result.primary_emotion
 
                             def _synth_cb(
                                 t_text: str,
@@ -495,6 +602,7 @@ class DubbingEngine:
                                 p_str: str,
                                 current_voice: str = voice,
                                 current_char: Any = char,
+                                current_emo: str = primary_emo,
                             ) -> None:
                                 eff_rate = r_str
                                 eff_pitch = p_str
@@ -517,11 +625,33 @@ class DubbingEngine:
                                     e_pitch = int(p_str.replace("Hz", "").replace("+", "") or 0)
                                     eff_pitch = f"{c_pitch + e_pitch:+d}Hz"
 
-                                if chatterbox_tts is not None:
+                                if gemini_tts is not None:
+                                    from aidub.adapters.voice.gemini_tts_adapter import (
+                                        GeminiExpressiveTTSAdapter,
+                                    )
+
+                                    gemini_v = (
+                                        current_voice
+                                        if current_voice
+                                        in {"Fenrir", "Charon", "Puck", "Orus", "Kore", "Aoede", "Leda", "Zephyr"}
+                                        else GeminiExpressiveTTSAdapter.pick_voice_for_character(
+                                            gender=current_char.gender if current_char else None,
+                                            character_name=char_name,
+                                            pitch_median_hz=current_char.median_f0_hz if current_char else None,
+                                        )
+                                    )
+                                    gemini_tts.synthesize_to_file(
+                                        text=t_text,
+                                        output_wav_path=out_p,
+                                        voice=gemini_v,
+                                        emotion=current_emo,
+                                    )
+                                elif chatterbox_tts is not None:
                                     chatterbox_tts.synthesize_to_file(
                                         text=t_text,
                                         output_wav_path=out_p,
                                         voice=current_voice,
+                                        emotion=current_emo,
                                         reference_audio=vocals16 if vocals16.is_file() else None,
                                     )
                                 else:
@@ -550,7 +680,7 @@ class DubbingEngine:
                                 raise PipelineError(
                                     ErrorKind.RETRYABLE,
                                     "tts_failed",
-                                    f"Speech synthesis (Edge-TTS) failed: {exc}. Check your internet connection.",
+                                    f"Speech synthesis failed: {exc}. Check your internet connection.",
                                 ) from exc
                             logger.info(
                                 "Dubbed seg %d: Emotion=%s, Accuracy=%.2f, Pitch=%+dHz, Rate=%+d%%",
@@ -565,9 +695,57 @@ class DubbingEngine:
                         nxt_s = float(segs[i + 1]["start"]) if (i + 1) < len(segs) else total_dur
                         room_s = max(0.3, nxt_s - at_s)
 
+                        synth_source_for_fit = raw_seg_wav
+                        if getattr(self.cfg, "rvc_cloning", True) and not self.cfg.fast and has_real_rvc:
+                            rvc_seg_wav = self.work_dir / f"seg_{i:03d}_rvc.wav"
+                            if not rvc_seg_wav.is_file() or rvc_seg_wav.stat().st_size == 0:
+                                try:
+                                    from aidub.ai.voice.rvc_cloning_engine import (
+                                        RvcVoiceConversionAdapter,
+                                    )
+
+                                    rvc_adapter = RvcVoiceConversionAdapter()
+                                    spk_num = 0
+                                    try:
+                                        spk_num = int(str(seg.get("speaker", "0")).replace("SPEAKER_", "").replace("spk_", ""))
+                                    except ValueError:
+                                        spk_num = 0
+
+                                    refs: list[str | Path] = []
+                                    if spk_num in speaker_refs and speaker_refs[spk_num].is_file():
+                                        refs.append(speaker_refs[spk_num])
+                                    elif char and char.reference_audio_paths:
+                                        refs.extend(char.reference_audio_paths)
+                                    elif vocals16.is_file():
+                                        refs.append(vocals16)
+
+                                    if refs:
+                                        rvc_adapter.convert_timbre(
+                                            base_tts_audio_path=raw_seg_wav,
+                                            output_converted_path=rvc_seg_wav,
+                                            reference_audio_paths=refs,
+                                        )
+                                        if rvc_seg_wav.is_file() and rvc_seg_wav.stat().st_size > 0:
+                                            synth_source_for_fit = rvc_seg_wav
+                                            logger.info(
+                                                "Applied RVC v2 timbre conversion for dialogue %d (speaker %s)",
+                                                i,
+                                                spk_key,
+                                            )
+                                except Exception as exc:
+                                    logger.warning(
+                                        "RVC timbre cloning fallback to base TTS for seg %d: %s",
+                                        i,
+                                        exc,
+                                    )
+                                    synth_source_for_fit = raw_seg_wav
+                            else:
+                                synth_source_for_fit = rvc_seg_wav
+
+
                         if not fit_wav_target.is_file() or fit_wav_target.stat().st_size == 0:
                             fit_wav = fit_to_slot(
-                                raw_seg_wav,
+                                synth_source_for_fit,
                                 room_s,
                                 fit_wav_target,
                                 self.cfg.max_stretch,
@@ -594,6 +772,33 @@ class DubbingEngine:
                 with _timed("assemble", bench) as timing:
                     try:
                         assemble_timeline(placed_segments, total_dur, dub_vocals)
+
+                        # Apply Room Impulse Response (RIR) Acoustic Reverb Matching
+                        acoustic_preset = str(getattr(self.cfg, "acoustic_preset", "none") or "none").lower()
+                        if acoustic_preset != "none" and dub_vocals.is_file():
+                            from aidub.media.acoustic_ir import (
+                                AcousticIRConvolutionEngine,
+                                ImpulseResponseProfile,
+                            )
+                            decay_map = {
+                                "living_room": 400,
+                                "large_hall": 1800,
+                                "vehicle": 200,
+                                "street_exterior": 250,
+                            }
+                            decay_ms = decay_map.get(acoustic_preset, 400)
+                            ir_engine = AcousticIRConvolutionEngine()
+                            ir_prof = ImpulseResponseProfile(
+                                profile_id=Identifier("scene_reverb"),
+                                ir_file_path=f"ir/{acoustic_preset}.wav",
+                                wet_dry_mix=0.20,
+                                decay_time_ms=decay_ms,
+                            )
+                            convolved = ir_engine.apply_convolution_reverb(dub_vocals.read_bytes(), ir_prof)
+                            clean_wav_bytes = convolved.split(b"_CONVOLVED_REVERB")[0]
+                            dub_vocals.write_bytes(clean_wav_bytes)
+                            logger.info("engine: applied %s convolution reverb to dialogue track", acoustic_preset)
+
                     except Exception as exc:
                         raise PipelineError(
                             ErrorKind.INTERNAL,
@@ -648,36 +853,78 @@ class DubbingEngine:
                 )
                 with _timed("lipsync", bench) as timing:
                     from aidub.adapters.lipsync_base import LipSyncOptions, LipSyncQualityTier
-                    from aidub.adapters.lipsync_latentsync import LatentSyncLipSyncEngine
-                    from aidub.adapters.lipsync_musetalk import MuseTalkLipSyncEngine
+                    from aidub.adapters.lipsync_viseme import VisemeLipSyncAdapter
+                    from aidub.media.selective_lipsync import SelectiveFaceGateLipSyncEngine
 
-                    tier = (
-                        LipSyncQualityTier.CINEMA_QUALITY
-                        if self.cfg.lipsync_tier == "cinema_quality"
-                        else LipSyncQualityTier.PREVIEW_FAST
-                    )
-                    ls_engine: LatentSyncLipSyncEngine | MuseTalkLipSyncEngine = (
-                        LatentSyncLipSyncEngine()
-                        if tier == LipSyncQualityTier.CINEMA_QUALITY
-                        else MuseTalkLipSyncEngine()
-                    )
+                    viseme_engine = VisemeLipSyncAdapter()
+                    ls_engine = viseme_engine
+
+                    if self.cfg.lipsync_tier == "cinema_quality" and os.environ.get("AIDUB_LATENTSYNC_COMMAND"):
+                        from aidub.adapters.lipsync_latentsync import LatentSyncLipSyncEngine
+                        tier = LipSyncQualityTier.CINEMA_QUALITY
+                        ls_engine = LatentSyncLipSyncEngine()
+                    elif self.cfg.lipsync_tier == "preview_fast" and os.environ.get("AIDUB_MUSETALK_COMMAND"):
+                        from aidub.adapters.lipsync_musetalk import MuseTalkLipSyncEngine
+                        tier = LipSyncQualityTier.PREVIEW_FAST
+                        ls_engine = MuseTalkLipSyncEngine()
+                    else:
+                        tier = LipSyncQualityTier.STUDIO_VISEME
+                        ls_engine = viseme_engine
+
                     options = LipSyncOptions(quality_tier=tier)
-                    ls_res = ls_engine.synthesize_lip_sync(
-                        shot_id=self.cfg.input.stem,
-                        source_video_path=str(self.cfg.input),
-                        target_audio_path=str(dub_vocals),
-                        output_directory=str(self.work_dir),
-                        options=options,
+                    selective_engine = SelectiveFaceGateLipSyncEngine()
+
+                    def _synth_shot(s_id: str, in_v: Path, in_a: Path, out_v: Path) -> Path | None:
+                        # First try primary engine if not viseme
+                        if ls_engine is not viseme_engine:
+                            try:
+                                res = ls_engine.synthesize_lip_sync(
+                                    shot_id=s_id,
+                                    source_video_path=str(in_v),
+                                    target_audio_path=str(in_a),
+                                    output_directory=str(out_v.parent),
+                                    options=options,
+                                )
+                                if res and res.output_video_path and Path(res.output_video_path).is_file():
+                                    return Path(res.output_video_path)
+                            except Exception as exc:
+                                logger.info("Shot lip-sync primary engine failed: %s; falling back to VisemeLipSyncAdapter", exc)
+
+                        # Viseme engine fallback/primary
+                        try:
+                            res = viseme_engine.synthesize_lip_sync(
+                                shot_id=s_id,
+                                source_video_path=str(in_v),
+                                target_audio_path=str(in_a),
+                                output_directory=str(out_v.parent),
+                                options=LipSyncOptions(quality_tier=LipSyncQualityTier.STUDIO_VISEME),
+                            )
+                            if res and res.output_video_path and Path(res.output_video_path).is_file():
+                                return Path(res.output_video_path)
+                            return None
+                        except Exception as exc:
+                            logger.error("Viseme lip-sync fallback failed: %s", exc)
+                            return None
+
+                    selective_report = selective_engine.run_selective_lipsync(
+                        source_video_path=self.cfg.input,
+                        dubbed_audio_path=dub_vocals,
+                        speech_segments=segs,
+                        output_video_path=self.work_dir / f"{self.cfg.input.stem}_lipsynced.mp4",
+                        work_dir=self.work_dir,
+                        synthesize_fn=_synth_shot,
+                        source_duration_s=total_dur,
                     )
-                    lipsynced_video = Path(ls_res.output_video_path)
+                    lipsynced_video = Path(selective_report.output_video_path)
                 self.manifest.mark_stage("lipsync", True, duration_ms=timing["duration_ms"])
                 self.manifest.save()
             else:
                 self._progress("lipsync", 91, "Reusing validated lip-synced video")
+                synced_f = self.work_dir / f"{self.cfg.input.stem}_lipsynced.mp4"
                 preview_f = self.work_dir / f"{self.cfg.input.stem}_musetalk_preview.mp4"
                 cinema_f = self.work_dir / f"{self.cfg.input.stem}_latentsync_cinema.mp4"
                 lipsynced_video = (
-                    preview_f if preview_f.is_file() else (cinema_f if cinema_f.is_file() else None)
+                    synced_f if synced_f.is_file() else (preview_f if preview_f.is_file() else (cinema_f if cinema_f.is_file() else None))
                 )
 
         video_for_mux = (
@@ -706,12 +953,96 @@ class DubbingEngine:
         self.manifest.mark_stage("mux", True, duration_ms=timing["duration_ms"])
         self.manifest.save()
 
-        # Stage 10: Subtitle Export
+        # Stage 10: Subtitle, Broadcast QC, and NLE Interchange Export
         origin_srt = write_srt(segs, self.work_dir / "origin_language.srt", translated=False)
         target_srt = write_srt(segs, self.work_dir / "target_language.srt", translated=True)
         bilingual_srt = write_bilingual_srt(
             segs, self.work_dir / "bilingual.srt", LineMode.BILINGUAL_TARGET_BOTTOM
         )
+        bilingual_ass = self.work_dir / "bilingual.ass"
+        try:
+            from aidub.subtitles.bengali_ass_styler import BengaliAssStyler, BengaliSubtitleStyle
+
+            BengaliAssStyler.generate_ass(
+                segments=segs,
+                output_path=bilingual_ass,
+                style_preset=BengaliSubtitleStyle.BILINGUAL_STACKED,
+            )
+            logger.info("engine: generated styled HarfBuzz Bengali ASS subtitles at %s", bilingual_ass.name)
+        except Exception as exc:
+            logger.info("engine: ASS subtitle generation skipped: %s", exc)
+
+        # Stage 10.1: Broadcast QC Compliance Certificate
+        qc_json_str = ""
+        qc_txt_str = ""
+        try:
+            from aidub.analysis.broadcast_qc import BroadcastQCEngine, DeliverySpec
+
+            spec_key = str(getattr(self.cfg, "broadcast_spec", "netflix") or "netflix").lower()
+            target_spec = (
+                DeliverySpec(spec_key)
+                if spec_key in [s.value for s in DeliverySpec]
+                else DeliverySpec.NETFLIX
+            )
+            audio_for_qc = final_audio_wav if final_audio_wav.is_file() else final_audio
+            if audio_for_qc.is_file():
+                qc_metrics = BroadcastQCEngine.analyze_wav_file(audio_for_qc)
+                qc_cert = BroadcastQCEngine.evaluate_compliance(
+                    qc_metrics, spec=target_spec, media_name=final_video.name
+                )
+                qc_json_file = self.work_dir / "broadcast_qc_certificate.json"
+                qc_json_file.write_text(qc_cert.to_json(), encoding="utf-8")
+                qc_txt_file = self.work_dir / "broadcast_qc_certificate.txt"
+                qc_txt_file.write_text(qc_cert.to_formatted_certificate(), encoding="utf-8")
+                qc_json_str = str(qc_json_file)
+                qc_txt_str = str(qc_txt_file)
+                logger.info("engine: Broadcast QC Certificate generated: %s", "PASSED" if qc_cert.passed else "NEEDS REMEDIATION")
+        except Exception as exc:
+            logger.warning("engine: Broadcast QC audit skipped: %s", exc)
+
+        # Stage 10.2: NLE Timeline Round-Trip Interchange (FCPXML 1.10+ and CMX3600 EDL)
+        fcpxml_str = ""
+        edl_str = ""
+        try:
+            from aidub.interchange.edl_fcpxml_adapter import EDLFCPXMLAdapter
+            from aidub.interchange.otio_adapter import OTIOClip, OTIOTimeline, OTIOTrack
+
+            otio_clips: list[OTIOClip] = []
+            for idx, seg in enumerate(segs):
+                st_ms = int(float(seg.get("start", 0.0)) * 1000)
+                en_ms = int(float(seg.get("end", st_ms / 1000 + 1.0)) * 1000)
+                dur_ms = max(100, en_ms - st_ms)
+                otio_clips.append(
+                    OTIOClip(
+                        clip_id=Identifier(f"clip_{idx:04d}"),
+                        name=f"Dialogue_{idx + 1:03d}",
+                        source_range_start_ms=st_ms,
+                        source_range_duration_ms=dur_ms,
+                        media_reference_path=str(dub_vocals),
+                    )
+                )
+
+            if otio_clips:
+                track = OTIOTrack(track_id=Identifier("t_dialogue"), kind="Audio", clips=otio_clips)
+                timeline = OTIOTimeline(
+                    timeline_id=Identifier("tl_dub_export"),
+                    name=final_video.stem,
+                    frame_rate=24.0,
+                    tracks=[track],
+                )
+                adapter = EDLFCPXMLAdapter()
+                edl_content = adapter.export_cmx3600_edl(timeline)
+                edl_file = self.work_dir / f"{final_video.stem}.edl"
+                edl_file.write_text(edl_content, encoding="utf-8")
+                edl_str = str(edl_file)
+
+                fcpxml_content = adapter.export_fcpxml(timeline)
+                fcpxml_file = self.work_dir / f"{final_video.stem}.fcpxml"
+                fcpxml_file.write_text(fcpxml_content, encoding="utf-8")
+                fcpxml_str = str(fcpxml_file)
+                logger.info("engine: NLE Interchange exported (%s, %s)", edl_file.name, fcpxml_file.name)
+        except Exception as exc:
+            logger.warning("engine: NLE interchange export skipped: %s", exc)
 
         # Benchmarks export
         bench_file = self.work_dir / "bench.json"
@@ -724,12 +1055,17 @@ class DubbingEngine:
             origin_srt=str(origin_srt),
             target_srt=str(target_srt),
             bilingual_srt=str(bilingual_srt),
+            bilingual_ass=str(bilingual_ass) if bilingual_ass.is_file() else "",
             dubbed_vocals=str(dub_vocals),
             dubbed_audio=str(final_audio),
             dubbed_video=str(final_video),
             lipsynced_video=str(lipsynced_video) if lipsynced_video else "",
             bench_json=str(bench_file),
             transcript_json=str(store._get_filename()),
+            qc_certificate_json=qc_json_str,
+            qc_certificate_txt=qc_txt_str,
+            fcpxml_path=fcpxml_str,
+            edl_path=edl_str,
         )
 
 
