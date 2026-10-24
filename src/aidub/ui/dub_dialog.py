@@ -16,6 +16,7 @@ try:
     from PySide6.QtWidgets import (
         QApplication,
         QButtonGroup,
+        QCheckBox,
         QComboBox,
         QDialog,
         QFrame,
@@ -167,6 +168,47 @@ if _QT:
             prof_lay.addWidget(self.fast_radio)
             layout.addWidget(profile_group)
 
+            # Advanced Studio & Broadcast Mastering Section
+            advanced_group = QGroupBox("Studio & Broadcast Mastering", self)
+            adv_lay = QVBoxLayout(advanced_group)
+            adv_lay.setSpacing(10)
+
+            self.isometric_chk = QCheckBox(
+                "Isometric Lip-Sync Alignment (Match Syllable Count & Jaw Cadence)", advanced_group
+            )
+            self.isometric_chk.setChecked(True)
+            self.isometric_chk.setStyleSheet("color: #E2E8F0; font-size: 12px;")
+            adv_lay.addWidget(self.isometric_chk)
+
+            # Acoustic Environment Reverb Matcher
+            adv_lay.addWidget(QLabel("Acoustic Environment (Convolution Reverb):", advanced_group))
+            self.reverb_combo = QComboBox(advanced_group)
+            self.reverb_combo.addItem("None (Clean Dry Studio)", "none")
+            self.reverb_combo.addItem("Living Room Interior (RT60: 0.4s)", "living_room")
+            self.reverb_combo.addItem("Large Hall / Cathedral (RT60: 1.8s)", "large_hall")
+            self.reverb_combo.addItem("Vehicle Cabin Interior (RT60: 0.2s)", "vehicle")
+            self.reverb_combo.addItem("Street Exterior Ambience (RT60: 0.25s)", "street_exterior")
+            adv_lay.addWidget(self.reverb_combo)
+
+            # Broadcast Delivery Standard
+            adv_lay.addWidget(QLabel("Broadcast Delivery Spec (ITU-R BS.1770-4):", advanced_group))
+            self.qc_combo = QComboBox(advanced_group)
+            self.qc_combo.addItem("Netflix 5.1 Surround (-24 LUFS, TP <= -1.0 dBTP)", "netflix")
+            self.qc_combo.addItem("EBU R128 European Broadcast (-23 LUFS, TP <= -1.0 dBTP)", "ebu_r128")
+            self.qc_combo.addItem("YouTube / Web 4K UHD (-14 LUFS, High Dynamic Range)", "youtube_web")
+            self.qc_combo.addItem("Theatrical Master Archive (-27 LUFS)", "theatrical")
+            adv_lay.addWidget(self.qc_combo)
+
+            # C2PA Provenance Credentials
+            self.c2pa_chk = QCheckBox(
+                "Embed Cryptographic C2PA Content Credentials & AI Provenance", advanced_group
+            )
+            self.c2pa_chk.setChecked(True)
+            self.c2pa_chk.setStyleSheet("color: #E2E8F0; font-size: 12px;")
+            adv_lay.addWidget(self.c2pa_chk)
+
+            layout.addWidget(advanced_group)
+
             # Button Box
             btn_row = QHBoxLayout()
             btn_row.setSpacing(10)
@@ -203,6 +245,18 @@ if _QT:
             target_lang = str(self.lang_combo.currentData() or "bn")
             quality_profile = "fast" if self.fast_radio.isChecked() else "quality"
             return target_lang, quality_profile
+
+        def get_advanced_settings(self) -> dict[str, Any]:
+            """Return comprehensive studio configuration dictionary."""
+            target_lang, quality_profile = self.get_settings()
+            return {
+                "target_lang": target_lang,
+                "quality_profile": quality_profile,
+                "isometric_alignment": self.isometric_chk.isChecked(),
+                "acoustic_preset": str(self.reverb_combo.currentData() or "none"),
+                "broadcast_spec": str(self.qc_combo.currentData() or "netflix"),
+                "embed_c2pa_provenance": self.c2pa_chk.isChecked(),
+            }
 
     class DubbingErrorDialog(QDialog):
         """Readable operator error dialog with one-click 'Copy details'."""
