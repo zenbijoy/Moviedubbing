@@ -16,6 +16,8 @@ def test_native_shell_starts_and_switches_indic_locales(
         desktop.show()
         desktop.application.processEvents()
         assert desktop.window.isVisible()
+        assert desktop.window.stack.currentWidget() is desktop.window.home_view
+        desktop.window.show_studio()
         assert desktop.window.stack.currentWidget() is desktop.window.studio
         assert desktop.locale_service.locale == "bn-BD"
         assert desktop.window.windowTitle() == desktop.locale_service("app.title")

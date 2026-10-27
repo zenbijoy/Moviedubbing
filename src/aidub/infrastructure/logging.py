@@ -11,13 +11,24 @@ Provides:
 from __future__ import annotations
 
 import logging
+import logging.handlers
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
+
+import platformdirs
 
 from aidub.security.privacy import DataClass, NetworkPolicy, PrivacyPolicy
 
 logger = logging.getLogger(__name__)
+
+
+def get_default_log_file() -> Path:
+    """Return default writable log file in user's application log directory."""
+    log_dir = Path(platformdirs.user_log_dir("aidub", "AIDubStudio"))
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir / "aidub_desktop.log"
 
 
 # ── Redaction patterns ────────────────────────────────────────────────────────
@@ -31,6 +42,8 @@ _REDACT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bsk-ant-[A-Za-z0-9\-]{20,}\b"), "[API_KEY_REDACTED]"),
     # Generic 40-char hex API keys
     (re.compile(r"\b[A-Fa-f0-9]{40}\b"), "[HEX_TOKEN_REDACTED]"),
+    # HuggingFace tokens  hf_...
+    (re.compile(r"\bhf_[A-Za-z0-9]{20,}\b"), "[HF_TOKEN_REDACTED]"),
     # phone numbers  +880-1234-567890
     (re.compile(r"\+?\d[\d\s\-]{8,14}\d"), "[PHONE_REDACTED]"),
     # email addresses
@@ -67,28 +80,51 @@ def configure_secure_logging(
     *,
     level: int = logging.INFO,
     redact: bool = True,
+    log_file: Path | str | None = None,
+    max_bytes: int = 5 * 1024 * 1024,
+    backup_count: int = 3,
 ) -> None:
-    """
-    Configure root logger with optional redaction filter and structured format.
+    """Configure root logger with optional redaction filter, structured format, and log rotation.
 
     Should be called once at application startup before any log output.
     """
     root = logging.getLogger()
     root.setLevel(level)
 
-    handler = logging.StreamHandler()
-    handler.setLevel(level)
     formatter = logging.Formatter(
         fmt="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
         datefmt="%Y-%m-%dT%H:%M:%SZ",
     )
-    handler.setFormatter(formatter)
 
+    # Console stream handler
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(level)
+    stream_handler.setFormatter(formatter)
     if redact:
-        handler.addFilter(RedactionFilter())
+        stream_handler.addFilter(RedactionFilter())
+    root.addHandler(stream_handler)
 
-    root.addHandler(handler)
-    logger.debug("secure logging configured (redact=%s)", redact)
+    # Optional bounded rotating file handler
+    if log_file is not None:
+        target_path = Path(log_file)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.handlers.RotatingFileHandler(
+            filename=str(target_path),
+            maxBytes=max_bytes,
+            backupCount=backup_count,
+            encoding="utf-8",
+        )
+        file_handler.setLevel(level)
+        file_handler.setFormatter(formatter)
+        if redact:
+            file_handler.addFilter(RedactionFilter())
+        root.addHandler(file_handler)
+
+    logger.debug(
+        "secure logging configured (redact=%s, log_file=%s)",
+        redact,
+        str(log_file) if log_file else "None",
+    )
 
 
 # ── Private Studio Guard ──────────────────────────────────────────────────────
@@ -145,4 +181,5 @@ __all__ = [
     "PrivateStudioViolation",
     "RedactionFilter",
     "configure_secure_logging",
+    "get_default_log_file",
 ]

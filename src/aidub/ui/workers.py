@@ -156,17 +156,22 @@ if _QT:
 
                 out_path = self._available_output_path()
                 import os
+
                 is_fast = self.quality_profile == "fast"
                 effective_lipsync = False if is_fast else self.lipsync
                 if effective_lipsync:
-                    if self.lipsync_tier == "cinema_quality" and not os.environ.get("AIDUB_LATENTSYNC_COMMAND"):
+                    if self.lipsync_tier == "cinema_quality" and not os.environ.get(
+                        "AIDUB_LATENTSYNC_COMMAND"
+                    ):
                         self.progress_updated.emit(
                             "lipsync_notice",
                             2,
                             "Notice: AIDUB_LATENTSYNC_COMMAND not configured; using Studio Viseme Lip-Sync.",
                         )
                         self.lipsync_tier = "studio_viseme"
-                    elif self.lipsync_tier == "preview_fast" and not os.environ.get("AIDUB_MUSETALK_COMMAND"):
+                    elif self.lipsync_tier == "preview_fast" and not os.environ.get(
+                        "AIDUB_MUSETALK_COMMAND"
+                    ):
                         self.progress_updated.emit(
                             "lipsync_notice",
                             2,
@@ -764,6 +769,252 @@ if _QT:
                 logger.exception("UtteranceRetakeWorker failed: %s", exc)
                 self.retake_failed.emit(str(exc))
 
+    class ModularExtractionWorker(QThread):
+        """Worker thread for extracting dialogue audio from source video."""
+
+        progress_updated = Signal(int, str)
+        extraction_completed = Signal(str, float)
+        extraction_failed = Signal(str)
+        extraction_cancelled = Signal()
+
+        def __init__(
+            self,
+            video_path: str | Path,
+            output_audio_path: str | Path,
+            sample_rate: int = 16_000,
+            parent: Any = None,
+            service: Any = None,
+        ) -> None:
+            super().__init__(parent)
+            self.video_path = Path(video_path)
+            self.output_audio_path = Path(output_audio_path)
+            self.sample_rate = sample_rate
+            self.service = service
+
+        def run(self) -> None:
+            try:
+                from aidub.application.modular_pipeline import (
+                    ModularDubbingPipelineService,
+                    PipelineCancelledError,
+                )
+
+                service = self.service or ModularDubbingPipelineService()
+                dur_s, out_p = service.extract_dialogue_audio(
+                    self.video_path,
+                    self.output_audio_path,
+                    sample_rate=self.sample_rate,
+                    cancel_check=self.isInterruptionRequested,
+                    progress_cb=self.progress_updated.emit,
+                )
+                self.extraction_completed.emit(str(out_p), dur_s)
+            except PipelineCancelledError:
+                self.extraction_cancelled.emit()
+            except Exception as exc:
+                logger.exception("ModularExtractionWorker failed: %s", exc)
+                self.extraction_failed.emit(str(exc))
+
+        def cancel(self) -> None:
+            self.requestInterruption()
+
+    class ModularTranscriptionWorker(QThread):
+        """Worker thread for transcribing speech audio into structured cues."""
+
+        progress_updated = Signal(int, str)
+        transcription_completed = Signal(list)
+        transcription_failed = Signal(str)
+        transcription_cancelled = Signal()
+
+        def __init__(
+            self,
+            audio_path: str | Path,
+            language: str | None = None,
+            model_size: str = "base",
+            parent: Any = None,
+            service: Any = None,
+        ) -> None:
+            super().__init__(parent)
+            self.audio_path = Path(audio_path)
+            self.language = language
+            self.model_size = model_size
+            self.service = service
+
+        def run(self) -> None:
+            try:
+                from aidub.application.modular_pipeline import (
+                    ModularDubbingPipelineService,
+                    PipelineCancelledError,
+                )
+
+                service = self.service or ModularDubbingPipelineService()
+                cues = service.transcribe_audio(
+                    self.audio_path,
+                    language=self.language,
+                    model_size=self.model_size,
+                    cancel_check=self.isInterruptionRequested,
+                    progress_cb=self.progress_updated.emit,
+                )
+                self.transcription_completed.emit(cues)
+            except PipelineCancelledError:
+                self.transcription_cancelled.emit()
+            except Exception as exc:
+                logger.exception("ModularTranscriptionWorker failed: %s", exc)
+                self.transcription_failed.emit(str(exc))
+
+        def cancel(self) -> None:
+            self.requestInterruption()
+
+    class ModularTranslationWorker(QThread):
+        """Worker thread for translating dialogue cues into target language."""
+
+        progress_updated = Signal(int, str)
+        translation_completed = Signal(list)
+        translation_failed = Signal(str)
+        translation_cancelled = Signal()
+
+        def __init__(
+            self,
+            cues: list[Any],
+            source_lang: str,
+            target_lang: str,
+            parent: Any = None,
+            service: Any = None,
+        ) -> None:
+            super().__init__(parent)
+            self.cues = cues
+            self.source_lang = source_lang
+            self.target_lang = target_lang
+            self.service = service
+
+        def run(self) -> None:
+            try:
+                from aidub.application.modular_pipeline import (
+                    ModularDubbingPipelineService,
+                    PipelineCancelledError,
+                )
+                from aidub.providers.factory import build_router_from_config
+
+                router = None
+                try:
+                    router = build_router_from_config()
+                except Exception:
+                    router = None
+
+                service = self.service or ModularDubbingPipelineService()
+                translated = service.translate_cues(
+                    self.cues,
+                    self.source_lang,
+                    self.target_lang,
+                    router=router,
+                    cancel_check=self.isInterruptionRequested,
+                    progress_cb=self.progress_updated.emit,
+                )
+                self.translation_completed.emit(translated)
+            except PipelineCancelledError:
+                self.translation_cancelled.emit()
+            except Exception as exc:
+                logger.exception("ModularTranslationWorker failed: %s", exc)
+                self.translation_failed.emit(str(exc))
+
+        def cancel(self) -> None:
+            self.requestInterruption()
+
+    class ModularBatchSynthesisWorker(QThread):
+        """Worker thread for synthesizing all translated cues into placed voice takes."""
+
+        progress_updated = Signal(int, str)
+        synthesis_completed = Signal(list)
+        synthesis_failed = Signal(str)
+        synthesis_cancelled = Signal()
+
+        def __init__(
+            self,
+            cues: list[Any],
+            target_lang: str,
+            output_dir: str | Path,
+            voice_name: str | None = None,
+            parent: Any = None,
+            service: Any = None,
+        ) -> None:
+            super().__init__(parent)
+            self.cues = cues
+            self.target_lang = target_lang
+            self.output_dir = Path(output_dir)
+            self.voice_name = voice_name
+            self.service = service
+
+        def run(self) -> None:
+            try:
+                from aidub.application.modular_pipeline import (
+                    ModularDubbingPipelineService,
+                    PipelineCancelledError,
+                )
+
+                service = self.service or ModularDubbingPipelineService()
+                takes = service.synthesize_cues(
+                    self.cues,
+                    self.target_lang,
+                    self.output_dir,
+                    voice_name=self.voice_name,
+                    cancel_check=self.isInterruptionRequested,
+                    progress_cb=self.progress_updated.emit,
+                )
+                self.synthesis_completed.emit(takes)
+            except PipelineCancelledError:
+                self.synthesis_cancelled.emit()
+            except Exception as exc:
+                logger.exception("ModularBatchSynthesisWorker failed: %s", exc)
+                self.synthesis_failed.emit(str(exc))
+
+        def cancel(self) -> None:
+            self.requestInterruption()
+
+    class ModularRenderWorker(QThread):
+        """Worker thread for rendering and muxing the final master video."""
+
+        progress_updated = Signal(int, str)
+        render_completed = Signal(str)
+        render_failed = Signal(str)
+        render_cancelled = Signal()
+
+        def __init__(
+            self,
+            video_path: str | Path,
+            audio_path: str | Path,
+            output_video_path: str | Path,
+            parent: Any = None,
+            service: Any = None,
+        ) -> None:
+            super().__init__(parent)
+            self.video_path = Path(video_path)
+            self.audio_path = Path(audio_path)
+            self.output_video_path = Path(output_video_path)
+            self.service = service
+
+        def run(self) -> None:
+            try:
+                from aidub.application.modular_pipeline import (
+                    ModularDubbingPipelineService,
+                    PipelineCancelledError,
+                )
+
+                service = self.service or ModularDubbingPipelineService()
+                out_v = service.render_master_timeline(
+                    self.video_path,
+                    self.audio_path,
+                    self.output_video_path,
+                    cancel_check=self.isInterruptionRequested,
+                    progress_cb=self.progress_updated.emit,
+                )
+                self.render_completed.emit(str(out_v))
+            except PipelineCancelledError:
+                self.render_cancelled.emit()
+            except Exception as exc:
+                logger.exception("ModularRenderWorker failed: %s", exc)
+                self.render_failed.emit(str(exc))
+
+        def cancel(self) -> None:
+            self.requestInterruption()
+
 
 __all__ = [
     "AIAssistantWorker",
@@ -772,6 +1023,11 @@ __all__ = [
     "DubbingEngineWorker",
     "EmotionAnalysisWorker",
     "LipSyncRenderWorker",
+    "ModularBatchSynthesisWorker",
+    "ModularExtractionWorker",
+    "ModularRenderWorker",
+    "ModularTranscriptionWorker",
+    "ModularTranslationWorker",
     "RenderExportWorker",
     "SpeechTranscriptionWorker",
     "TTSPreviewWorker",

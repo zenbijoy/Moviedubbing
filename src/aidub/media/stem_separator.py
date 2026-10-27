@@ -48,7 +48,9 @@ def separate_stems(
         )
         adapter.separate(str(audio_p), str(out_dir))
         if vocal_path.is_file() and music_path.is_file():
-            logger.info("Roformer stem separation complete: vocals=%s music=%s", vocal_path, music_path)
+            logger.info(
+                "Roformer stem separation complete: vocals=%s music=%s", vocal_path, music_path
+            )
             return vocal_path, music_path
 
     # ------------------------------------------------------------------

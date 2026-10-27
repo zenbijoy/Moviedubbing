@@ -38,7 +38,9 @@ def test_colab_input_bundle_packaging(tmp_path: Path) -> None:
     movie_path.write_bytes(b"TEST_MOVIE_HEADER_PAYLOAD")
 
     segments_path = work_dir / "asr_segments.json"
-    segments_path.write_text(json.dumps([{"start": 0.0, "end": 2.0, "text": "Hello"}]), encoding="utf-8")
+    segments_path.write_text(
+        json.dumps([{"start": 0.0, "end": 2.0, "text": "Hello"}]), encoding="utf-8"
+    )
 
     ref_dir = work_dir / "speaker_references"
     ref_dir.mkdir(parents=True, exist_ok=True)
@@ -106,6 +108,7 @@ def test_poll_and_sync_kaggle_job_success(tmp_path: Path) -> None:
 
     # Mock client methods
     status_sequence = ["running", "complete"]
+
     def _mock_get_status(slug: str) -> tuple[str, str]:
         return status_sequence.pop(0), "OK"
 
@@ -117,12 +120,14 @@ def test_poll_and_sync_kaggle_job_success(tmp_path: Path) -> None:
         return [out_v, out_a]
 
     progress_ticks: list[tuple[int, str]] = []
+
     def _cb(pct: int, msg: str) -> None:
         progress_ticks.append((pct, msg))
 
-    with patch.object(client, "get_kernel_status", side_effect=_mock_get_status), \
-         patch.object(client, "download_kernel_output", side_effect=_mock_download):
-
+    with (
+        patch.object(client, "get_kernel_status", side_effect=_mock_get_status),
+        patch.object(client, "download_kernel_output", side_effect=_mock_download),
+    ):
         res = CloudSyncEngine.poll_and_sync_kaggle_job(
             client=client,
             kernel_slug="aidub-movie-test",
@@ -143,6 +148,7 @@ def test_colab_live_webhook_server(tmp_path: Path) -> None:
     work_dir.mkdir(parents=True, exist_ok=True)
 
     received_bundles: list[CloudSyncResult] = []
+
     def _on_received(res: CloudSyncResult) -> None:
         received_bundles.append(res)
 

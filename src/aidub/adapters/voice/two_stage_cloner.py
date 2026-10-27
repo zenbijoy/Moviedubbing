@@ -245,7 +245,10 @@ class TwoStageCharacterVoiceCloner:
         # ------------------------------------------------------------------
         valid_refs = [Path(p) for p in reference_audio_paths if Path(p).is_file()]
         if not valid_refs:
-            logger.warning("No valid reference audio paths provided for character %s; using Stage 1 base audio", character_name)
+            logger.warning(
+                "No valid reference audio paths provided for character %s; using Stage 1 base audio",
+                character_name,
+            )
             if stage1_wav.resolve() != out_final.resolve():
                 out_final.write_bytes(stage1_wav.read_bytes())
             similarity = 0.70

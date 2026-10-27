@@ -86,8 +86,10 @@ def test_cloud_accelerator_dialog_colab_support(qapp, tmp_path: Path):
     assert hasattr(dlg, "_generate_colab_notebook")
 
     out_ipynb = tmp_path / "test_colab.ipynb"
-    with patch("PySide6.QtWidgets.QFileDialog.getSaveFileName", return_value=(str(out_ipynb), "")), \
-         patch("PySide6.QtWidgets.QMessageBox.information"):
+    with (
+        patch("PySide6.QtWidgets.QFileDialog.getSaveFileName", return_value=(str(out_ipynb), "")),
+        patch("PySide6.QtWidgets.QMessageBox.information"),
+    ):
         dlg._generate_colab_notebook()
 
     assert out_ipynb.is_file()
@@ -133,4 +135,3 @@ def test_inspector_panel_realtime_syllable_rhythm_sync(qapp):
     assert "%" in inspector.t_score_lbl.text()
     assert "syl" in inspector.t_score_lbl.text()
     assert "Lip Sync" in inspector.l_score_lbl.text()
-

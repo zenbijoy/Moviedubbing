@@ -138,7 +138,9 @@ class StudioMasterExporter:
             try:
                 qc_metrics = BroadcastQCEngine.analyze_wav_file(dub_audio)
             except Exception as e:
-                logger.warning("Could not analyze WAV directly for QC: %s. Using default baseline metrics.", e)
+                logger.warning(
+                    "Could not analyze WAV directly for QC: %s. Using default baseline metrics.", e
+                )
                 qc_metrics = LoudnessQCResult(
                     integrated_lufs=-24.0,
                     loudness_range_lu=4.0,
@@ -206,7 +208,7 @@ class StudioMasterExporter:
             timeline_clips.append(
                 OTIOClip(
                     clip_id=f"cue_{i:04d}",
-                    name=f"Line_{i+1}_{u.get('speaker', '0')}",
+                    name=f"Line_{i + 1}_{u.get('speaker', '0')}",
                     source_range_start_ms=round(s_val * 1000.0),
                     source_range_duration_ms=max(1, round(dur_val * 1000.0)),
                     media_reference_path=wav_ref,
@@ -273,7 +275,9 @@ class StudioMasterExporter:
                 "manifest_id": f"c2pa_fallback_{hashlib.sha256(w_dir.name.encode()).hexdigest()[:16]}",
                 "project_id": f"proj_{w_dir.name}",
                 "status": "unsigned_fallback",
-                "digital_signature_sha256": hashlib.sha256(b"fallback_c2pa_credentials").hexdigest(),
+                "digital_signature_sha256": hashlib.sha256(
+                    b"fallback_c2pa_credentials"
+                ).hexdigest(),
             }
             c2pa_path.write_text(json.dumps(fallback_manifest, indent=2), encoding="utf-8")
 
@@ -313,18 +317,23 @@ class StudioMasterExporter:
                 f_size = f_path.stat().st_size
                 total_bytes += f_size
                 sha = hashlib.sha256(f_path.read_bytes()).hexdigest()
-                inventory["files"].append({
-                    "filename": f_path.name,
-                    "size_bytes": f_size,
-                    "sha256": sha,
-                })
+                inventory["files"].append(
+                    {
+                        "filename": f_path.name,
+                        "size_bytes": f_size,
+                        "sha256": sha,
+                    }
+                )
 
         pkg_manifest_path = pkg_dir / "package_manifest.json"
         pkg_manifest_path.write_text(json.dumps(inventory, indent=2), encoding="utf-8")
 
         elapsed = time.perf_counter() - start_time
         if progress_cb:
-            progress_cb(100, f"Studio Master Bundle created successfully ({len(all_deliverables)} items, {elapsed:.1f}s)!")
+            progress_cb(
+                100,
+                f"Studio Master Bundle created successfully ({len(all_deliverables)} items, {elapsed:.1f}s)!",
+            )
 
         logger.info(
             "Studio master bundle generated at %s (%d files, %d bytes in %.2fs)",
@@ -398,42 +407,62 @@ class StudioMasterExporter:
         audio_idx = 0
         if has_orig:
             cmd.extend(["-map", "1:a:0"])
-            cmd.extend([
-                f"-metadata:s:a:{audio_idx}", f"language={source_lang}",
-                f"-metadata:s:a:{audio_idx}", f"title=Original Dialogue ({source_lang.upper()})",
-            ])
+            cmd.extend(
+                [
+                    f"-metadata:s:a:{audio_idx}",
+                    f"language={source_lang}",
+                    f"-metadata:s:a:{audio_idx}",
+                    f"title=Original Dialogue ({source_lang.upper()})",
+                ]
+            )
             audio_idx += 1
 
         if has_dub:
             stream_in = 2 if has_orig else 1
             cmd.extend(["-map", f"{stream_in}:a:0"])
-            cmd.extend([
-                f"-metadata:s:a:{audio_idx}", f"language={target_lang}",
-                f"-metadata:s:a:{audio_idx}", f"title=Master Studio Dub ({target_lang.upper()})",
-            ])
+            cmd.extend(
+                [
+                    f"-metadata:s:a:{audio_idx}",
+                    f"language={target_lang}",
+                    f"-metadata:s:a:{audio_idx}",
+                    f"title=Master Studio Dub ({target_lang.upper()})",
+                ]
+            )
             audio_idx += 1
 
         if has_sub:
             sub_in = (3 if has_orig else 2) if has_dub else 1
             cmd.extend(["-map", f"{sub_in}:s:0"])
-            cmd.extend([
-                "-metadata:s:s:0", f"language={target_lang}",
-                "-metadata:s:s:0", f"title=Localized Subtitles ({target_lang.upper()})",
-            ])
+            cmd.extend(
+                [
+                    "-metadata:s:s:0",
+                    f"language={target_lang}",
+                    "-metadata:s:s:0",
+                    f"title=Localized Subtitles ({target_lang.upper()})",
+                ]
+            )
 
-        cmd.extend([
-            "-c:v", "copy",
-            "-c:a", "aac",
-            "-b:a", "320k",
-            "-c:s", "srt",
-            str(output_mkv),
-        ])
+        cmd.extend(
+            [
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "320k",
+                "-c:s",
+                "srt",
+                str(output_mkv),
+            ]
+        )
 
         try:
             subprocess.run(cmd, capture_output=True, check=True)
             logger.info("Muxed master dual-audio MKV container: %s", output_mkv)
         except Exception as exc:
-            logger.warning("FFmpeg dual-audio MKV muxing failed (%s); writing deliverable placeholder", exc)
+            logger.warning(
+                "FFmpeg dual-audio MKV muxing failed (%s); writing deliverable placeholder", exc
+            )
             if not output_mkv.is_file():
                 output_mkv.write_bytes(b"MATROSKA_DUAL_AUDIO_STUDIO_DELIVERABLE_V2")
 

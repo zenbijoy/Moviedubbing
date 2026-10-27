@@ -190,7 +190,9 @@ class UtteranceRetakeService:
                     effective_text,
                 )
             except Exception as exc:
-                logger.warning("Isometric optimization fallback for retake #%d: %s", utterance_index, exc)
+                logger.warning(
+                    "Isometric optimization fallback for retake #%d: %s", utterance_index, exc
+                )
 
         # ------------------------------------------------------------------
         # 2. Synthesize the single replacement take
@@ -198,7 +200,11 @@ class UtteranceRetakeService:
         if progress_cb:
             progress_cb(25, f"Synthesizing replacement take for #{utterance_index}...")
 
-        eff_voice = voice_name or target_seg.get("voice") or default_voice_for_language(self.target_language)
+        eff_voice = (
+            voice_name
+            or target_seg.get("voice")
+            or default_voice_for_language(self.target_language)
+        )
         tts_engine = EdgeTTSAdapter()
         retake_raw_wav = self.work_dir / f"seg_{utterance_index:03d}_retake_raw.mp3"
         fit_wav_target = self.work_dir / f"seg_{utterance_index:03d}_fit.wav"
@@ -234,7 +240,9 @@ class UtteranceRetakeService:
                 )
                 if rvc_retake_wav.is_file() and rvc_retake_wav.stat().st_size > 0:
                     synth_source_for_fit = rvc_retake_wav
-                    logger.info("Applied RVC v2 voice conversion to retake utterance #%d", utterance_index)
+                    logger.info(
+                        "Applied RVC v2 voice conversion to retake utterance #%d", utterance_index
+                    )
             except Exception as exc:
                 logger.warning("RVC retake voice conversion fallback: %s", exc)
 
@@ -259,7 +267,11 @@ class UtteranceRetakeService:
         # ------------------------------------------------------------------
         effective_acoustic_preset = acoustic_preset or manifest_acoustic_preset
         acoustic_preset_applied: str | None = None
-        if effective_acoustic_preset and str(effective_acoustic_preset).lower() != "none" and fitted_wav.is_file():
+        if (
+            effective_acoustic_preset
+            and str(effective_acoustic_preset).lower() != "none"
+            and fitted_wav.is_file()
+        ):
             try:
                 from aidub.contracts.base import Identifier
                 from aidub.media.acoustic_ir import (
@@ -284,13 +296,21 @@ class UtteranceRetakeService:
                     wet_dry_mix=0.20,
                     decay_time_ms=decay_ms,
                 )
-                convolved_bytes = ir_engine.apply_convolution_reverb(fitted_wav.read_bytes(), ir_prof)
+                convolved_bytes = ir_engine.apply_convolution_reverb(
+                    fitted_wav.read_bytes(), ir_prof
+                )
                 clean_bytes = convolved_bytes.split(b"_CONVOLVED_REVERB")[0]
                 fitted_wav.write_bytes(clean_bytes)
                 acoustic_preset_applied = preset_key
-                logger.info("Applied acoustic IR convolution reverb (%s) to retake #%d", preset_key, utterance_index)
+                logger.info(
+                    "Applied acoustic IR convolution reverb (%s) to retake #%d",
+                    preset_key,
+                    utterance_index,
+                )
             except Exception as exc:
-                logger.warning("Acoustic IR convolution fallback for retake #%d: %s", utterance_index, exc)
+                logger.warning(
+                    "Acoustic IR convolution fallback for retake #%d: %s", utterance_index, exc
+                )
 
         # ------------------------------------------------------------------
         # 6. Ripple Edit Alignment (if requested)
@@ -307,8 +327,14 @@ class UtteranceRetakeService:
                     u_j["start"] = max(0.0, round(old_s + delta_s, 4))
                     u_j["end"] = max(float(u_j["start"]) + 0.1, round(old_e + delta_s, 4))
                 target_seg["end"] = round(seg_start + fitted_dur, 4)
-                total_dur = max(total_dur + delta_s, max(float(u.get("end", 0.0)) for u in utterances) + 0.5)
-                logger.info("Ripple edit applied: shifted %d downstream utterances by %+0.3fs", len(utterances) - (utterance_index + 1), delta_s)
+                total_dur = max(
+                    total_dur + delta_s, max(float(u.get("end", 0.0)) for u in utterances) + 0.5
+                )
+                logger.info(
+                    "Ripple edit applied: shifted %d downstream utterances by %+0.3fs",
+                    len(utterances) - (utterance_index + 1),
+                    delta_s,
+                )
         else:
             target_seg["end"] = round(seg_start + fitted_dur, 4)
 
@@ -374,12 +400,14 @@ class UtteranceRetakeService:
         for i, u in enumerate(utterances):
             s_val = float(u.get("start", 0.0))
             e_val = float(u.get("end", s_val + 1.0))
-            sub_cues.append({
-                "start": s_val,
-                "end": e_val,
-                "src": u.get("text", ""),
-                "tgt": u.get("tgt", ""),
-            })
+            sub_cues.append(
+                {
+                    "start": s_val,
+                    "end": e_val,
+                    "src": u.get("text", ""),
+                    "tgt": u.get("tgt", ""),
+                }
+            )
 
         bilingual_srt_path = self.work_dir / "bilingual.srt"
         write_bilingual_srt(sub_cues, bilingual_srt_path)
@@ -389,7 +417,9 @@ class UtteranceRetakeService:
         # ------------------------------------------------------------------
         # 10. Re-mux output video container
         # ------------------------------------------------------------------
-        final_video_path = output_video_path or (self.work_dir / f"retake_master_{self.target_language}.mp4")
+        final_video_path = output_video_path or (
+            self.work_dir / f"retake_master_{self.target_language}.mp4"
+        )
         final_video_p = Path(final_video_path)
 
         if origin_video and origin_video.is_file():

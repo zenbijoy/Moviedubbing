@@ -77,7 +77,9 @@ def save_kaggle_credentials(username: str, key: str) -> Path:
     folder = Path.home() / ".kaggle"
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / "kaggle.json"
-    target.write_text(json.dumps({"username": username.strip(), "key": key.strip()}, indent=2), encoding="utf-8")
+    target.write_text(
+        json.dumps({"username": username.strip(), "key": key.strip()}, indent=2), encoding="utf-8"
+    )
     access_token_target = folder / "access_token"
     try:
         access_token_target.write_text(key.strip(), encoding="utf-8")
@@ -183,10 +185,10 @@ class KaggleNotebookBuilder:
                     "stems_dir.mkdir(parents=True, exist_ok=True)\n",
                     "\n",
                     "print('[PROGRESS: 15%] Extracting 16kHz master audio track...', flush=True)\n",
-                    "!ffmpeg -y -hide_banner -loglevel error -i \"$movie_path\" -vn -acodec pcm_s16le -ar 16000 -ac 1 \"$audio_wav\"\n",
+                    '!ffmpeg -y -hide_banner -loglevel error -i "$movie_path" -vn -acodec pcm_s16le -ar 16000 -ac 1 "$audio_wav"\n',
                     "\n",
                     "print('[PROGRESS: 20%] Running Demucs v4 GPU Stem Separation (preserving background music & sound effects)...', flush=True)\n",
-                    "!demucs --two-stems=vocals -n htdemucs -d cuda \"$audio_wav\" -o \"$stems_dir\"\n",
+                    '!demucs --two-stems=vocals -n htdemucs -d cuda "$audio_wav" -o "$stems_dir"\n',
                     "\n",
                     "vocals_file = stems_dir / 'htdemucs' / 'audio_16k' / 'vocals.wav'\n",
                     "music_file = stems_dir / 'htdemucs' / 'audio_16k' / 'no_vocals.wav'\n",
@@ -301,13 +303,13 @@ class KaggleNotebookBuilder:
                     "valid_files = [p[2] for p in valid_parts if p[2].is_file()]\n",
                     "concat_list.write_text('\\n'.join([f\"file '{p.resolve()}'\" for p in valid_files]), encoding='utf-8')\n",
                     "\n",
-                    "!ffmpeg -y -hide_banner -loglevel error -f concat -safe 0 -i \"$concat_list\" -c:a pcm_s16le -ar 48000 \"$dubbed_audio\"\n",
+                    '!ffmpeg -y -hide_banner -loglevel error -f concat -safe 0 -i "$concat_list" -c:a pcm_s16le -ar 48000 "$dubbed_audio"\n',
                     "\n",
                     "# Mix dubbed speech with original background music stem if present\n",
                     "mixed_audio = output_dir / 'dubbed_mixed.wav'\n",
                     "if music_file.is_file() and dubbed_audio.is_file():\n",
                     "    print('[PROGRESS: 85%] Mixing dialogue over original background music with sidechain ducking...', flush=True)\n",
-                    "    !ffmpeg -y -hide_banner -loglevel error -i \"$dubbed_audio\" -i \"$music_file\" -filter_complex \"[1:a]volume=0.35[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=2[aout]\" -map \"[aout]\" -c:a pcm_s16le -ar 48000 \"$mixed_audio\"\n",
+                    '    !ffmpeg -y -hide_banner -loglevel error -i "$dubbed_audio" -i "$music_file" -filter_complex "[1:a]volume=0.35[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=2[aout]" -map "[aout]" -c:a pcm_s16le -ar 48000 "$mixed_audio"\n',
                     "    final_dub_audio = mixed_audio if mixed_audio.is_file() else dubbed_audio\n",
                     "else:\n",
                     "    final_dub_audio = dubbed_audio\n",
@@ -334,7 +336,7 @@ class KaggleNotebookBuilder:
                     "    en = format_srt_time(seg['end'])\n",
                     "    tgt_txt = seg.get('tgt', seg['text'])\n",
                     "    src_txt = seg['text']\n",
-                    "    srt_lines.append(f\"{idx+1}\\n{st} --> {en}\\n{tgt_txt}\\n{src_txt}\\n\\n\")\n",
+                    '    srt_lines.append(f"{idx+1}\\n{st} --> {en}\\n{tgt_txt}\\n{src_txt}\\n\\n")\n',
                     "\n",
                     "srt_file = output_dir / 'bilingual.srt'\n",
                     "srt_file.write_text(''.join(srt_lines), encoding='utf-8')\n",
@@ -351,9 +353,9 @@ class KaggleNotebookBuilder:
                     "out_video = output_dir / 'dubbed_master.mp4'\n",
                     "print('[PROGRESS: 92%] Packaging final movie video with dubbed multi-channel audio track...', flush=True)\n",
                     "if final_dub_audio.is_file():\n",
-                    "    !ffmpeg -y -hide_banner -loglevel error -i \"$movie_path\" -i \"$final_dub_audio\" -map 0:v -map 1:a -c:v copy -c:a aac -b:a 256k -shortest \"$out_video\"\n",
+                    '    !ffmpeg -y -hide_banner -loglevel error -i "$movie_path" -i "$final_dub_audio" -map 0:v -map 1:a -c:v copy -c:a aac -b:a 256k -shortest "$out_video"\n',
                     "else:\n",
-                    "    !ffmpeg -y -hide_banner -loglevel error -i \"$movie_path\" -c:v copy -c:a aac \"$out_video\"\n",
+                    '    !ffmpeg -y -hide_banner -loglevel error -i "$movie_path" -c:v copy -c:a aac "$out_video"\n',
                     "\n",
                     "print('[PROGRESS: 100%] COMPLETE! Master video and subtitles ready for download.', flush=True)\n",
                     "outputs = list(output_dir.glob('*.mp4')) + list(output_dir.glob('*.wav')) + list(output_dir.glob('*.srt')) + list(output_dir.glob('*.json'))\n",
@@ -416,7 +418,10 @@ class KaggleClient:
     def check_connection(self) -> tuple[bool, str]:
         """Test authentication against Kaggle API."""
         if not self.is_configured or self.creds is None:
-            return False, "Kaggle credentials not configured. Please set username and key in settings."
+            return (
+                False,
+                "Kaggle credentials not configured. Please set username and key in settings.",
+            )
 
         url = f"{KAGGLE_API_BASE}/datasets/list"
         req = urllib.request.Request(  # noqa: S310
@@ -484,7 +489,10 @@ class KaggleClient:
                 resp_data = json.loads(resp.read().decode("utf-8"))
                 if resp_data.get("hasError") and resp_data.get("error"):
                     return False, f"Kaggle error: {resp_data.get('error')}"
-                kernel_url = resp_data.get("url") or f"https://www.kaggle.com/code/{self.creds.username}/{kernel_slug}"
+                kernel_url = (
+                    resp_data.get("url")
+                    or f"https://www.kaggle.com/code/{self.creds.username}/{kernel_slug}"
+                )
                 return True, kernel_url
         except urllib.error.HTTPError as exc:
             try:
@@ -559,7 +567,9 @@ class KaggleClient:
                         f_url = f_info.get("url")
                         if f_url:
                             f_path = dest / f_name
-                            f_req = urllib.request.Request(f_url, headers={"User-Agent": "aidub-studio/1.0"})  # noqa: S310
+                            f_req = urllib.request.Request(  # noqa: S310
+                                f_url, headers={"User-Agent": "aidub-studio/1.0"}
+                            )
                             with urllib.request.urlopen(f_req, timeout=60.0) as f_resp:  # noqa: S310
                                 f_path.write_bytes(f_resp.read())
                             downloaded.append(f_path)
@@ -592,4 +602,3 @@ __all__ = [
     "load_kaggle_credentials",
     "save_kaggle_credentials",
 ]
-

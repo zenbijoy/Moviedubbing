@@ -11,17 +11,17 @@ from __future__ import annotations
 
 import enum
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
 
-from aidub.media.ffmpeg_ops import _ffmpeg_exe, _run, duration, probe
+from aidub.media.ffmpeg_ops import _ffmpeg_exe, _run, probe
 from aidub.media.surround_mixer import SurroundSoundMixer
 
 logger = logging.getLogger(__name__)
 
 
-class BroadcastPreset(str, enum.Enum):
+class BroadcastPreset(enum.StrEnum):
     YOUTUBE_4K = "youtube_4k"
     NETFLIX_51 = "netflix_51"
     THEATRICAL_MASTER = "theatrical_master"
@@ -135,6 +135,8 @@ class BroadcastMasterExporter:
             raise FileNotFoundError(f"Source video not found: {vid}")
         if not aud.is_file():
             raise FileNotFoundError(f"Master audio track not found: {aud}")
+        if vid.resolve() == out.resolve():
+            raise ValueError(f"Output path cannot overwrite source video: {out}")
 
         if isinstance(preset, str):
             try:
@@ -167,7 +169,18 @@ class BroadcastMasterExporter:
         if has_sub and burn_subtitles:
             # Escape path for ffmpeg subtitles filter (replace backslashes and colons for Windows)
             clean_sub = str(sub_file.resolve()).replace("\\", "/").replace(":", "\\:")
-            cmd.extend(["-vf", f"subtitles='{clean_sub}'", "-c:v", cfg.video_codec, "-crf", str(cfg.crf), "-preset", "medium"])
+            cmd.extend(
+                [
+                    "-vf",
+                    f"subtitles='{clean_sub}'",
+                    "-c:v",
+                    cfg.video_codec,
+                    "-crf",
+                    str(cfg.crf),
+                    "-preset",
+                    "medium",
+                ]
+            )
         else:
             # Stream copy video for lossless speed when no filter required, or re-encode if requested
             cmd.extend(["-c:v", "copy"])
@@ -176,20 +189,32 @@ class BroadcastMasterExporter:
         cmd.extend(["-map", "0:v:0", "-map", "1:a:0"])
 
         if has_sub and not burn_subtitles:
-            cmd.extend([
-                "-map", "2:s:0",
-                "-c:s", "mov_text" if out.suffix.lower() == ".mp4" else "srt",
-                "-metadata:s:s:0", "language=ben",
-                "-metadata:s:s:0", "title=Bengali Dubbed Subtitles",
-            ])
+            cmd.extend(
+                [
+                    "-map",
+                    "2:s:0",
+                    "-c:s",
+                    "mov_text" if out.suffix.lower() == ".mp4" else "srt",
+                    "-metadata:s:s:0",
+                    "language=ben",
+                    "-metadata:s:s:0",
+                    "title=Bengali Dubbed Subtitles",
+                ]
+            )
 
         # Audio encoding settings
-        cmd.extend([
-            "-c:a", cfg.audio_codec,
-            "-b:a", cfg.audio_bitrate,
-            "-ar", str(cfg.sample_rate),
-            "-ac", str(cfg.channels),
-        ])
+        cmd.extend(
+            [
+                "-c:a",
+                cfg.audio_codec,
+                "-b:a",
+                cfg.audio_bitrate,
+                "-ar",
+                str(cfg.sample_rate),
+                "-ac",
+                str(cfg.channels),
+            ]
+        )
 
         if cfg.extra_movflags and out.suffix.lower() in {".mp4", ".mov", ".m4v"}:
             cmd.extend(["-movflags", "".join(cfg.extra_movflags)])
@@ -201,6 +226,28 @@ class BroadcastMasterExporter:
 
         logger.info("Executing Broadcast Master Exporter: %s", " ".join(cmd))
         _run(cmd)
+
+        if not out.is_file() or out.stat().st_size == 0:
+            raise RuntimeError(f"Export failed: Output file {out} was not created or is empty.")
+
+        try:
+            probe_data = probe(out)
+            streams = probe_data.get("streams", [])
+            has_video = any(s.get("codec_type") == "video" for s in streams)
+            has_audio = any(s.get("codec_type") == "audio" for s in streams)
+            if streams and not has_video:
+                raise RuntimeError(f"Export verification failed: Output {out} has no video stream.")
+            if streams and not has_audio:
+                raise RuntimeError(f"Export verification failed: Output {out} has no audio stream.")
+            out_dur = float(probe_data.get("format", {}).get("duration", 0.0))
+            if streams and out_dur < 0.0:
+                raise RuntimeError(
+                    f"Export verification failed: Output {out} has invalid duration {out_dur}s."
+                )
+        except Exception as exc:
+            if "Export verification failed" in str(exc):
+                raise
+            logger.warning("Post-export media probe skipped or unavailable: %s", exc)
 
         if progress_cb:
             progress_cb(100, f"Master successfully created: {out.name}")
@@ -243,7 +290,7 @@ class BroadcastMasterExporter:
             if progress_cb:
                 progress_cb(50, "Multiplexing 5.1 audio with video streams...")
 
-            final_master = cls.export(
+            return cls.export(
                 video_path=video_path,
                 audio_path=temp_51_wav,
                 output_path=output_path,
@@ -252,7 +299,6 @@ class BroadcastMasterExporter:
                 burn_subtitles=burn_subtitles,
                 progress_cb=progress_cb,
             )
-            return final_master
         finally:
             if temp_51_wav.is_file():
                 try:
@@ -293,6 +339,8 @@ class BroadcastMasterExporter:
             raise FileNotFoundError(f"Original audio track not found: {orig_aud}")
         if not dub_aud.is_file():
             raise FileNotFoundError(f"Dubbed audio track not found: {dub_aud}")
+        if vid.resolve() == out.resolve():
+            raise ValueError(f"Output path cannot overwrite source video: {out}")
 
         if progress_cb:
             progress_cb(10, "Configuring Dual-Audio Multi-Track container streams...")
@@ -313,30 +361,52 @@ class BroadcastMasterExporter:
         if has_sub:
             cmd.extend(["-i", str(sub_p)])
 
-        cmd.extend([
-            "-map", "0:v:0",
-            "-map", "1:a:0",
-            "-map", "2:a:0",
-            "-c:v", "copy",
-            "-c:a:0", "aac",
-            "-b:a:0", "192k",
-            "-metadata:s:a:0", f"language={original_lang}",
-            "-metadata:s:a:0", "title=Original Audio",
-            "-c:a:1", "aac",
-            "-b:a:1", "192k",
-            "-metadata:s:a:1", f"language={dubbed_lang}",
-            "-metadata:s:a:1", f"title={dubbed_lang.capitalize()} Dubbed Audio",
-            "-disposition:a:0", "0",
-            "-disposition:a:1", "default",
-        ])
+        cmd.extend(
+            [
+                "-map",
+                "0:v:0",
+                "-map",
+                "1:a:0",
+                "-map",
+                "2:a:0",
+                "-c:v",
+                "copy",
+                "-c:a:0",
+                "aac",
+                "-b:a:0",
+                "192k",
+                "-metadata:s:a:0",
+                f"language={original_lang}",
+                "-metadata:s:a:0",
+                "title=Original Audio",
+                "-c:a:1",
+                "aac",
+                "-b:a:1",
+                "192k",
+                "-metadata:s:a:1",
+                f"language={dubbed_lang}",
+                "-metadata:s:a:1",
+                f"title={dubbed_lang.capitalize()} Dubbed Audio",
+                "-disposition:a:0",
+                "0",
+                "-disposition:a:1",
+                "default",
+            ]
+        )
 
         if has_sub:
-            cmd.extend([
-                "-map", "3:s:0",
-                "-c:s", "mov_text" if out.suffix.lower() == ".mp4" else "srt",
-                "-metadata:s:s:0", f"language={dubbed_lang}",
-                "-metadata:s:s:0", "title=Bilingual Subtitles",
-            ])
+            cmd.extend(
+                [
+                    "-map",
+                    "3:s:0",
+                    "-c:s",
+                    "mov_text" if out.suffix.lower() == ".mp4" else "srt",
+                    "-metadata:s:s:0",
+                    f"language={dubbed_lang}",
+                    "-metadata:s:s:0",
+                    "title=Bilingual Subtitles",
+                ]
+            )
 
         if out.suffix.lower() in {".mp4", ".mov", ".m4v"}:
             cmd.extend(["-movflags", "+faststart"])
@@ -346,9 +416,29 @@ class BroadcastMasterExporter:
             progress_cb(40, "Multiplexing dual-audio streams into master container...")
 
         _run(cmd)
+
+        if not out.is_file() or out.stat().st_size == 0:
+            raise RuntimeError(f"Export failed: Output file {out} was not created or is empty.")
+
+        try:
+            probe_data = probe(out)
+            streams = probe_data.get("streams", [])
+            has_video = any(s.get("codec_type") == "video" for s in streams)
+            audio_streams = [s for s in streams if s.get("codec_type") == "audio"]
+            if streams and not has_video:
+                raise RuntimeError(f"Export verification failed: Output {out} has no video stream.")
+            if streams and len(audio_streams) < 2:
+                raise RuntimeError(
+                    f"Export verification failed: Expected at least 2 audio tracks (dual-audio), found {len(audio_streams)}."
+                )
+        except Exception as exc:
+            if "Export verification failed" in str(exc):
+                raise
+            logger.warning("Could not probe output media %s: %s", out, exc)
+
         if progress_cb:
             progress_cb(100, f"Dual-audio master successfully generated: {out.name}")
         return out
 
 
-__all__ = ["BroadcastMasterExporter", "BroadcastPreset", "ExportConfig", "PRESET_CONFIGS"]
+__all__ = ["PRESET_CONFIGS", "BroadcastMasterExporter", "BroadcastPreset", "ExportConfig"]

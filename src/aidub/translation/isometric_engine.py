@@ -20,38 +20,38 @@ logger = logging.getLogger(__name__)
 # ── Language Pacing Profiles (Phonetic Syllables per Second) ─────────────────
 # Standard cinematic dialogue pacing distributions (mu, sigma)
 PACING_PROFILES: dict[str, tuple[float, float]] = {
-    "en": (4.4, 0.6),    # English: ~4.4 syl/sec
-    "bn": (5.4, 0.7),    # Bengali: ~5.4 syl/sec (higher agglutinative density)
-    "hi": (5.2, 0.7),    # Hindi: ~5.2 syl/sec
-    "es": (5.8, 0.8),    # Spanish: ~5.8 syl/sec (syllable-timed language)
-    "ja": (6.5, 0.9),    # Japanese: ~6.5 morae/sec
-    "de": (4.2, 0.5),    # German: ~4.2 syl/sec
-    "fr": (5.1, 0.6),    # French: ~5.1 syl/sec
+    "en": (4.4, 0.6),  # English: ~4.4 syl/sec
+    "bn": (5.4, 0.7),  # Bengali: ~5.4 syl/sec (higher agglutinative density)
+    "hi": (5.2, 0.7),  # Hindi: ~5.2 syl/sec
+    "es": (5.8, 0.8),  # Spanish: ~5.8 syl/sec (syllable-timed language)
+    "ja": (6.5, 0.9),  # Japanese: ~6.5 morae/sec
+    "de": (4.2, 0.5),  # German: ~4.2 syl/sec
+    "fr": (5.1, 0.6),  # French: ~5.1 syl/sec
 }
 
 
 # ── Bengali Phrase Simplifications & Contractions for Syllable Fitting ────────
 # (Pattern, Replacement, Syllable delta)
 BENGALI_CONTRACTIONS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"আমার মনে হয় যে", re.IGNORECASE), "মনে হয়"),           # 6 -> 3 syl
-    (re.compile(r"এই কারণে যে", re.IGNORECASE), "কারণ"),                   # 5 -> 2 syl
-    (re.compile(r"করতে সমর্থ হওয়া", re.IGNORECASE), "পারা"),              # 7 -> 2 syl
-    (re.compile(r"কথা বলতে থাকা", re.IGNORECASE), "বলা"),                 # 6 -> 2 syl
-    (re.compile(r"অনুগ্রহ করে", re.IGNORECASE), "দয়া করে"),               # 5 -> 4 syl
-    (re.compile(r"খুব বেশি পরিমাণে", re.IGNORECASE), "প্রচুর"),            # 7 -> 2 syl
-    (re.compile(r"এখন এই মুহূর্তে", re.IGNORECASE), "এখনই"),              # 6 -> 3 syl
-    (re.compile(r"কোনো সন্দেহ নেই", re.IGNORECASE), "নিশ্চিত"),            # 6 -> 2 syl
-    (re.compile(r"চেষ্টা করতে থাকা", re.IGNORECASE), "চেষ্টা করা"),        # 6 -> 4 syl
-    (re.compile(r"ঠিক এই সময়ে", re.IGNORECASE), "তখনই"),                 # 5 -> 2 syl
+    (re.compile(r"আমার মনে হয় যে", re.IGNORECASE), "মনে হয়"),  # 6 -> 3 syl
+    (re.compile(r"এই কারণে যে", re.IGNORECASE), "কারণ"),  # 5 -> 2 syl
+    (re.compile(r"করতে সমর্থ হওয়া", re.IGNORECASE), "পারা"),  # 7 -> 2 syl
+    (re.compile(r"কথা বলতে থাকা", re.IGNORECASE), "বলা"),  # 6 -> 2 syl
+    (re.compile(r"অনুগ্রহ করে", re.IGNORECASE), "দয়া করে"),  # 5 -> 4 syl
+    (re.compile(r"খুব বেশি পরিমাণে", re.IGNORECASE), "প্রচুর"),  # 7 -> 2 syl
+    (re.compile(r"এখন এই মুহূর্তে", re.IGNORECASE), "এখনই"),  # 6 -> 3 syl
+    (re.compile(r"কোনো সন্দেহ নেই", re.IGNORECASE), "নিশ্চিত"),  # 6 -> 2 syl
+    (re.compile(r"চেষ্টা করতে থাকা", re.IGNORECASE), "চেষ্টা করা"),  # 6 -> 4 syl
+    (re.compile(r"ঠিক এই সময়ে", re.IGNORECASE), "তখনই"),  # 5 -> 2 syl
 ]
 
 # Bengali Expansion Rules (for padding undershooting lines)
 BENGALI_EXPANSIONS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"^না$", re.IGNORECASE), "কখনোই না"),                     # 1 -> 4 syl
-    (re.compile(r"^হ্যাঁ$", re.IGNORECASE), "হ্যাঁ অবশ্যই"),              # 1 -> 4 syl
-    (re.compile(r"\bযাব\b", re.IGNORECASE), "চলে যাব"),                   # 2 -> 3 syl
-    (re.compile(r"\bবলব\b", re.IGNORECASE), "বলে দেব"),                   # 2 -> 3 syl
-    (re.compile(r"\bকরব\b", re.IGNORECASE), "করে ফেলব"),                  # 2 -> 4 syl
+    (re.compile(r"^না$", re.IGNORECASE), "কখনোই না"),  # 1 -> 4 syl
+    (re.compile(r"^হ্যাঁ$", re.IGNORECASE), "হ্যাঁ অবশ্যই"),  # 1 -> 4 syl
+    (re.compile(r"\bযাব\b", re.IGNORECASE), "চলে যাব"),  # 2 -> 3 syl
+    (re.compile(r"\bবলব\b", re.IGNORECASE), "বলে দেব"),  # 2 -> 3 syl
+    (re.compile(r"\bকরব\b", re.IGNORECASE), "করে ফেলব"),  # 2 -> 4 syl
 ]
 
 
@@ -147,7 +147,9 @@ class IsometricTranslationEngine:
         score = max(0.0, min(1.0, syl_penalty * stretch_penalty))
 
         # Lip-sync compliant if within 15% syllable budget and stretch between 0.85 and 1.18
-        is_compliant = (deviation <= max(1, round(budget * 0.15))) and (0.85 <= stretch_ratio <= 1.20)
+        is_compliant = (deviation <= max(1, round(budget * 0.15))) and (
+            0.85 <= stretch_ratio <= 1.20
+        )
 
         return IsometricCandidate(
             text=text,

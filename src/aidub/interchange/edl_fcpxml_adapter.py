@@ -75,9 +75,7 @@ class EDLFCPXMLAdapter:
     Production-grade adapter converting timeline structures to CMX3600 EDL and FCPXML 1.10+.
     """
 
-    def export_cmx3600_edl(
-        self, timeline: OTIOTimeline, start_timecode_ms: int = 3600000
-    ) -> str:
+    def export_cmx3600_edl(self, timeline: OTIOTimeline, start_timecode_ms: int = 3600000) -> str:
         """
         Export timeline as industry-standard CMX3600 EDL with accurate timecodes.
 
@@ -185,14 +183,16 @@ class EDLFCPXMLAdapter:
             f'    <format id="r1" name="FFVideoFormat1080p{fps_nominal}" frameDuration="{frame_dur_str}" width="1920" height="1080"/>',
         ]
         xml.extend(asset_xml_lines)
-        xml.extend([
-            "  </resources>",
-            '  <library location="file:///AIDub_Master.fcpbundle">',
-            '    <event name="AIDub Production Event">',
-            f'      <project name="{escape(timeline.name)}">',
-            f'        <sequence format="r1" duration="{seq_duration_str}" tcStart="0s" tcFormat="NDF">',
-            "          <spine>",
-        ])
+        xml.extend(
+            [
+                "  </resources>",
+                '  <library location="file:///AIDub_Master.fcpbundle">',
+                '    <event name="AIDub Production Event">',
+                f'      <project name="{escape(timeline.name)}">',
+                f'        <sequence format="r1" duration="{seq_duration_str}" tcStart="0s" tcFormat="NDF">',
+                "          <spine>",
+            ]
+        )
 
         # Populate Spine with clips
         offset_ms = 0
@@ -215,14 +215,16 @@ class EDLFCPXMLAdapter:
                 )
                 offset_ms += clip.source_range_duration_ms
 
-        xml.extend([
-            "          </spine>",
-            "        </sequence>",
-            "      </project>",
-            "    </event>",
-            "  </library>",
-            "</fcpxml>",
-        ])
+        xml.extend(
+            [
+                "          </spine>",
+                "        </sequence>",
+                "      </project>",
+                "    </event>",
+                "  </library>",
+                "</fcpxml>",
+            ]
+        )
 
         logger.info(
             "edl_fcpxml_adapter: generated complete FCPXML 1.10 manifest for '%s'", timeline.name

@@ -8,7 +8,6 @@ import numpy as np
 import pytest
 
 from aidub.analysis.broadcast_qc import (
-    BroadcastQCCertificate,
     BroadcastQCEngine,
     DeliverySpec,
     LoudnessQCResult,

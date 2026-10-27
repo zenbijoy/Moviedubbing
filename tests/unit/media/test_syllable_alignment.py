@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
 from aidub.media.syllable_alignment import (
-    BENGALI_VOWELS,
     RhythmMatchReport,
     SyllableAlignmentEngine,
 )
@@ -90,4 +88,3 @@ def test_devanagari_and_cjk_syllable_counting():
     # Auto detection for Hindi and CJK
     assert SyllableAlignmentEngine.count_syllables("नमस्ते दुनिया", language="auto") >= 4
     assert SyllableAlignmentEngine.count_syllables("你好世界", language="auto") == 4
-

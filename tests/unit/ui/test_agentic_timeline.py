@@ -101,6 +101,11 @@ def test_reference_workspace_exposes_navigation_tools_and_ai_actions() -> None:
             if button is not screen.ai_overlay.run_btn
         }
         assert ai_actions == {
+            "Extract Dialogue Audio",
+            "Transcribe Speech (S1)",
+            "Translate Subtitles (S2)",
+            "Synthesize Voices (A2)",
+            "Render Master Video",
             "Select Dub Voice",
             "Improve Emotion",
             "Audio Analysis",

@@ -8,8 +8,9 @@ and ranks candidate audio clips via comprehensive quality scoring.
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from aidub.contracts.base import ContractModel, Identifier
 from aidub.domain.speaker_embedding import SpeakerEmbedding
@@ -70,8 +71,24 @@ class ReferenceBank(ContractModel):
         return valid[0]
 
 
+class ProfileVersionRecord(ContractModel):
+    """Historical snapshot of a character voice profile version."""
+
+    version: int = Field(ge=1)
+    timestamp_iso: str = Field(min_length=1)
+    change_summary: str = Field(default="")
+    snapshot_json: str = Field(default="")
+
+
 class CharacterVoiceProfile(ContractModel):
-    """Full character voice profile containing multiple emotion reference banks."""
+    """Full character voice profile containing multiple emotion reference banks and engine configs."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=False,
+        str_strip_whitespace=True,
+        validate_assignment=True,
+    )
 
     profile_id: Identifier
     character_id: Identifier
@@ -82,11 +99,50 @@ class CharacterVoiceProfile(ContractModel):
         default_factory=dict
     )  # "neutral", "angry", "sad", etc.
 
+    # Engine & Consistency Attributes
+    selected_engine: str = Field(default="edge_tts")
+    model_version: str = Field(default="1.0.0")
+    primary_language: str = Field(default="bn-BD")
+    supported_accents: list[str] = Field(default_factory=lambda: ["standard"])
+    default_voice_id: str = Field(default="")
+    default_emotion: str = Field(default="neutral")
+    default_pace: float = Field(default=1.0, ge=0.5, le=2.0)
+    default_pitch_shift: float = Field(default=0.0, ge=-12.0, le=12.0)
+    default_performance_style: str = Field(default="natural")
+    authorized_reference_path: str = Field(default="")
+    reference_audio_metadata: dict[str, Any] = Field(default_factory=dict)
+    project_overrides: dict[str, Any] = Field(default_factory=dict)
+    consent_notes: str = Field(default="")
+
+    # Versioning & Update History
+    version: int = Field(default=1, ge=1)
+    history: list[ProfileVersionRecord] = Field(default_factory=list)
+
+    def create_version_snapshot(self, change_summary: str = "") -> None:
+        """Create a version snapshot and increment the version counter."""
+        import json
+        from datetime import UTC, datetime
+
+        now_iso = datetime.now(UTC).isoformat()
+        dump_dict = self.model_dump(exclude={"history"}, mode="json")
+        snapshot = json.dumps(dump_dict)
+        self.history.append(
+            ProfileVersionRecord(
+                version=self.version,
+                timestamp_iso=now_iso,
+                change_summary=change_summary,
+                snapshot_json=snapshot,
+            )
+        )
+        self.version += 1
+
 
 __all__ = [
     "CharacterVoiceProfile",
+    "ProfileVersionRecord",
     "ReferenceBank",
     "ReferenceQualityReport",
     "ReferenceQualityTier",
     "ReferenceSample",
 ]
+

@@ -173,6 +173,8 @@ class RvcVoiceConversionAdapter:
         self.native_matcher = NativeSpectralTimbreMatcher()
         self.remote_url = os.getenv("RVC_ENDPOINT_URL", "").strip()
         self.rvc_command = os.getenv("AIDUB_RVC_COMMAND", "").strip()
+        self.model_path = os.getenv("AIDUB_RVC_MODEL_PATH", "").strip()
+        self.index_path = os.getenv("AIDUB_RVC_INDEX_PATH", "").strip()
 
     def convert_timbre(
         self,

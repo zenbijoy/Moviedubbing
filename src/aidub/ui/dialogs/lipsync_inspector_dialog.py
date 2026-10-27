@@ -59,12 +59,18 @@ if _QT:
         def __init__(self, parent: QWidget | None = None) -> None:
             super().__init__(parent)
             self.setMinimumSize(280, 260)
-            self.setStyleSheet("background: #090D14; border: 1px solid #1E293B; border-radius: 6px;")
-            self._geometry = VisemeGeometry(openness=0.1, width=0.5, lip_protrusion=0.1, teeth_visible=False)
+            self.setStyleSheet(
+                "background: #090D14; border: 1px solid #1E293B; border-radius: 6px;"
+            )
+            self._geometry = VisemeGeometry(
+                openness=0.1, width=0.5, lip_protrusion=0.1, teeth_visible=False
+            )
             self._current_viseme_label = "Rest"
             self._current_viseme_group = VisemeGroup.SILENCE
 
-        def update_kinematics(self, geometry: VisemeGeometry, group: VisemeGroup, label: str) -> None:
+        def update_kinematics(
+            self, geometry: VisemeGeometry, group: VisemeGroup, label: str
+        ) -> None:
             self._geometry = geometry
             self._current_viseme_group = group
             self._current_viseme_label = label
@@ -123,7 +129,12 @@ if _QT:
 
                 # Upper teeth if exposed
                 if self._geometry.teeth_visible:
-                    teeth_rect = QRectF(cx - eff_width * 0.35, mouth_y - eff_open / 2.0, eff_width * 0.70, min(10.0, eff_open * 0.45))
+                    teeth_rect = QRectF(
+                        cx - eff_width * 0.35,
+                        mouth_y - eff_open / 2.0,
+                        eff_width * 0.70,
+                        min(10.0, eff_open * 0.45),
+                    )
                     painter.fillRect(teeth_rect, QColor("#F1F5F9"))
 
             # Upper and Lower Lip Curves
@@ -134,23 +145,34 @@ if _QT:
             upper_lip = QPainterPath()
             upper_lip.moveTo(cx - eff_width / 2.0, mouth_y)
             upper_lip.cubicTo(
-                cx - eff_width * 0.25, mouth_y - eff_open / 2.0 - 4.0,
-                cx + eff_width * 0.25, mouth_y - eff_open / 2.0 - 4.0,
-                cx + eff_width / 2.0, mouth_y,
+                cx - eff_width * 0.25,
+                mouth_y - eff_open / 2.0 - 4.0,
+                cx + eff_width * 0.25,
+                mouth_y - eff_open / 2.0 - 4.0,
+                cx + eff_width / 2.0,
+                mouth_y,
             )
             painter.drawPath(upper_lip)
 
             lower_lip = QPainterPath()
             lower_lip.moveTo(cx - eff_width / 2.0, mouth_y)
             lower_lip.cubicTo(
-                cx - eff_width * 0.25, mouth_y + eff_open / 2.0 + 4.0,
-                cx + eff_width * 0.25, mouth_y + eff_open / 2.0 + 4.0,
-                cx + eff_width / 2.0, mouth_y,
+                cx - eff_width * 0.25,
+                mouth_y + eff_open / 2.0 + 4.0,
+                cx + eff_width * 0.25,
+                mouth_y + eff_open / 2.0 + 4.0,
+                cx + eff_width / 2.0,
+                mouth_y,
             )
             painter.drawPath(lower_lip)
 
             # 4. Computer-Vision Face ROI Tracking Box (Cyan HUD)
-            roi_box = QRectF(cx - eff_width * 0.75 - 12, mouth_y - max_open * 0.8 - 12, eff_width * 1.5 + 24, max_open * 1.6 + 24)
+            roi_box = QRectF(
+                cx - eff_width * 0.75 - 12,
+                mouth_y - max_open * 0.8 - 12,
+                eff_width * 1.5 + 24,
+                max_open * 1.6 + 24,
+            )
             painter.setPen(QPen(QColor("#06B6D4"), 1.5, Qt.PenStyle.DashLine))
             painter.drawRect(roi_box)
 
@@ -158,23 +180,36 @@ if _QT:
             cw = 8.0
             painter.setPen(QPen(QColor("#22D3EE"), 2.0))
             # Top-left
-            painter.drawLine(QPointF(roi_box.left(), roi_box.top()), QPointF(roi_box.left() + cw, roi_box.top()))
-            painter.drawLine(QPointF(roi_box.left(), roi_box.top()), QPointF(roi_box.left(), roi_box.top() + cw))
+            painter.drawLine(
+                QPointF(roi_box.left(), roi_box.top()), QPointF(roi_box.left() + cw, roi_box.top())
+            )
+            painter.drawLine(
+                QPointF(roi_box.left(), roi_box.top()), QPointF(roi_box.left(), roi_box.top() + cw)
+            )
             # Bottom-right
-            painter.drawLine(QPointF(roi_box.right(), roi_box.bottom()), QPointF(roi_box.right() - cw, roi_box.bottom()))
-            painter.drawLine(QPointF(roi_box.right(), roi_box.bottom()), QPointF(roi_box.right(), roi_box.bottom() - cw))
+            painter.drawLine(
+                QPointF(roi_box.right(), roi_box.bottom()),
+                QPointF(roi_box.right() - cw, roi_box.bottom()),
+            )
+            painter.drawLine(
+                QPointF(roi_box.right(), roi_box.bottom()),
+                QPointF(roi_box.right(), roi_box.bottom() - cw),
+            )
 
             # HUD Label Badge
             painter.setFont(QFont("Cascadia Code", 9, QFont.Weight.Bold))
             painter.setPen(QColor("#06B6D4"))
-            painter.drawText(int(roi_box.left()), int(roi_box.top() - 6), "MOUTH_ROI [TRACKING LOCK]")
+            painter.drawText(
+                int(roi_box.left()), int(roi_box.top() - 6), "MOUTH_ROI [TRACKING LOCK]"
+            )
 
             # Current Viseme Overlay Tag
             painter.setFont(QFont("Inter", 11, QFont.Weight.Bold))
             painter.setPen(QColor("#F8FAFC"))
-            tag = f"Viseme: {self._current_viseme_label} ({self._current_viseme_group.value.upper()})"
+            tag = (
+                f"Viseme: {self._current_viseme_label} ({self._current_viseme_group.value.upper()})"
+            )
             painter.drawText(12, h - 14, tag)
-
 
     class _VisemeTimelineWidget(QWidget):
         """
@@ -204,7 +239,9 @@ if _QT:
             self._total_duration_s: float = 1.0
             self._offset_s: float = 0.0
 
-        def set_cues(self, cues: list[VisemeCue], total_dur_s: float, offset_s: float = 0.0) -> None:
+        def set_cues(
+            self, cues: list[VisemeCue], total_dur_s: float, offset_s: float = 0.0
+        ) -> None:
             self._cues = cues
             self._total_duration_s = max(0.2, total_dur_s)
             self._offset_s = offset_s
@@ -264,8 +301,12 @@ if _QT:
                 x2 = (end_t / dur) * w
                 geom = cue.geometry
                 peak_h = env_h * (0.2 + 0.75 * geom.openness)
-                painter.drawLine(QPointF(x1, env_y + env_h), QPointF((x1 + x2) / 2.0, env_y + env_h - peak_h))
-                painter.drawLine(QPointF((x1 + x2) / 2.0, env_y + env_h - peak_h), QPointF(x2, env_y + env_h))
+                painter.drawLine(
+                    QPointF(x1, env_y + env_h), QPointF((x1 + x2) / 2.0, env_y + env_h - peak_h)
+                )
+                painter.drawLine(
+                    QPointF((x1 + x2) / 2.0, env_y + env_h - peak_h), QPointF(x2, env_y + env_h)
+                )
 
             # Playhead (Red Vertical Bar)
             px = (self._playhead_s / dur) * w
@@ -282,7 +323,11 @@ if _QT:
             # Time code text
             painter.setFont(QFont("Cascadia Code", 8))
             painter.setPen(QColor("#94A3B8"))
-            painter.drawText(6, 18, f"00:00.00 | Playhead: {self._playhead_s:0.2f}s | Slip Offset: {self._offset_s * 1000.0:+.1f}ms")
+            painter.drawText(
+                6,
+                18,
+                f"00:00.00 | Playhead: {self._playhead_s:0.2f}s | Slip Offset: {self._offset_s * 1000.0:+.1f}ms",
+            )
 
         def mousePressEvent(self, event: Any) -> None:  # noqa: N802
             self._handle_scrub(event.pos().x())
@@ -297,7 +342,6 @@ if _QT:
             target_time = frac * self._total_duration_s
             self.set_playhead(target_time)
             self.playhead_scrubbed.emit(target_time)
-
 
     class LipSyncInspectorDialog(QDialog):
         """
@@ -317,7 +361,9 @@ if _QT:
             super().__init__(parent)
             self.setWindowTitle("Split-Screen Lip-Sync Inspector & Viseme Aligner")
             self.resize(880, 560)
-            self.setStyleSheet("background: #0B0E14; color: #F1F5F9; font-family: 'Inter', sans-serif;")
+            self.setStyleSheet(
+                "background: #0B0E14; color: #F1F5F9; font-family: 'Inter', sans-serif;"
+            )
 
             self.utterance_index = utterance_index
             self.dialogue_text = dialogue_text
@@ -350,16 +396,24 @@ if _QT:
 
             # 1. Header Information Bar
             header_frame = QFrame(self)
-            header_frame.setStyleSheet("background: #111722; border: 1px solid #1E293B; border-radius: 6px; padding: 6px;")
+            header_frame.setStyleSheet(
+                "background: #111722; border: 1px solid #1E293B; border-radius: 6px; padding: 6px;"
+            )
             h_lay = QHBoxLayout(header_frame)
             h_lay.setContentsMargins(10, 4, 10, 4)
 
-            lbl_title = QLabel(f"<b>Line #{self.utterance_index + 1} Lip-Sync Studio</b> ({self.language.upper()})", header_frame)
+            lbl_title = QLabel(
+                f"<b>Line #{self.utterance_index + 1} Lip-Sync Studio</b> ({self.language.upper()})",
+                header_frame,
+            )
             lbl_title.setStyleSheet("font-size: 13px; color: #38BDF8;")
             h_lay.addWidget(lbl_title)
 
             h_lay.addStretch()
-            lbl_text = QLabel(f"Dialogue: \"{self.dialogue_text[:40]}{'...' if len(self.dialogue_text) > 40 else ''}\"", header_frame)
+            lbl_text = QLabel(
+                f'Dialogue: "{self.dialogue_text[:40]}{"..." if len(self.dialogue_text) > 40 else ""}"',
+                header_frame,
+            )
             lbl_text.setStyleSheet("color: #94A3B8; font-size: 11px;")
             h_lay.addWidget(lbl_text)
 
@@ -397,14 +451,20 @@ if _QT:
 
             # Compliance Gauge Card
             gauge_card = QFrame(right_container)
-            gauge_card.setStyleSheet("background: #111722; border: 1px solid #1E293B; border-radius: 6px; padding: 8px;")
+            gauge_card.setStyleSheet(
+                "background: #111722; border: 1px solid #1E293B; border-radius: 6px; padding: 8px;"
+            )
             g_lay = QVBoxLayout(gauge_card)
             g_lay.setContentsMargins(8, 8, 8, 8)
             g_lay.setSpacing(6)
 
             top_g_row = QHBoxLayout()
-            self.lbl_compliance_title = QLabel("Lip-Sync Compliance Index: 100% (BROADCAST PASS)", gauge_card)
-            self.lbl_compliance_title.setStyleSheet("font-size: 11px; font-weight: bold; color: #10B981;")
+            self.lbl_compliance_title = QLabel(
+                "Lip-Sync Compliance Index: 100% (BROADCAST PASS)", gauge_card
+            )
+            self.lbl_compliance_title.setStyleSheet(
+                "font-size: 11px; font-weight: bold; color: #10B981;"
+            )
             top_g_row.addWidget(self.lbl_compliance_title)
             top_g_row.addStretch()
             self.lbl_offset_badge = QLabel("Offset: 0.0 ms (In Sync)", gauge_card)
@@ -437,7 +497,9 @@ if _QT:
 
             # 3. Slip-and-Slide Interactive Calibration Controls
             ctrl_card = QFrame(self)
-            ctrl_card.setStyleSheet("background: #0E131E; border: 1px solid #1E293B; border-radius: 6px; padding: 8px;")
+            ctrl_card.setStyleSheet(
+                "background: #0E131E; border: 1px solid #1E293B; border-radius: 6px; padding: 8px;"
+            )
             c_lay = QVBoxLayout(ctrl_card)
             c_lay.setContentsMargins(10, 8, 10, 8)
             c_lay.setSpacing(8)
@@ -460,7 +522,9 @@ if _QT:
             slider_row.addWidget(self.slip_slider, stretch=1)
 
             self.lbl_slider_val = QLabel("  0.0 ms (0.0 frames @ 30fps)", ctrl_card)
-            self.lbl_slider_val.setStyleSheet("font-family: 'Cascadia Code'; font-size: 11px; color: #38BDF8; min-width: 170px;")
+            self.lbl_slider_val.setStyleSheet(
+                "font-family: 'Cascadia Code'; font-size: 11px; color: #38BDF8; min-width: 170px;"
+            )
             slider_row.addWidget(self.lbl_slider_val)
             c_lay.addLayout(slider_row)
 
@@ -469,18 +533,28 @@ if _QT:
             btn_row.setSpacing(6)
 
             self.btn_nudge_left = QPushButton("◀ -1 Frame (-33ms)", ctrl_card)
-            self.btn_nudge_left.setStyleSheet("QPushButton{background: #1E293B; color: #CBD5E1; border: 1px solid #334155; padding: 4px 8px; border-radius: 4px; font-size: 10px;}")
-            self.btn_nudge_left.clicked.connect(lambda: self.slip_slider.setValue(self.slip_slider.value() - 33))
+            self.btn_nudge_left.setStyleSheet(
+                "QPushButton{background: #1E293B; color: #CBD5E1; border: 1px solid #334155; padding: 4px 8px; border-radius: 4px; font-size: 10px;}"
+            )
+            self.btn_nudge_left.clicked.connect(
+                lambda: self.slip_slider.setValue(self.slip_slider.value() - 33)
+            )
             btn_row.addWidget(self.btn_nudge_left)
 
             self.btn_reset_slip = QPushButton("Reset Alignment (0ms)", ctrl_card)
-            self.btn_reset_slip.setStyleSheet("QPushButton{background: #1E293B; color: #CBD5E1; border: 1px solid #334155; padding: 4px 8px; border-radius: 4px; font-size: 10px;}")
+            self.btn_reset_slip.setStyleSheet(
+                "QPushButton{background: #1E293B; color: #CBD5E1; border: 1px solid #334155; padding: 4px 8px; border-radius: 4px; font-size: 10px;}"
+            )
             self.btn_reset_slip.clicked.connect(lambda: self.slip_slider.setValue(0))
             btn_row.addWidget(self.btn_reset_slip)
 
             self.btn_nudge_right = QPushButton("+1 Frame (+33ms) ▶", ctrl_card)
-            self.btn_nudge_right.setStyleSheet("QPushButton{background: #1E293B; color: #CBD5E1; border: 1px solid #334155; padding: 4px 8px; border-radius: 4px; font-size: 10px;}")
-            self.btn_nudge_right.clicked.connect(lambda: self.slip_slider.setValue(self.slip_slider.value() + 33))
+            self.btn_nudge_right.setStyleSheet(
+                "QPushButton{background: #1E293B; color: #CBD5E1; border: 1px solid #334155; padding: 4px 8px; border-radius: 4px; font-size: 10px;}"
+            )
+            self.btn_nudge_right.clicked.connect(
+                lambda: self.slip_slider.setValue(self.slip_slider.value() + 33)
+            )
             btn_row.addWidget(self.btn_nudge_right)
 
             btn_row.addStretch()
@@ -507,14 +581,20 @@ if _QT:
         def _on_slider_changed(self, value: int) -> None:
             self._current_offset_ms = float(value)
             frames = self._current_offset_ms / 33.333
-            self.lbl_slider_val.setText(f"{self._current_offset_ms:+6.1f} ms ({frames:+3.1f} frames @ 30fps)")
-            self.timeline_widget.set_cues(self.cues, self.duration_s, offset_s=self._current_offset_ms / 1000.0)
+            self.lbl_slider_val.setText(
+                f"{self._current_offset_ms:+6.1f} ms ({frames:+3.1f} frames @ 30fps)"
+            )
+            self.timeline_widget.set_cues(
+                self.cues, self.duration_s, offset_s=self._current_offset_ms / 1000.0
+            )
             self._update_compliance_metrics()
             # Also update mouth preview at current playhead
             self._on_playhead_scrubbed(self._play_pos_s)
 
         def _update_compliance_metrics(self) -> None:
-            report = LipSyncVisemeEngine.evaluate_lip_sync_compliance(self.cues, self._current_offset_ms)
+            report = LipSyncVisemeEngine.evaluate_lip_sync_compliance(
+                self.cues, self._current_offset_ms
+            )
             pct = int(report.compliance_score * 100)
             self.compliance_bar.setValue(pct)
 
@@ -526,12 +606,16 @@ if _QT:
                 status_text = "OUT OF SYNC" if pct < 60 else "SLIGHT DRIFT"
 
             self.lbl_compliance_title.setText(f"Lip-Sync Compliance Index: {pct}% ({status_text})")
-            self.lbl_compliance_title.setStyleSheet(f"font-size: 11px; font-weight: bold; color: {status_color};")
+            self.lbl_compliance_title.setStyleSheet(
+                f"font-size: 11px; font-weight: bold; color: {status_color};"
+            )
             self.compliance_bar.setStyleSheet(
                 f"QProgressBar{{background: #1E293B; border-radius: 4px;}}"
                 f"QProgressBar::chunk{{background: {status_color}; border-radius: 4px;}}"
             )
-            self.lbl_offset_badge.setText(f"Offset: {self._current_offset_ms:+.1f} ms ({report.lead_lag_status})")
+            self.lbl_offset_badge.setText(
+                f"Offset: {self._current_offset_ms:+.1f} ms ({report.lead_lag_status})"
+            )
             self.lbl_advice.setText(report.remediation_advice)
 
         def _on_playhead_scrubbed(self, playhead_s: float) -> None:
@@ -574,7 +658,11 @@ if _QT:
 
         def _on_apply_offset(self) -> None:
             offset_s = self._current_offset_ms / 1000.0
-            logger.info("Applying lip-sync slip offset: utterance #%d, offset=%.4fs", self.utterance_index, offset_s)
+            logger.info(
+                "Applying lip-sync slip offset: utterance #%d, offset=%.4fs",
+                self.utterance_index,
+                offset_s,
+            )
             self.offset_applied.emit(self.utterance_index, offset_s)
             self.accept()
 

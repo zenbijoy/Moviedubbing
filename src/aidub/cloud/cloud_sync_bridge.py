@@ -178,11 +178,17 @@ class CloudSyncEngine:
             fname_lower = f.name.lower()
             if fname_lower.endswith((".mp4", ".mkv", ".mov")) and not dubbed_video:
                 dubbed_video = f
-            elif fname_lower.endswith((".wav", ".mp3", ".flac", ".m4a")) and ("dubbed" in fname_lower or "master" in fname_lower or not dubbed_audio):
+            elif fname_lower.endswith((".wav", ".mp3", ".flac", ".m4a")) and (
+                "dubbed" in fname_lower or "master" in fname_lower or not dubbed_audio
+            ):
                 dubbed_audio = f
             elif fname_lower.endswith((".srt", ".vtt", ".ass")) and not subtitle_file:
                 subtitle_file = f
-            elif fname_lower.endswith(".json") and ("asr" in fname_lower or "segment" in fname_lower or "utterance" in fname_lower) and not utterances_file:
+            elif (
+                fname_lower.endswith(".json")
+                and ("asr" in fname_lower or "segment" in fname_lower or "utterance" in fname_lower)
+                and not utterances_file
+            ):
                 utterances_file = f
 
         # If audio found, promote to standard project locations if not already there
@@ -268,12 +274,16 @@ class CloudSyncEngine:
 
             if status == "complete":
                 if progress_cb:
-                    progress_cb(90, "Kaggle GPU finished! Downloading rendered master deliverables...")
+                    progress_cb(
+                        90, "Kaggle GPU finished! Downloading rendered master deliverables..."
+                    )
                 dest_dir = w_dir / "cloud_sync"
                 dest_dir.mkdir(parents=True, exist_ok=True)
                 downloaded = client.download_kernel_output(kernel_slug, dest_dir)
                 if progress_cb:
-                    progress_cb(98, f"Downloaded {len(downloaded)} items. Importing into project...")
+                    progress_cb(
+                        98, f"Downloaded {len(downloaded)} items. Importing into project..."
+                    )
 
                 return cls.import_cloud_output_bundle(dest_dir, w_dir)
 
@@ -311,7 +321,10 @@ class CloudSyncEngine:
             if progress_cb:
                 mins, secs = divmod(int(elapsed), 60)
                 pct = min(88, int(12 + (elapsed / 600.0) * 73))
-                progress_cb(pct, f"Kaggle GPU Status: {status.upper()} [{mins:02d}m {secs:02d}s elapsed] (Running Whisper Large-v3 & Stems)...")
+                progress_cb(
+                    pct,
+                    f"Kaggle GPU Status: {status.upper()} [{mins:02d}m {secs:02d}s elapsed] (Running Whisper Large-v3 & Stems)...",
+                )
 
             time.sleep(poll_interval_seconds)
 
@@ -356,15 +369,20 @@ class ColabLiveWebhookServer:
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
-                    self.wfile.write(json.dumps({"status": "ready", "engine": "AIDub Colab Bridge"}).encode())
+                    self.wfile.write(
+                        json.dumps({"status": "ready", "engine": "AIDub Colab Bridge"}).encode()
+                    )
                     return
                 self.send_response(404)
                 self.end_headers()
 
             def do_POST(self) -> None:
+                content_len = int(self.headers.get("Content-Length", 0))
                 # Validate token in headers
                 token = self.headers.get("X-AIDub-Token", "")
                 if token != bridge_self.auth_token:
+                    if content_len > 0:
+                        _ = self.rfile.read(content_len)
                     self.send_response(403)
                     self.end_headers()
                     self.wfile.write(b"Unauthorized token")
@@ -390,11 +408,15 @@ class ColabLiveWebhookServer:
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
-                    self.wfile.write(json.dumps({
-                        "status": "success",
-                        "files_imported": res.total_files,
-                        "bytes": res.total_bytes,
-                    }).encode())
+                    self.wfile.write(
+                        json.dumps(
+                            {
+                                "status": "success",
+                                "files_imported": res.total_files,
+                                "bytes": res.total_bytes,
+                            }
+                        ).encode()
+                    )
                     return
 
                 self.send_response(404)
@@ -407,7 +429,9 @@ class ColabLiveWebhookServer:
             self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
             self._thread.start()
             self._is_running = True
-            logger.info("Colab Live Webhook Server active on http://127.0.0.1:%d/api/colab/sync", self.port)
+            logger.info(
+                "Colab Live Webhook Server active on http://127.0.0.1:%d/api/colab/sync", self.port
+            )
             return True
         except Exception as exc:
             logger.warning("Could not start Colab Webhook Server on port %d: %s", self.port, exc)

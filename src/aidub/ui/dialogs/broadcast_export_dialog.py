@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from PySide6.QtCore import Qt, QThread, Signal
+    from PySide6.QtGui import QCloseEvent
     from PySide6.QtWidgets import (
         QCheckBox,
         QComboBox,
@@ -74,6 +75,7 @@ if _QT:
 
         def run(self) -> None:
             try:
+
                 def progress_cb(pct: int, msg: str) -> None:
                     self.progress_signal.emit(pct, msg)
 
@@ -131,7 +133,9 @@ if _QT:
             default_output_name: str = "broadcast_master.mp4",
         ) -> None:
             super().__init__(parent)
-            self.setWindowTitle("Broadcast Master Delivery Exporter — Netflix / YouTube / 5.1 Surround")
+            self.setWindowTitle(
+                "Broadcast Master Delivery Exporter — Netflix / YouTube / 5.1 Surround"
+            )
             self.setMinimumSize(640, 520)
             self.video_path = video_path
             self.audio_path = audio_path
@@ -183,16 +187,31 @@ if _QT:
             pg_lay = QVBoxLayout(preset_group)
 
             self.preset_combo = QComboBox(self)
-            self.preset_combo.addItem("📦 1-Click Studio Master Bundle (Dual-Audio MKV + Broadcast QC + FCPXML/EDL + C2PA)", "studio_master_bundle")
-            self.preset_combo.addItem("YouTube / Web 4K UHD (-14 LUFS, AAC 384k, Faststart)", BroadcastPreset.YOUTUBE_4K)
-            self.preset_combo.addItem("Netflix Specification (5.1 Surround, EBU R128 -23 LUFS, AC3 640k)", BroadcastPreset.NETFLIX_51)
-            self.preset_combo.addItem("Theatrical Master Archive (High Bitrate 5.1 E-AC3 768k)", BroadcastPreset.THEATRICAL_MASTER)
-            self.preset_combo.addItem("Mobile / Social Stream (1080p, AAC 192k)", BroadcastPreset.MOBILE_STREAM)
+            self.preset_combo.addItem(
+                "📦 1-Click Studio Master Bundle (Dual-Audio MKV + Broadcast QC + FCPXML/EDL + C2PA)",
+                "studio_master_bundle",
+            )
+            self.preset_combo.addItem(
+                "YouTube / Web 4K UHD (-14 LUFS, AAC 384k, Faststart)", BroadcastPreset.YOUTUBE_4K
+            )
+            self.preset_combo.addItem(
+                "Netflix Specification (5.1 Surround, EBU R128 -23 LUFS, AC3 640k)",
+                BroadcastPreset.NETFLIX_51,
+            )
+            self.preset_combo.addItem(
+                "Theatrical Master Archive (High Bitrate 5.1 E-AC3 768k)",
+                BroadcastPreset.THEATRICAL_MASTER,
+            )
+            self.preset_combo.addItem(
+                "Mobile / Social Stream (1080p, AAC 192k)", BroadcastPreset.MOBILE_STREAM
+            )
             self.preset_combo.currentIndexChanged.connect(self._on_preset_changed)
             pg_lay.addWidget(self.preset_combo)
 
             self.spec_card = QLabel(self)
-            self.spec_card.setStyleSheet("background: #0F172A; border: 1px solid #1E293B; border-radius: 4px; padding: 8px; font-size: 11px; color: #94A3B8;")
+            self.spec_card.setStyleSheet(
+                "background: #0F172A; border: 1px solid #1E293B; border-radius: 4px; padding: 8px; font-size: 11px; color: #94A3B8;"
+            )
             pg_lay.addWidget(self.spec_card)
             layout.addWidget(preset_group)
 
@@ -201,7 +220,9 @@ if _QT:
             og_lay = QVBoxLayout(opt_group)
             og_lay.setSpacing(8)
 
-            self.surround_chk = QCheckBox("Enable 5.1 Discrete Surround Remixer (Center Voice Isolation)", self)
+            self.surround_chk = QCheckBox(
+                "Enable 5.1 Discrete Surround Remixer (Center Voice Isolation)", self
+            )
             self.surround_chk.setChecked(bool(self.music_path and Path(self.music_path).is_file()))
             og_lay.addWidget(self.surround_chk)
 
@@ -220,7 +241,11 @@ if _QT:
             dest_group = QGroupBox("Output Destination", self)
             dg_lay = QHBoxLayout(dest_group)
 
-            default_out = str(Path(video_path).parent / "master_delivery_package" if video_path else Path.cwd() / "master_delivery_package")
+            default_out = str(
+                Path(video_path).parent / "master_delivery_package"
+                if video_path
+                else Path.cwd() / "master_delivery_package"
+            )
             self.dest_edit = QLineEdit(default_out, self)
             dg_lay.addWidget(self.dest_edit, 1)
 
@@ -337,12 +362,22 @@ if _QT:
         def _start_export(self) -> None:
             dest = self.dest_edit.text().strip()
             if not dest:
-                QMessageBox.warning(self, "Invalid Output", "Please choose an output destination file.")
+                QMessageBox.warning(
+                    self, "Invalid Output", "Please choose an output destination file."
+                )
+                return
+
+            if self.video_path and Path(dest).resolve() == Path(self.video_path).resolve():
+                QMessageBox.critical(
+                    self,
+                    "Destination Conflict",
+                    "The destination path cannot overwrite the source video file. Please select a different output name or path.",
+                )
                 return
 
             preset_enum = self.preset_combo.currentData()
             sub_mode = self.sub_mode_combo.currentData()
-            burn_sub = (sub_mode == "burn")
+            burn_sub = sub_mode == "burn"
             sub_file = self.subtitle_path if sub_mode != "none" else None
             use_surround = self.surround_chk.isChecked()
 
@@ -404,6 +439,18 @@ if _QT:
             self.export_btn.setEnabled(True)
             self.cancel_btn.setEnabled(True)
             QMessageBox.critical(self, "Export Failed", f"Broadcast mastering error:\n{error_msg}")
+
+        def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
+            if hasattr(self, "_worker") and self._worker is not None and self._worker.isRunning():
+                self._worker.terminate()
+                self._worker.wait(1500)
+            event.accept()
+
+        def reject(self) -> None:
+            if hasattr(self, "_worker") and self._worker is not None and self._worker.isRunning():
+                self._worker.terminate()
+                self._worker.wait(1500)
+            super().reject()
 
 
 __all__ = ["BroadcastExportDialog"]

@@ -131,7 +131,7 @@ class PyannoteDiarizationAdapter:
                 "Pyannote.audio is not installed; install the production diarization dependencies"
             ) from exc
         if self._pipeline_instance is None:
-            token = os.environ.get("PYANNOTE_TOKEN") or os.environ.get("HF_TOKEN")
+            token = os.environ.get("AIDUB_PYANNOTE_TOKEN") or os.environ.get("PYANNOTE_TOKEN") or os.environ.get("HF_TOKEN")
             try:
                 self._pipeline_instance = pyannote.audio.Pipeline.from_pretrained(
                     self.options.model_id,

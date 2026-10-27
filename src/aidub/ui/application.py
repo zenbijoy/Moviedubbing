@@ -7,9 +7,8 @@ from typing import TYPE_CHECKING
 
 from aidub import __version__
 from aidub.i18n import CatalogError, LocaleService
-
-from .qt_support import DesktopDependencyError, require_pyside6
-from .styles import APPLICATION_STYLE
+from aidub.ui.design import APPLICATION_STYLE, setup_application_fonts
+from aidub.ui.qt_support import DesktopDependencyError, require_pyside6
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -26,7 +25,6 @@ class DesktopApplication:
     ) -> None:
         require_pyside6()
         from PySide6.QtCore import QCoreApplication
-        from PySide6.QtGui import QFont
         from PySide6.QtWidgets import QApplication
 
         from .studio_window import AIDubStudioWindow
@@ -39,12 +37,7 @@ class DesktopApplication:
         QCoreApplication.setApplicationName("AI Movie Dubbing Studio")
         QCoreApplication.setApplicationVersion(__version__)
         if hasattr(self.application, "setFont"):
-            default_font = QFont("Segoe UI", 10)
-            default_font.setStyleHint(QFont.StyleHint.SansSerif)
-            QFont.insertSubstitutions(
-                "Segoe UI", ["Segoe UI Variable", "Inter", "Arial", "sans-serif"]
-            )
-            self.application.setFont(default_font)
+            setup_application_fonts(self.application)
         if hasattr(self.application, "setStyleSheet"):
             self.application.setStyleSheet(APPLICATION_STYLE)
         self.locale_service = LocaleService(locale)
@@ -73,12 +66,11 @@ def run_desktop(
     """
 
     try:
-        desktop = DesktopApplication(argv, locale=locale)
-    except (DesktopDependencyError, CatalogError) as exc:
-        sys.stderr.write(f"{exc}\n")
+        app = DesktopApplication(argv, locale=locale)
+        return app.run()
+    except DesktopDependencyError as exc:
+        sys.stderr.write(f"Error: {exc}\n")
         return 2
-    return desktop.run()
-
-
-if __name__ == "__main__":
-    sys.exit(run_desktop())
+    except CatalogError as exc:
+        sys.stderr.write(f"Localization Error: {exc}\n")
+        return 2

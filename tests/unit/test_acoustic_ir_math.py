@@ -8,13 +8,14 @@ import io
 import wave
 
 import numpy as np
-import pytest
 
 from aidub.contracts.base import Identifier
 from aidub.media.acoustic_ir import AcousticIRConvolutionEngine, ImpulseResponseProfile
 
 
-def create_synthetic_wav_bytes(duration_s: float = 0.5, freq_hz: float = 440.0, framerate: int = 48000) -> bytes:
+def create_synthetic_wav_bytes(
+    duration_s: float = 0.5, freq_hz: float = 440.0, framerate: int = 48000
+) -> bytes:
     """Generate a clean sine wave PCM WAV byte stream for acoustic testing."""
     t = np.linspace(0, duration_s, int(framerate * duration_s), endpoint=False, dtype=np.float32)
     # 440 Hz tone with exponential decay
@@ -60,7 +61,9 @@ def test_real_wav_convolution() -> None:
     assert b"CONVOLVED_REVERB" in convolved_bytes
 
     # Parse resulting WAV and verify audio integrity
-    with wave.open(io.BytesIO(convolved_bytes[:convolved_bytes.find(b"_CONVOLVED_REVERB")]), "rb") as out_wav:
+    with wave.open(
+        io.BytesIO(convolved_bytes[: convolved_bytes.find(b"_CONVOLVED_REVERB")]), "rb"
+    ) as out_wav:
         assert out_wav.getnchannels() == 1
         assert out_wav.getframerate() == 48000
         frames = out_wav.readframes(out_wav.getnframes())

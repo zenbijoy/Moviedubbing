@@ -189,7 +189,10 @@ class TranslationPipeline:
                     txt = translated_texts[j] if j < len(translated_texts) else line.text
                     # Estimate duration based on Bengali phonetic syllable rate (~185ms/syl)
                     from aidub.media.syllable_alignment import SyllableAlignmentEngine
-                    syl_count = SyllableAlignmentEngine.count_syllables(txt, context.target_language)
+
+                    syl_count = SyllableAlignmentEngine.count_syllables(
+                        txt, context.target_language
+                    )
                     est_ms = round(syl_count * 185)
                     delta_pct = abs(est_ms - line.duration_ms) / max(line.duration_ms, 1)
 

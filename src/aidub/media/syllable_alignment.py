@@ -10,7 +10,6 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
-from typing import Any
 
 # Bengali Vowel Characters (Independent and Dependent Matras)
 BENGALI_VOWELS = set("অআইঈউঊঋএঐওঔািীুূৃেৈোৌ")
@@ -110,11 +109,11 @@ class SyllableAlignmentEngine:
         """Determine syllable count based on detected script or language code."""
         lang = language.lower().split("-")[0]
         # Check if text contains Bengali unicode block
-        has_bengali = any("\u0980" <= ch <= "\u09FF" for ch in text)
+        has_bengali = any("\u0980" <= ch <= "\u09ff" for ch in text)
         if has_bengali or lang == "bn":
             return cls.count_bengali_syllables(text)
 
-        has_devanagari = any("\u0900" <= ch <= "\u097F" for ch in text)
+        has_devanagari = any("\u0900" <= ch <= "\u097f" for ch in text)
         if has_devanagari or lang in ("hi", "mr", "ne", "sa"):
             return cls.count_devanagari_syllables(text)
 

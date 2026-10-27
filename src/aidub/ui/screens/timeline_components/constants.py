@@ -46,8 +46,7 @@ __all__ = [
     "TOOL_PALETTE_WIDTH",
     "TRACK_HEADER_WIDTH",
     "TRACK_HEIGHT",
-    "ClipTuple",
     "_TRACK_DEFS",
+    "ClipTuple",
     "_format_tc",
 ]
-

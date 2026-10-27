@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -48,9 +48,13 @@ def test_kaggle_accelerator_dialog_exports_notebook(tmp_path: Path) -> None:
     )
     try:
         dest_ipynb = tmp_path / "dubbing_kaggle.ipynb"
-        with patch("PySide6.QtWidgets.QFileDialog.getSaveFileName", return_value=(str(dest_ipynb), "")):
-            with patch("PySide6.QtWidgets.QMessageBox.information"):
-                dlg._generate_notebook()
+        with (
+            patch(
+                "PySide6.QtWidgets.QFileDialog.getSaveFileName", return_value=(str(dest_ipynb), "")
+            ),
+            patch("PySide6.QtWidgets.QMessageBox.information"),
+        ):
+            dlg._generate_notebook()
 
         assert dest_ipynb.is_file()
         assert dest_ipynb.stat().st_size > 500
@@ -69,22 +73,27 @@ def test_timeline_screen_kaggle_and_voice_shortcuts() -> None:
 
         # Test Space key press delegates to play/pause
         with patch.object(screen.monitor_panel, "_toggle_play") as mock_play:
-            space_ev = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Space, Qt.KeyboardModifier.NoModifier)
+            space_ev = QKeyEvent(
+                QKeyEvent.Type.KeyPress, Qt.Key.Key_Space, Qt.KeyboardModifier.NoModifier
+            )
             screen.keyPressEvent(space_ev)
             mock_play.assert_called_once()
 
         # Test Ctrl+K triggers _open_kaggle_accelerator
         with patch.object(screen, "_open_kaggle_accelerator") as mock_kaggle:
-            k_ev = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_K, Qt.KeyboardModifier.ControlModifier)
+            k_ev = QKeyEvent(
+                QKeyEvent.Type.KeyPress, Qt.Key.Key_K, Qt.KeyboardModifier.ControlModifier
+            )
             screen.keyPressEvent(k_ev)
             mock_kaggle.assert_called_once()
 
         # Test Ctrl+D triggers _run_agentic_dub
         with patch.object(screen, "_run_agentic_dub") as mock_dub:
-            d_ev = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_D, Qt.KeyboardModifier.ControlModifier)
+            d_ev = QKeyEvent(
+                QKeyEvent.Type.KeyPress, Qt.Key.Key_D, Qt.KeyboardModifier.ControlModifier
+            )
             screen.keyPressEvent(d_ev)
             mock_dub.assert_called_once()
     finally:
         screen.close()
         app.processEvents()
-

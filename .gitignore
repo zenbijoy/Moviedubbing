@@ -54,3 +54,9 @@ mypy_output.txt
 *_work/
 work_*/
 out_*/
+file_list.txt
+files.txt
+main_structure.txt
+test_output.txt
+tree.txt
+

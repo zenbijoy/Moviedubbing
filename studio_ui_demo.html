@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Movie Dubbing Studio — Full UI Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg-base:#070C14; --bg-card:#0E1520; --bg-card2:#131B2A; --bg-hover:#192234;
+  --border:#1E293B; --border-hi:#243044;
+  --cyan:#22D3EE; --cyan-dim:#0E7490; --blue:#3B82F6; --purple:#A855F7;
+  --green:#22C55E; --yellow:#F59E0B; --red:#EF4444; --orange:#F97316;
+  --text-hi:#F1F5F9; --text-mid:#94A3B8; --text-lo:#475569;
+  --radius:12px; --radius-sm:8px; --font:'Inter',sans-serif; --mono:'JetBrains Mono',monospace;
+  --sidebar-w:240px; --topbar-h:56px;
+}
+html,body{height:100%;overflow:hidden;}
+body{font-family:var(--font);background:var(--bg-base);color:var(--text-hi);display:flex;flex-direction:column;}
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#1E293B;border-radius:3px;}
+#app{display:flex;height:100vh;overflow:hidden;}
+#sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:linear-gradient(180deg,#0B1220 0%,#080D18 100%);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;z-index:10;}
+.sidebar-logo{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border);}
+.logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--cyan),var(--blue));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;box-shadow:0 0 16px rgba(34,211,238,0.35);}
+.logo-text{font-size:13px;font-weight:800;color:var(--text-hi);letter-spacing:-0.3px;line-height:1.2;}
+.logo-text span{display:block;font-size:10px;font-weight:500;color:var(--cyan);letter-spacing:0.5px;}
+.sidebar-section{padding:8px 12px 4px;font-size:9.5px;font-weight:700;color:var(--text-lo);letter-spacing:1px;text-transform:uppercase;margin-top:8px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;margin:1px 8px;border-radius:var(--radius-sm);cursor:pointer;transition:all 0.15s;font-size:13px;font-weight:500;color:var(--text-mid);position:relative;}
+.nav-item:hover{background:var(--bg-hover);color:var(--text-hi);}
+.nav-item.active{background:linear-gradient(90deg,rgba(34,211,238,0.12),rgba(59,130,246,0.06));color:var(--cyan);border:1px solid rgba(34,211,238,0.15);}
+.nav-item.active::before{content:'';position:absolute;left:-8px;top:50%;transform:translateY(-50%);width:3px;height:20px;background:var(--cyan);border-radius:0 3px 3px 0;}
+.nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0;}
+.nav-badge{margin-left:auto;background:var(--cyan);color:#000;font-size:9px;font-weight:800;padding:1px 6px;border-radius:10px;}
+.nav-badge.warn{background:var(--yellow);}
+.nav-badge.err{background:var(--red);color:#fff;}
+.sidebar-footer{margin-top:auto;border-top:1px solid var(--border);padding:12px;}
+.hw-tier-badge{background:linear-gradient(90deg,rgba(34,211,238,0.1),rgba(59,130,246,0.05));border:1px solid rgba(34,211,238,0.2);border-radius:var(--radius-sm);padding:8px 10px;font-size:11px;}
+.hw-tier-badge .tier-label{color:var(--cyan);font-weight:700;font-size:10px;letter-spacing:1px;text-transform:uppercase;}
+.hw-tier-badge .tier-name{font-size:12px;font-weight:800;color:var(--text-hi);margin:2px 0;}
+.hw-tier-badge .tier-sub{color:var(--text-lo);font-size:10px;}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+#topbar{height:var(--topbar-h);background:rgba(10,15,25,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 20px;flex-shrink:0;z-index:5;}
+.topbar-breadcrumb{font-size:13px;color:var(--text-mid);display:flex;align-items:center;gap:6px;}
+.topbar-breadcrumb .active{color:var(--text-hi);font-weight:600;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.15s;border:none;outline:none;font-family:var(--font);}
+.btn-primary{background:linear-gradient(135deg,var(--cyan),var(--blue));color:#000;}
+.btn-primary:hover{opacity:0.85;box-shadow:0 0 18px rgba(34,211,238,0.3);}
+.btn-ghost{background:var(--bg-card2);color:var(--text-mid);border:1px solid var(--border);}
+.btn-ghost:hover{color:var(--text-hi);border-color:var(--border-hi);}
+.btn-danger{background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.25);}
+.btn-green{background:rgba(34,197,94,0.1);color:var(--green);border:1px solid rgba(34,197,94,0.25);}
+.btn-sm{padding:4px 10px;font-size:11px;}
+.btn-icon{padding:6px 8px;}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite;}
+.status-dot.warn{background:var(--yellow);box-shadow:0 0 8px var(--yellow);}
+.status-dot.off{background:var(--text-lo);box-shadow:none;animation:none;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.5;}}
+#content{flex:1;overflow-y:auto;padding:24px;}
+.screen{display:none;animation:fadeIn 0.2s ease;}
+.screen.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+.card-sm{padding:14px 16px;border-radius:var(--radius-sm);}
+.card-hover:hover{border-color:var(--border-hi);background:var(--bg-card2);cursor:pointer;}
+.section-title{font-size:17px;font-weight:800;color:var(--text-hi);margin-bottom:4px;}
+.section-sub{font-size:12px;color:var(--text-mid);margin-bottom:20px;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.flex{display:flex;} .flex-col{flex-direction:column;} .gap-3{gap:12px;} .gap-4{gap:16px;} .gap-6{gap:24px;} .items-center{align-items:center;} .justify-between{justify-content:space-between;} .mt-4{margin-top:16px;} .mt-6{margin-top:24px;} .mb-4{margin-bottom:16px;}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;display:flex;align-items:center;gap:14px;}
+.stat-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.stat-val{font-size:24px;font-weight:900;color:var(--text-hi);}
+.stat-lbl{font-size:11px;color:var(--text-mid);font-weight:500;}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:0.5px;}
+.pill-cyan{background:rgba(34,211,238,0.12);color:var(--cyan);border:1px solid rgba(34,211,238,0.2);}
+.pill-green{background:rgba(34,197,94,0.12);color:var(--green);border:1px solid rgba(34,197,94,0.2);}
+.pill-yellow{background:rgba(245,158,11,0.12);color:var(--yellow);border:1px solid rgba(245,158,11,0.2);}
+.pill-red{background:rgba(239,68,68,0.12);color:var(--red);border:1px solid rgba(239,68,68,0.2);}
+.pill-purple{background:rgba(168,85,247,0.12);color:var(--purple);border:1px solid rgba(168,85,247,0.2);}
+.pill-blue{background:rgba(59,130,246,0.12);color:var(--blue);border:1px solid rgba(59,130,246,0.2);}
+.progress-track{width:100%;height:6px;background:var(--bg-hover);border-radius:3px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--cyan),var(--blue));transition:width 0.4s ease;}
+.progress-fill.green{background:var(--green);}
+.progress-fill.yellow{background:var(--yellow);}
+.progress-fill.red{background:var(--red);}
+.input-group{margin-bottom:14px;}
+.input-label{font-size:11px;font-weight:600;color:var(--text-mid);margin-bottom:5px;display:block;letter-spacing:0.3px;}
+.input-field{width:100%;padding:8px 12px;background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-hi);font-family:var(--font);font-size:13px;outline:none;transition:border-color 0.15s;}
+.input-field:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(34,211,238,0.08);}
+.input-field::placeholder{color:var(--text-lo);}
+.input-field.mono{font-family:var(--mono);font-size:12px;}
+.input-row{display:flex;gap:8px;align-items:flex-end;}
+.input-row .input-group{flex:1;margin-bottom:0;}
+select.input-field option{background:#131B2A;}
+.waveform-canvas{width:100%;height:72px;background:#080D16;border-radius:var(--radius-sm);display:flex;align-items:center;gap:2px;padding:4px 8px;overflow:hidden;}
+.wave-bar{flex-shrink:0;width:3px;border-radius:2px;background:rgba(34,211,238,0.25);}
+.wave-bar.played{background:var(--cyan);}
+.timeline-track{background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;margin-bottom:4px;display:flex;align-items:center;gap:10px;}
+.track-label{width:90px;font-size:11px;font-weight:600;color:var(--text-mid);flex-shrink:0;}
+.track-body{flex:1;height:40px;position:relative;background:#080D16;border-radius:4px;overflow:hidden;}
+.track-segment{position:absolute;height:100%;border-radius:3px;display:flex;align-items:center;padding:0 6px;font-size:10px;font-weight:600;color:rgba(255,255,255,0.8);cursor:pointer;}
+.seg-video{background:rgba(59,130,246,0.4);border:1px solid rgba(59,130,246,0.6);}
+.seg-audio{background:rgba(34,211,238,0.3);border:1px solid rgba(34,211,238,0.5);}
+.seg-dub{background:rgba(168,85,247,0.3);border:1px solid rgba(168,85,247,0.5);}
+.seg-sfx{background:rgba(245,158,11,0.3);border:1px solid rgba(245,158,11,0.5);}
+.playhead{position:absolute;top:0;bottom:0;width:2px;background:#FFF;z-index:5;}
+.playhead::after{content:'';position:absolute;top:-4px;left:-4px;width:10px;height:10px;border-radius:50%;background:#FFF;}
+.setup-step{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden;}
+.setup-step-header{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer;transition:background 0.15s;}
+.setup-step-header:hover{background:var(--bg-hover);}
+.step-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;background:var(--bg-card2);border:1.5px solid var(--border-hi);color:var(--text-mid);}
+.step-num.done{background:rgba(34,197,94,0.15);border-color:var(--green);color:var(--green);}
+.step-num.active{background:rgba(34,211,238,0.12);border-color:var(--cyan);color:var(--cyan);}
+.setup-step-title{font-size:13px;font-weight:700;color:var(--text-hi);}
+.setup-step-sub{font-size:11px;color:var(--text-mid);}
+.step-chevron{margin-left:auto;color:var(--text-lo);transition:transform 0.2s;font-size:12px;}
+.step-chevron.open{transform:rotate(90deg);}
+.setup-step-body{padding:0 18px 16px;display:none;}
+.setup-step-body.open{display:block;}
+.code-block{background:#050A12;border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;font-family:var(--mono);font-size:12px;color:#A3E635;overflow-x:auto;margin:8px 0;white-space:pre;line-height:1.8;}
+.code-block .comment{color:#475569;}
+.code-block .cmd{color:var(--cyan);}
+.code-block .str{color:#F59E0B;}
+.code-block .kw{color:var(--purple);}
+.info-box{background:rgba(34,211,238,0.05);border:1px solid rgba(34,211,238,0.15);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;color:var(--text-mid);margin:8px 0;display:flex;gap:8px;align-items:flex-start;}
+.info-box.warn{background:rgba(245,158,11,0.05);border-color:rgba(245,158,11,0.2);}
+.info-box.err{background:rgba(239,68,68,0.05);border-color:rgba(239,68,68,0.2);}
+.info-box.ok{background:rgba(34,197,94,0.05);border-color:rgba(34,197,94,0.2);}
+.provider-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:flex;gap:14px;align-items:flex-start;transition:border-color 0.15s;}
+.provider-card:hover{border-color:var(--border-hi);}
+.provider-card.active{border-color:rgba(34,211,238,0.3);background:rgba(34,211,238,0.03);}
+.provider-logo{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.voice-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;display:flex;align-items:center;gap:12px;transition:all 0.15s;cursor:pointer;}
+.voice-card:hover{border-color:var(--cyan);background:var(--bg-card2);}
+.voice-avatar{width:40px;height:40px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;border:2px solid var(--border-hi);}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:100;}
+.modal-overlay.open{display:flex;}
+.modal-box{background:#0E1520;border:1px solid var(--border-hi);border-radius:16px;padding:28px;width:min(520px,90vw);max-height:80vh;overflow-y:auto;animation:modalIn 0.2s ease;}
+@keyframes modalIn{from{transform:scale(0.95);opacity:0;}to{transform:scale(1);opacity:1;}}
+.modal-title{font-size:18px;font-weight:800;margin-bottom:4px;}
+.modal-sub{font-size:12px;color:var(--text-mid);margin-bottom:20px;}
+#toast-container{position:fixed;bottom:24px;right:24px;z-index:200;display:flex;flex-direction:column;gap:8px;align-items:flex-end;}
+.toast{background:var(--bg-card);border:1px solid var(--border-hi);border-radius:var(--radius-sm);padding:12px 16px;font-size:13px;font-weight:500;color:var(--text-hi);display:flex;align-items:center;gap:8px;animation:toastIn 0.25s ease;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,0.4);}
+.toast.ok{border-color:rgba(34,197,94,0.4);}
+.toast.err{border-color:rgba(239,68,68,0.4);}
+.toast.warn{border-color:rgba(245,158,11,0.4);}
+@keyframes toastIn{from{opacity:0;transform:translateX(30px);}to{opacity:1;transform:translateX(0);}}
+.switch{position:relative;display:inline-block;width:38px;height:20px;}
+.switch input{opacity:0;width:0;height:0;}
+.slider{position:absolute;cursor:pointer;inset:0;background:var(--bg-hover);border-radius:20px;transition:.3s;}
+.slider:before{content:'';position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:#FFF;border-radius:50%;transition:.3s;}
+input:checked + .slider{background:var(--cyan);}
+input:checked + .slider:before{transform:translateX(18px);}
+.hw-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.hw-row:last-child{border-bottom:none;}
+.hw-key{color:var(--text-mid);font-weight:500;}
+.hw-val{color:var(--text-hi);font-weight:700;font-family:var(--mono);}
+.glow-ring{width:100px;height:100px;border-radius:50%;margin:0 auto 16px;background:conic-gradient(var(--cyan) 0%,var(--blue) 60%,transparent 60%);display:flex;align-items:center;justify-content:center;animation:spinRing 3s linear infinite;position:relative;}
+.glow-ring::after{content:'';position:absolute;inset:8px;border-radius:50%;background:#0E1520;}
+.glow-ring-inner{position:relative;z-index:2;font-size:28px;}
+@keyframes spinRing{to{transform:rotate(360deg);}}
+.project-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:all 0.15s;}
+.project-card:hover{border-color:var(--cyan);transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,0,0,0.3);}
+.project-thumb{width:100%;height:100px;border-radius:var(--radius-sm);background:linear-gradient(135deg,#0A1520,#1E293B);display:flex;align-items:center;justify-content:center;font-size:40px;margin-bottom:10px;position:relative;overflow:hidden;}
+.project-thumb::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,transparent 50%,rgba(7,12,20,0.8));}
+.lang-flag{position:absolute;bottom:6px;right:6px;z-index:1;background:rgba(0,0,0,0.6);padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;color:var(--cyan);}
+.manual-tag{display:inline-flex;align-items:center;gap:4px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);color:var(--purple);padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:0.3px;}
+</style>
+</head>
+<body>
+<div id="toast-container"></div>
+
+<!-- DUB MODAL -->
+<div class="modal-overlay" id="dub-modal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box" style="width:min(580px,92vw);">
+    <div class="modal-title">🎬 New Dub Job</div>
+    <div class="modal-sub">Configure and launch a full AI dubbing pipeline</div>
+    <div class="input-group"><label class="input-label">Source Video File</label>
+      <div class="input-row"><div class="input-group"><input class="input-field" value="C:\Media\inception.mkv"/></div>
+      <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="toast('📁 File picker opened...','ok')">📁 Browse</button></div>
+    </div>
+    <div class="input-row" style="gap:12px;">
+      <div class="input-group" style="flex:1;"><label class="input-label">Source Language</label><select class="input-field"><option>en-US</option><option>en-GB</option></select></div>
+      <div class="input-group" style="flex:1;"><label class="input-label">Target Language</label><select class="input-field"><option>bn-BD — Bangla</option><option>hi-IN — Hindi</option></select></div>
+    </div>
+    <div class="input-row" style="gap:12px;">
+      <div class="input-group" style="flex:1;"><label class="input-label">Whisper Model</label><select class="input-field"><option>medium</option><option>large-v3</option></select></div>
+      <div class="input-group" style="flex:1;"><label class="input-label">Profile</label><select class="input-field"><option>fast (no diarization)</option><option>full (diarization)</option></select></div>
+    </div>
+    <div class="input-group"><label class="input-label">Output Path</label><input class="input-field" value="C:\Exports\inception_bn_dubbed.mp4"/></div>
+    <div class="card card-sm" style="margin-bottom:14px;background:rgba(34,211,238,0.03);">
+      <div style="font-size:11px;font-weight:700;color:var(--text-mid);margin-bottom:6px;">PIPELINE STAGES</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        <span class="pill pill-cyan">1·Probe</span><span style="color:var(--text-lo);">→</span>
+        <span class="pill pill-blue">2·Transcribe</span><span style="color:var(--text-lo);">→</span>
+        <span class="pill pill-purple">3·Translate</span><span style="color:var(--text-lo);">→</span>
+        <span class="pill pill-green">4·TTS</span><span style="color:var(--text-lo);">→</span>
+        <span class="pill pill-yellow">5·Mix</span><span style="color:var(--text-lo);">→</span>
+        <span class="pill pill-cyan">6·Mux</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="document.getElementById('dub-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="startDubJob()">🚀 Launch Pipeline</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW PROJECT MODAL -->
+<div class="modal-overlay" id="proj-modal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box">
+    <div class="modal-title">➕ New Dubbing Project</div>
+    <div class="modal-sub">Create a new .aidub workspace project</div>
+    <div class="input-group"><label class="input-label">Project Name</label><input class="input-field" placeholder="My Movie Dub"/></div>
+    <div class="input-group"><label class="input-label">Source Video</label><input class="input-field" placeholder="C:\Media\movie.mkv"/></div>
+    <div class="input-row" style="gap:10px;margin-bottom:14px;">
+      <div class="input-group" style="flex:1;margin-bottom:0;"><label class="input-label">Source Lang</label><select class="input-field"><option>en-US</option></select></div>
+      <div class="input-group" style="flex:1;margin-bottom:0;"><label class="input-label">Target Lang</label><select class="input-field"><option>bn-BD</option><option>hi-IN</option></select></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="document.getElementById('proj-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="document.getElementById('proj-modal').classList.remove('open');toast('✅ Project created!','ok')">Create Project</button>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+  <!-- SIDEBAR -->
+  <nav id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🎬</div>
+      <div class="logo-text">AI Dubbing Studio<span>v0.9.0-alpha</span></div>
+    </div>
+    <div class="sidebar-section">Workspace</div>
+    <div class="nav-item active" onclick="showScreen('dashboard')"><span class="nav-icon">🏠</span> Dashboard</div>
+    <div class="nav-item" onclick="showScreen('projects')"><span class="nav-icon">📁</span> Projects <span class="nav-badge">3</span></div>
+    <div class="nav-item" onclick="showScreen('timeline')"><span class="nav-icon">🎞</span> Timeline Editor</div>
+    <div class="sidebar-section">AI Pipeline</div>
+    <div class="nav-item" onclick="showScreen('providers')"><span class="nav-icon">🤖</span> AI Providers <span class="nav-badge warn">!</span></div>
+    <div class="nav-item" onclick="showScreen('voices')"><span class="nav-icon">🎤</span> Voice Manager</div>
+    <div class="nav-item" onclick="showScreen('models')"><span class="nav-icon">🧠</span> Local Models <span class="nav-badge err">↓</span></div>
+    <div class="sidebar-section">Setup</div>
+    <div class="nav-item" onclick="showScreen('setup')"><span class="nav-icon">⚙️</span> Setup Wizard</div>
+    <div class="nav-item" onclick="showScreen('hardware')"><span class="nav-icon">💻</span> Hardware</div>
+    <div class="nav-item" onclick="showScreen('kaggle')"><span class="nav-icon">📊</span> Kaggle / HF / Ollama</div>
+    <div class="sidebar-section">System</div>
+    <div class="nav-item" onclick="showScreen('logs')"><span class="nav-icon">📋</span> Logs</div>
+    <div class="nav-item" onclick="showScreen('settings')"><span class="nav-icon">🔧</span> Settings</div>
+    <div class="sidebar-footer">
+      <div class="hw-tier-badge">
+        <div class="tier-label">Hardware Tier</div>
+        <div class="tier-name">MID_GPU</div>
+        <div class="tier-sub">RTX 3060 · 12 GB VRAM</div>
+      </div>
+    </div>
+  </nav>
+
+  <div id="main">
+    <div id="topbar">
+      <div class="topbar-breadcrumb">
+        <span>Studio</span><span style="color:var(--text-lo);">›</span>
+        <span class="active" id="topbar-page">Dashboard</span>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <div class="status-dot" id="status-dot"></div>
+        <span style="font-size:12px;color:var(--text-mid);" id="status-text">Ready</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-left:12px;">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('dub-modal').classList.add('open')">🎬 New Dub</button>
+        <button class="btn btn-primary btn-sm" onclick="showScreen('setup')">⚡ Setup Guide</button>
+      </div>
+    </div>
+
+    <div id="content">
+
+      <!-- ══ DASHBOARD ══ -->
+      <div class="screen active" id="screen-dashboard">
+        <div class="section-title">Dashboard</div>
+        <div class="section-sub">AI Movie Dubbing Studio — Overview & Quick Actions</div>
+        <div class="grid-4 mb-4">
+          <div class="stat-card"><div class="stat-icon" style="background:rgba(34,211,238,0.1);">🎬</div><div><div class="stat-val">3</div><div class="stat-lbl">Active Projects</div></div></div>
+          <div class="stat-card"><div class="stat-icon" style="background:rgba(168,85,247,0.1);">🎤</div><div><div class="stat-val">12</div><div class="stat-lbl">Voice Profiles</div></div></div>
+          <div class="stat-card"><div class="stat-icon" style="background:rgba(34,197,94,0.1);">✅</div><div><div class="stat-val">7</div><div class="stat-lbl">Dub Jobs Done</div></div></div>
+          <div class="stat-card"><div class="stat-icon" style="background:rgba(245,158,11,0.1);">⚡</div><div><div class="stat-val">2.3x</div><div class="stat-lbl">Speed Factor</div></div></div>
+        </div>
+        <div class="grid-2 gap-6">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--text-hi);margin-bottom:12px;">Recent Projects</div>
+            <div class="grid-2 gap-3">
+              <div class="project-card" onclick="showScreen('timeline')">
+                <div class="project-thumb">🎭<div class="lang-flag">→ বাং</div></div>
+                <div style="font-size:13px;font-weight:700;">Inception (2010)</div>
+                <div style="font-size:11px;color:var(--text-mid);margin:2px 0;">EN → Bangla · 148 min</div>
+                <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;"><span class="pill pill-green">✓ Transcribed</span><span class="pill pill-cyan">Dubbing</span></div>
+              </div>
+              <div class="project-card" onclick="showScreen('timeline')">
+                <div class="project-thumb">🌌<div class="lang-flag">→ हिं</div></div>
+                <div style="font-size:13px;font-weight:700;">Interstellar</div>
+                <div style="font-size:11px;color:var(--text-mid);margin:2px 0;">EN → Hindi · 169 min</div>
+                <div style="display:flex;gap:6px;margin-top:8px;"><span class="pill pill-yellow">⏳ Queued</span></div>
+              </div>
+              <div class="project-card" onclick="showScreen('timeline')">
+                <div class="project-thumb">🤖<div class="lang-flag">→ বাং</div></div>
+                <div style="font-size:13px;font-weight:700;">Terminator 2</div>
+                <div style="font-size:11px;color:var(--text-mid);margin:2px 0;">EN → Bangla · 137 min</div>
+                <div style="display:flex;gap:6px;margin-top:8px;"><span class="pill pill-purple">Draft</span></div>
+              </div>
+              <div class="project-card" style="border-style:dashed;display:flex;align-items:center;justify-content:center;height:150px;flex-direction:column;gap:8px;" onclick="document.getElementById('proj-modal').classList.add('open')">
+                <span style="font-size:32px;">➕</span>
+                <span style="font-size:12px;color:var(--text-mid);font-weight:600;">New Project</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--text-hi);margin-bottom:12px;">Quick Actions</div>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <div class="card card-sm card-hover flex items-center gap-3" onclick="document.getElementById('dub-modal').classList.add('open')">
+                  <div style="width:36px;height:36px;border-radius:8px;background:rgba(34,211,238,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;">🎬</div>
+                  <div><div style="font-size:13px;font-weight:700;">Start New Dub Job</div><div style="font-size:11px;color:var(--text-mid);">Whisper → Translate → TTS → Mix</div></div>
+                  <span style="margin-left:auto;color:var(--text-lo);">›</span>
+                </div>
+                <div class="card card-sm card-hover flex items-center gap-3" onclick="showScreen('providers')">
+                  <div style="width:36px;height:36px;border-radius:8px;background:rgba(59,130,246,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;">🔑</div>
+                  <div><div style="font-size:13px;font-weight:700;">Configure API Keys</div><div style="font-size:11px;color:var(--text-mid);">OpenRouter · Gemini · DeepSeek</div></div>
+                  <span style="margin-left:auto;color:var(--text-lo);">›</span>
+                </div>
+                <div class="card card-sm card-hover flex items-center gap-3" onclick="showScreen('models')">
+                  <div style="width:36px;height:36px;border-radius:8px;background:rgba(168,85,247,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;">🧠</div>
+                  <div><div style="font-size:13px;font-weight:700;">Download Local Models</div><div style="font-size:11px;color:var(--text-mid);">Whisper · Pyannote · Demucs</div></div>
+                  <span class="nav-badge err" style="margin-left:auto;">Action needed</span>
+                </div>
+                <div class="card card-sm card-hover flex items-center gap-3" onclick="showScreen('hardware')">
+                  <div style="width:36px;height:36px;border-radius:8px;background:rgba(34,197,94,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;">💻</div>
+                  <div><div style="font-size:13px;font-weight:700;">Hardware Diagnostics</div><div style="font-size:11px;color:var(--text-mid);">Auto-detect GPU · VRAM · Tier</div></div>
+                  <span style="margin-left:auto;color:var(--text-lo);">›</span>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div style="font-size:13px;font-weight:700;margin-bottom:12px;">🩺 System Readiness</div>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="color:var(--green);">✔</span><span style="flex:1;color:var(--text-mid);">FFmpeg 6.1</span><span class="pill pill-green">Ready</span></div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="color:var(--green);">✔</span><span style="flex:1;color:var(--text-mid);">Faster-Whisper</span><span class="pill pill-green">medium</span></div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="color:var(--yellow);">⚠</span><span style="flex:1;color:var(--text-mid);">Pyannote Diarization</span><span class="pill pill-yellow">No HF Token</span></div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="color:var(--red);">✗</span><span style="flex:1;color:var(--text-mid);">Demucs (music stem)</span><span class="pill pill-red">Not Downloaded</span></div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="color:var(--green);">✔</span><span style="flex:1;color:var(--text-mid);">Edge TTS</span><span class="pill pill-green">Online</span></div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="color:var(--yellow);">⚠</span><span style="flex:1;color:var(--text-mid);">OpenRouter API Key</span><span class="pill pill-yellow">Not Set</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ SETUP WIZARD ══ -->
+      <div class="screen" id="screen-setup">
+        <div class="section-title">⚙️ Setup Wizard</div>
+        <div class="section-sub">Complete these steps to fully enable all AI Movie Dubbing features. Click each step to expand.</div>
+
+        <div class="setup-step">
+          <div class="setup-step-header" onclick="toggleStep(this)">
+            <div class="step-num done">✓</div>
+            <div><div class="setup-step-title">1 · Python 3.12 + Virtual Environment</div><div class="setup-step-sub">Create and activate .venv, install all dependencies</div></div>
+            <span class="step-chevron">›</span>
+          </div>
+          <div class="setup-step-body">
+            <div class="info-box ok">✅ Python 3.12 x64 is required. The app will not run on 3.11 or 3.10.</div>
+            <div class="code-block"><span class="comment"># Download Python 3.12 from: https://www.python.org/downloads/</span>
+<span class="comment"># Choose: Windows installer (64-bit) — check "Add to PATH"</span>
+
+<span class="comment"># In PowerShell (project root):</span>
+<span class="cmd">py -3.12 -m venv .venv</span>
+<span class="cmd">.venv\Scripts\Activate.ps1</span>
+<span class="cmd">python -m pip install --upgrade pip</span>
+<span class="cmd">python -m pip install -e ".[dev,desktop]"</span>
+<span class="cmd">aidub doctor --json</span></div>
+            <div class="info-box warn">⚠ If scripts are blocked: <code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code></div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="setup-step-header" onclick="toggleStep(this)">
+            <div class="step-num done">✓</div>
+            <div><div class="setup-step-title">2 · FFmpeg Installation</div><div class="setup-step-sub">Required for ALL media encoding, decoding, and mixing</div></div>
+            <span class="step-chevron">›</span>
+          </div>
+          <div class="setup-step-body">
+            <div class="info-box ok">✅ FFmpeg 6.1 detected on this machine.</div>
+            <div class="code-block"><span class="comment"># Option A — winget (Windows 10/11 built-in)</span>
+<span class="cmd">winget install Gyan.FFmpeg</span>
+
+<span class="comment"># Option B — Chocolatey package manager</span>
+<span class="cmd">choco install ffmpeg-full -y</span>
+
+<span class="comment"># Option C — Manual download</span>
+<span class="comment"># 1. https://www.gyan.dev/ffmpeg/builds/ → ffmpeg-release-full.7z</span>
+<span class="comment"># 2. Extract → rename folder to C:\ffmpeg</span>
+<span class="comment"># 3. System Properties → Environment Variables → PATH → Add: C:\ffmpeg\bin</span>
+
+<span class="cmd">ffmpeg -version</span>
+<span class="cmd">ffprobe -version</span></div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="setup-step-header" onclick="toggleStep(this)">
+            <div class="step-num active">3</div>
+            <div><div class="setup-step-title">3 · Faster-Whisper Local ASR Model <span class="manual-tag">⬇ Download</span></div><div class="setup-step-sub">Offline speech transcription — downloads on first use or manually</div></div>
+            <span class="step-chevron">›</span>
+          </div>
+          <div class="setup-step-body">
+            <div class="info-box">ℹ Faster-Whisper auto-downloads on first use. Pre-download to avoid delay at runtime.</div>
+            <div class="input-group" style="margin-top:10px;"><label class="input-label">Choose Model Size</label>
+              <select class="input-field" id="whisper-model-select">
+                <option value="tiny">tiny (39MB) — fastest, low quality</option>
+                <option value="base">base (74MB) — fast, basic</option>
+                <option value="small">small (244MB) — balanced</option>
+                <option value="medium" selected>medium (769MB) — recommended ✓</option>
+                <option value="large-v3">large-v3 (1.5GB) — best quality</option>
+              </select>
+            </div>
+            <div class="code-block"><span class="comment"># Install packages (venv must be active)</span>
+<span class="cmd">pip install faster-whisper huggingface-hub</span>
+
+<span class="comment"># Auto-download on first use:</span>
+<span class="kw">python</span> -c <span class="str">"from faster_whisper import WhisperModel; WhisperModel('medium', device='cpu')"</span>
+
+<span class="comment"># OR download via CLI:</span>
+<span class="cmd">huggingface-cli download Systran/faster-whisper-medium</span>
+
+<span class="comment"># Cache: %USERPROFILE%\.cache\huggingface\hub\models--Systran--faster-whisper-medium</span></div>
+            <div class="info-box warn">⚠ large-v3 needs ~4GB VRAM. Use medium or small for CPU-only machines.</div>
+            <div style="display:flex;gap:8px;margin-top:10px;">
+              <button class="btn btn-primary btn-sm" onclick="toast('✅ Whisper medium queued for download (simulated)','ok')">⬇ Download Model</button>
+              <button class="btn btn-ghost btn-sm" onclick="toast('🌐 Opening HuggingFace...','ok')">🌐 HuggingFace</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="setup-step-header" onclick="toggleStep(this)">
+            <div class="step-num">4</div>
+            <div><div class="setup-step-title">4 · Pyannote Speaker Diarization <span class="manual-tag">🔐 HF Token Required</span></div><div class="setup-step-sub">Identifies which speaker says what. Requires HuggingFace token + gate approval.</div></div>
+            <span class="step-chevron">›</span>
+          </div>
+          <div class="setup-step-body">
+            <div class="info-box err">✗ PYANNOTE_TOKEN not set. Speaker diarization disabled. Use --no-diarization for fast mode.</div>
+            <div style="font-size:13px;font-weight:700;color:var(--text-hi);margin:12px 0 8px;">Manual Steps:</div>
+            <ol style="font-size:12px;color:var(--text-mid);padding-left:20px;line-height:2.3;">
+              <li>Go to <strong style="color:var(--cyan);">https://huggingface.co</strong> → Sign up / Log in</li>
+              <li>Visit and click <strong>Accept</strong> on these gated model pages:<br>
+                <code style="font-family:var(--mono);color:var(--cyan);">https://huggingface.co/pyannote/speaker-diarization-3.1</code><br>
+                <code style="font-family:var(--mono);color:var(--cyan);">https://huggingface.co/pyannote/segmentation-3.0</code>
+              </li>
+              <li>Profile → Settings → <strong>Access Tokens</strong> → New Token (Role: Read)</li>
+              <li>Copy token (starts with <code style="font-family:var(--mono);color:var(--yellow);">hf_</code>)</li>
+              <li>Add to your <code>.env</code> file in the project root</li>
+            </ol>
+            <div class="code-block"><span class="comment"># .env file</span>
+<span class="kw">PYANNOTE_TOKEN</span>=<span class="str">hf_YOUR_TOKEN_HERE</span></div>
+            <div class="input-group" style="margin-top:10px;"><label class="input-label">Paste HuggingFace Token</label>
+              <div class="input-row">
+                <div class="input-group"><input class="input-field mono" type="password" placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxx" id="pyannote-token-input"/></div>
+                <button class="btn btn-primary btn-sm" style="flex-shrink:0" onclick="savePyannoteToken()">💾 Save to .env</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="setup-step-header" onclick="toggleStep(this)">
+            <div class="step-num">5</div>
+            <div><div class="setup-step-title">5 · Demucs Music Stem Separation <span class="manual-tag">⬇ 1.5GB Download</span></div><div class="setup-step-sub">Separates dialogue/music/SFX for cleaner isolated dubbing tracks</div></div>
+            <span class="step-chevron">›</span>
+          </div>
+          <div class="setup-step-body">
+            <div class="info-box err">✗ Demucs not found. Music stem separation disabled. Skip with fast profile.</div>
+            <div class="code-block"><span class="comment"># Install demucs</span>
+<span class="cmd">pip install demucs</span>
+
+<span class="comment"># Trigger model download (~1.5GB, htdemucs model)</span>
+<span class="kw">python</span> -c <span class="str">"import demucs.separate; print('Demucs OK')"</span>
+
+<span class="comment"># Or use CLI to separate a test file:</span>
+<span class="cmd">python -m demucs --two-stems=vocals test_clip.mp3</span>
+
+<span class="comment"># Model cache: %USERPROFILE%\.cache\torch\hub\checkpoints\</span>
+<span class="comment"># Output: separated/htdemucs/{trackname}/vocals.wav + no_vocals.wav</span></div>
+            <div class="info-box">ℹ Requires ~4GB RAM. GPU strongly recommended. Skip with <code>aidub dub --no-diarization</code></div>
+            <button class="btn btn-primary btn-sm" style="margin-top:8px;" id="demucs-btn" onclick="startDemucsDownload()">⬇ Install Demucs (Sim)</button>
+            <div class="progress-track" style="margin-top:8px;"><div class="progress-fill red" id="demucs-fill" style="width:0%"></div></div>
+            <div id="demucs-status" style="font-size:10px;color:var(--text-lo);margin-top:3px;">Not started</div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="setup-step-header" onclick="toggleStep(this)">
+            <div class="step-num">6</div>
+            <div><div class="setup-step-title">6 · LLM Provider API Keys <span class="manual-tag">🔑 Manual</span></div><div class="setup-step-sub">For translation — OpenRouter free tier recommended to start</div></div>
+            <span class="step-chevron">›</span>
+          </div>
+          <div class="setup-step-body">
+            <div style="font-size:13px;font-weight:700;color:var(--text-hi);margin-bottom:8px;">Option A — OpenRouter (Free Tier) 🆓</div>
+            <ol style="font-size:12px;color:var(--text-mid);padding-left:20px;line-height:2;">
+              <li>Go to <strong style="color:var(--cyan);">https://openrouter.ai</strong> → Sign Up Free</li>
+              <li>Dashboard → API Keys → Create Key</li>
+              <li>Default free model: <code style="font-family:var(--mono);color:var(--cyan);">minimax/minimax-m3.1-flash:free</code></li>
+            </ol>
+            <div class="code-block"><span class="kw">OPENROUTER_API_KEY</span>=<span class="str">sk-or-v1-YOUR_KEY</span>
+<span class="kw">OPENROUTER_MODEL</span>=<span class="str">minimax/minimax-m3.1-flash:free</span></div>
+            <div style="font-size:13px;font-weight:700;color:var(--text-hi);margin:10px 0 8px;">Option B — Google Gemini (Free tier) 🆓</div>
+            <ol style="font-size:12px;color:var(--text-mid);padding-left:20px;line-height:2;">
+              <li>Go to <strong style="color:var(--cyan);">https://aistudio.google.com/apikey</strong></li>
+              <li>Click <strong>Create API Key</strong> → Copy it</li>
+            </ol>
+            <div class="code-block"><span class="kw">GEMINI_API_KEY</span>=<span class="str">AIzaSy_YOUR_KEY</span>
+<span class="kw">GEMINI_MODEL</span>=<span class="str">gemini-2.0-flash</span>
+
+<span class="comment"># Add both to .env:</span>
+<span class="cmd">copy .env.example .env</span>
+<span class="cmd">notepad .env</span></div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="setup-step-header" onclick="toggleStep(this)">
+            <div class="step-num">7</div>
+            <div><div class="setup-step-title">7 · NVIDIA CUDA (Optional GPU Acceleration) <span class="manual-tag">GPU</span></div><div class="setup-step-sub">Dramatically speeds up Whisper, Demucs, Pyannote (10-50x faster)</div></div>
+            <span class="step-chevron">›</span>
+          </div>
+          <div class="setup-step-body">
+            <div class="code-block"><span class="comment"># Check CUDA status</span>
+<span class="cmd">nvidia-smi</span>
+<span class="kw">python</span> -c <span class="str">"import torch; print('CUDA:', torch.cuda.is_available(), torch.cuda.get_device_name(0))"</span>
+
+<span class="comment"># Install CUDA 12.1 toolkit from:</span>
+<span class="comment"># https://developer.nvidia.com/cuda-downloads</span>
+
+<span class="comment"># Install PyTorch with CUDA 12.1 support:</span>
+<span class="cmd">pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121</span>
+
+<span class="comment"># Faster-Whisper auto-uses CUDA when available</span>
+<span class="kw">python</span> -c <span class="str">"from faster_whisper import WhisperModel; m = WhisperModel('medium', device='cuda'); print('GPU mode OK')"</span></div>
+            <div class="info-box">ℹ ULTRA_CUDA tier requires 12GB+ VRAM. MID_GPU needs 4GB+. Below that, CPU_BASIC is assigned.</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;background:rgba(34,211,238,0.03);border-color:rgba(34,211,238,0.2);">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <span style="font-size:32px;">🩺</span>
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:700;">Run System Doctor</div>
+              <div style="font-size:12px;color:var(--text-mid);">Checks all dependencies, prints JSON readiness report</div>
+              <div class="code-block" style="margin-top:8px;"><span class="cmd">aidub doctor --json</span>
+<span class="cmd">aidub doctor --require-runtime</span></div>
+            </div>
+            <button class="btn btn-primary" onclick="runDoctorSim()">🩺 Run Doctor</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ KAGGLE / HF / OLLAMA ══ -->
+      <div class="screen" id="screen-kaggle">
+        <div class="section-title">📊 Kaggle · HuggingFace · Ollama</div>
+        <div class="section-sub">Manual setup instructions for dataset access, model downloads, and local LLM setup</div>
+
+        <div class="card mb-4">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:42px;height:42px;background:#20BEFF;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;">📊</div>
+            <div><div style="font-size:16px;font-weight:800;">Kaggle API Setup</div><div style="font-size:12px;color:var(--text-mid);">Download datasets for model training or evaluation</div></div>
+          </div>
+          <ol style="font-size:12px;color:var(--text-mid);padding-left:18px;line-height:2.2;">
+            <li>Create free account at <strong style="color:var(--cyan);">https://www.kaggle.com</strong></li>
+            <li>Click Profile icon → <strong>Settings → API → Create New Token</strong></li>
+            <li>A file <code style="font-family:var(--mono);color:var(--yellow);">kaggle.json</code> downloads automatically</li>
+            <li>Place the file at the required path:</li>
+          </ol>
+          <div class="code-block"><span class="comment"># Windows — required location:</span>
+<span class="str">C:\Users\YOUR_USERNAME\.kaggle\kaggle.json</span>
+
+<span class="comment"># PowerShell commands:</span>
+<span class="cmd">New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.kaggle"</span>
+<span class="cmd">Copy-Item Downloads\kaggle.json "$env:USERPROFILE\.kaggle\kaggle.json"</span>
+
+<span class="comment"># Install CLI and test</span>
+<span class="cmd">pip install kaggle</span>
+<span class="cmd">kaggle datasets list</span>
+
+<span class="comment"># Download a dataset</span>
+<span class="cmd">kaggle datasets download -d USERNAME/DATASET -p ./data</span>
+<span class="cmd">kaggle competitions download -c COMPETITION -p ./data</span></div>
+          <div class="info-box warn">⚠ NEVER commit kaggle.json to Git. Add <code>.kaggle/</code> to your <code>.gitignore</code>.</div>
+          <div style="margin-top:10px;display:flex;gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="toast('🌐 Opening kaggle.com...','ok')">🌐 Open Kaggle</button>
+            <button class="btn btn-ghost btn-sm" onclick="toast('✅ kaggle.json location verified (sim)','ok')">✅ Verify Setup</button>
+          </div>
+        </div>
+
+        <div class="card mb-4">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:42px;height:42px;background:#FF6B35;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;">🤗</div>
+            <div><div style="font-size:16px;font-weight:800;">HuggingFace Hub Setup</div><div style="font-size:12px;color:var(--text-mid);">Required for Pyannote, Whisper, and other gated models</div></div>
+          </div>
+          <ol style="font-size:12px;color:var(--text-mid);padding-left:18px;line-height:2.2;">
+            <li>Register at <strong style="color:var(--cyan);">https://huggingface.co/join</strong></li>
+            <li>Settings → Access Tokens → <strong>New Token</strong> (type: Read)</li>
+            <li>Accept gated model licenses for pyannote models</li>
+          </ol>
+          <div class="code-block"><span class="cmd">pip install huggingface_hub</span>
+
+<span class="comment"># Option A — interactive login (saves to ~/.huggingface/token)</span>
+<span class="cmd">huggingface-cli login</span>
+
+<span class="comment"># Option B — environment variable</span>
+<span class="kw">HUGGINGFACE_TOKEN</span>=<span class="str">hf_YOUR_TOKEN</span>  <span class="comment"># add to .env</span>
+
+<span class="comment"># Download specific models</span>
+<span class="cmd">huggingface-cli download pyannote/speaker-diarization-3.1</span>
+<span class="cmd">huggingface-cli download Systran/faster-whisper-large-v3</span>
+
+<span class="comment"># View cached models</span>
+<span class="cmd">huggingface-cli scan-cache</span></div>
+          <div class="input-group" style="margin-top:12px;"><label class="input-label">HuggingFace Token</label>
+            <div class="input-row">
+              <div class="input-group"><input class="input-field mono" type="password" placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxx" id="hf-token-input"/></div>
+              <button class="btn btn-primary btn-sm" style="flex-shrink:0" onclick="saveHFToken()">💾 Save to .env</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:42px;height:42px;background:#6E5BF7;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;">🦙</div>
+            <div><div style="font-size:16px;font-weight:800;">Ollama — 100% Offline Local LLM</div><div style="font-size:12px;color:var(--text-mid);">No API key, no cost. Run llama3/mistral/qwen2 locally for translation.</div></div>
+          </div>
+          <div class="code-block"><span class="comment"># 1. Download from https://ollama.ai — Windows .exe installer</span>
+<span class="comment">#    Ollama runs as a background Windows service on port 11434</span>
+
+<span class="comment"># 2. Pull a translation model</span>
+<span class="cmd">ollama pull llama3.2:3b</span>        <span class="comment"># ~2GB — fast, good quality</span>
+<span class="cmd">ollama pull mistral:7b</span>         <span class="comment"># ~4GB — better for EN→BN</span>
+<span class="cmd">ollama pull qwen2.5:7b</span>         <span class="comment"># ~4GB — best for Asian languages</span>
+<span class="cmd">ollama pull aya-expanse:8b</span>     <span class="comment"># ~5GB — multilingual specialist</span>
+
+<span class="comment"># 3. Configure in .env as an unofficial OpenAI-compatible endpoint:</span>
+<span class="kw">UNOFFICIAL_1_URL</span>=<span class="str">http://localhost:11434/v1</span>
+<span class="kw">UNOFFICIAL_1_KEY</span>=<span class="str">ollama</span>
+<span class="kw">UNOFFICIAL_1_MODEL</span>=<span class="str">llama3.2:3b</span>
+<span class="kw">UNOFFICIAL_1_NAME</span>=<span class="str">local_ollama</span>
+<span class="kw">PROVIDER_PRIORITY</span>=<span class="str">unofficial,openrouter,gemini</span>
+
+<span class="comment"># 4. Test connection</span>
+<span class="cmd">ollama run llama3.2:3b "Translate to Bangla: Hello World"</span>
+<span class="cmd">curl http://localhost:11434/api/tags</span></div>
+          <div class="info-box ok">✅ With Ollama: ALL translation runs 100% OFFLINE. No API costs ever.</div>
+          <div style="margin-top:10px;display:flex;gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="toast('🦙 Get Ollama at: https://ollama.ai','ok')">🌐 Get Ollama</button>
+            <button class="btn btn-ghost btn-sm" onclick="toast('🔍 Testing localhost:11434... (sim)','ok')">🔍 Test Connection</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ LOCAL MODELS ══ -->
+      <div class="screen" id="screen-models">
+        <div class="section-title">🧠 Local AI Models</div>
+        <div class="section-sub">Download and manage locally-hosted models for offline operation</div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div style="width:48px;height:48px;background:rgba(34,211,238,0.1);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;">🎙</div>
+              <div style="flex:1;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:14px;font-weight:800;">Faster-Whisper</span><span class="pill pill-green">Installed</span><span style="font-size:11px;color:var(--text-lo);margin-left:auto;font-family:var(--mono);">medium · 769MB</span></div>
+                <div style="font-size:12px;color:var(--text-mid);">OpenAI Whisper ASR for speech transcription. Used in all pipeline runs.</div>
+                <div style="margin-top:8px;"><div class="progress-track"><div class="progress-fill green" style="width:100%"></div></div></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+                <button class="btn btn-ghost btn-sm" onclick="toast('Upgrading to large-v3...','ok')">⬆ Upgrade</button>
+                <button class="btn btn-ghost btn-sm" onclick="toast('🧪 Whisper test: OK','ok')">🧪 Test</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div style="width:48px;height:48px;background:rgba(245,158,11,0.1);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;">👥</div>
+              <div style="flex:1;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:14px;font-weight:800;">Pyannote Diarization 3.1</span><span class="pill pill-yellow">Token Needed</span><span style="font-size:11px;color:var(--text-lo);margin-left:auto;font-family:var(--mono);">~650MB</span></div>
+                <div style="font-size:12px;color:var(--text-mid);">Speaker diarization — who speaks when. Needs HF token + model gate approval.</div>
+                <div style="margin-top:8px;"><div class="progress-track"><div class="progress-fill yellow" style="width:0%"></div></div></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+                <button class="btn btn-ghost btn-sm" onclick="showScreen('setup')">🔑 Get HF Token</button>
+                <button class="btn btn-ghost btn-sm" onclick="toast('❌ Set HF token first','err')">⬇ Download</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div style="width:48px;height:48px;background:rgba(239,68,68,0.1);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;">🎵</div>
+              <div style="flex:1;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:14px;font-weight:800;">Demucs (htdemucs)</span><span class="pill pill-red">Not Installed</span><span style="font-size:11px;color:var(--text-lo);margin-left:auto;font-family:var(--mono);">~1.5GB</span></div>
+                <div style="font-size:12px;color:var(--text-mid);">Music/dialogue stem separation for cleaner dubbing audio.</div>
+                <div style="margin-top:8px;"><div class="progress-track"><div class="progress-fill red" id="demucs-fill-m" style="width:0%"></div></div><div id="demucs-status-m" style="font-size:10px;color:var(--text-lo);margin-top:3px;">Not started</div></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+                <button class="btn btn-primary btn-sm" onclick="startDemucsDownloadM()">⬇ Install</button>
+                <button class="btn btn-ghost btn-sm" onclick="toast('Skipping Demucs — fast profile','warn')">⏩ Skip</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div style="width:48px;height:48px;background:rgba(34,197,94,0.1);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;">🔊</div>
+              <div style="flex:1;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:14px;font-weight:800;">Microsoft Edge TTS</span><span class="pill pill-green">Online · Ready</span></div>
+                <div style="font-size:12px;color:var(--text-mid);">Cloud TTS — no download. Needs internet. 400+ voices, 100+ languages.</div>
+                <div style="margin-top:8px;"><div class="progress-track"><div class="progress-fill green" style="width:100%"></div></div></div>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="toast('🔊 Testing Edge TTS...','ok')">🧪 Test</button>
+            </div>
+          </div>
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div style="width:48px;height:48px;background:rgba(110,91,247,0.1);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;">🦙</div>
+              <div style="flex:1;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:14px;font-weight:800;">Ollama Local LLM</span><span class="pill pill-red">Not Configured</span></div>
+                <div style="font-size:12px;color:var(--text-mid);">Local translation LLM. No API key needed. Supports llama3, mistral, qwen2.</div>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="showScreen('kaggle')">📖 Setup Guide</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ PROVIDERS ══ -->
+      <div class="screen" id="screen-providers">
+        <div class="section-title">🤖 AI Provider Configuration</div>
+        <div class="section-sub">Set API keys and models for cloud translation providers</div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="provider-card active">
+            <div class="provider-logo" style="background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.15);">🔗</div>
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-size:14px;font-weight:800;">OpenRouter</span><span class="pill pill-green">Free Tier</span><span class="pill pill-cyan">Priority #1</span></div>
+              <div style="font-size:12px;color:var(--text-mid);margin-bottom:10px;">100+ LLMs via one API. Free models available. Best starting point.</div>
+              <div class="input-row">
+                <div class="input-group" style="flex:2;"><label class="input-label">API Key</label><input class="input-field mono" type="password" placeholder="sk-or-v1-xxxxxxx" id="or-key"/></div>
+                <div class="input-group" style="flex:2;"><label class="input-label">Model</label>
+                  <select class="input-field">
+                    <option>minimax/minimax-m3.1-flash:free 🆓</option>
+                    <option>meta-llama/llama-3.1-8b-instruct:free 🆓</option>
+                    <option>google/gemini-flash-1.5</option>
+                  </select>
+                </div>
+                <button class="btn btn-primary btn-sm" style="flex-shrink:0;margin-top:17px;" onclick="saveProvider('OpenRouter')">💾 Save</button>
+              </div>
+            </div>
+          </div>
+          <div class="provider-card">
+            <div class="provider-logo" style="background:rgba(66,133,244,0.08);border:1px solid rgba(66,133,244,0.15);">✨</div>
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-size:14px;font-weight:800;">Google Gemini</span><span class="pill pill-green">Free Tier</span><span class="pill pill-blue">Priority #2</span></div>
+              <div style="font-size:12px;color:var(--text-mid);margin-bottom:10px;">Gemini 2.0 Flash — excellent for Bangla/Hindi translation.</div>
+              <div class="input-row">
+                <div class="input-group" style="flex:2;"><label class="input-label">API Key</label><input class="input-field mono" type="password" placeholder="AIzaSy_..." id="gem-key"/></div>
+                <div class="input-group" style="flex:1;"><label class="input-label">Model</label><select class="input-field"><option>gemini-2.0-flash</option><option>gemini-1.5-pro</option></select></div>
+                <button class="btn btn-primary btn-sm" style="flex-shrink:0;margin-top:17px;" onclick="saveProvider('Gemini')">💾 Save</button>
+              </div>
+            </div>
+          </div>
+          <div class="provider-card">
+            <div class="provider-logo" style="background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.15);">🔮</div>
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-size:14px;font-weight:800;">DeepSeek</span><span class="pill pill-purple">Very Cheap</span></div>
+              <div style="font-size:12px;color:var(--text-mid);margin-bottom:10px;">deepseek-chat — extremely low cost, strong multilingual.</div>
+              <div class="input-row">
+                <div class="input-group" style="flex:2;"><label class="input-label">API Key</label><input class="input-field mono" type="password" placeholder="sk-..." id="ds-key"/></div>
+                <div class="input-group" style="flex:1;"><label class="input-label">Base URL</label><input class="input-field mono" value="https://api.deepseek.com" id="ds-url"/></div>
+                <button class="btn btn-primary btn-sm" style="flex-shrink:0;margin-top:17px;" onclick="saveProvider('DeepSeek')">💾 Save</button>
+              </div>
+            </div>
+          </div>
+          <div class="provider-card">
+            <div class="provider-logo" style="background:rgba(110,91,247,0.08);border:1px solid rgba(110,91,247,0.15);">🦙</div>
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-size:14px;font-weight:800;">Local Ollama</span><span class="pill pill-yellow">Offline · No Cost</span></div>
+              <div style="font-size:12px;color:var(--text-mid);margin-bottom:10px;">OpenAI-compatible local endpoint. No internet needed.</div>
+              <div class="input-row">
+                <div class="input-group" style="flex:2;"><label class="input-label">Base URL</label><input class="input-field mono" value="http://localhost:11434/v1" id="ol-url"/></div>
+                <div class="input-group" style="flex:2;"><label class="input-label">Model</label><input class="input-field mono" value="llama3.2:3b" id="ol-model"/></div>
+                <button class="btn btn-primary btn-sm" style="flex-shrink:0;margin-top:17px;" onclick="saveProvider('Ollama')">💾 Save</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ TIMELINE ══ -->
+      <div class="screen" id="screen-timeline">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div><div class="section-title">🎞 Timeline Editor</div><div class="section-sub">Inception (2010) · EN → Bangla · 148 min · 24fps</div></div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm">⏮</button>
+            <button class="btn btn-primary btn-sm" id="play-btn" onclick="togglePlay()">▶ Play</button>
+            <button class="btn btn-ghost btn-sm">⏭</button>
+            <button class="btn btn-ghost btn-sm" onclick="toast('🎬 Exporting master...','ok')">📤 Export</button>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:12px;padding:12px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <span style="font-size:11px;font-weight:600;color:var(--text-mid);">AUDIO WAVEFORM</span>
+            <span class="pill pill-cyan">00:04:32 / 02:28:00</span>
+          </div>
+          <div class="waveform-canvas" id="waveform-canvas"></div>
+        </div>
+        <div class="card" style="padding:12px;margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:700;color:var(--text-mid);margin-bottom:8px;letter-spacing:1px;">TIMELINE TRACKS</div>
+          <div class="timeline-track"><span class="track-label">🎬 Video</span><div class="track-body"><div class="track-segment seg-video" style="left:0%;width:100%;"><span>Inception.mkv</span></div><div class="playhead" id="playhead" style="left:12%"></div></div></div>
+          <div class="timeline-track"><span class="track-label">🎙 Original</span><div class="track-body"><div class="track-segment seg-audio" style="left:0%;width:100%;"></div></div></div>
+          <div class="timeline-track"><span class="track-label">🔵 Dubbed BN</span><div class="track-body"><div class="track-segment seg-dub" style="left:0%;width:48%;"><span>Seg 1</span></div><div class="track-segment seg-dub" style="left:50%;width:35%;"><span>Seg 2</span></div><div class="track-segment seg-dub" style="left:87%;width:12%;"><span>...</span></div></div></div>
+          <div class="timeline-track"><span class="track-label">🎵 Music</span><div class="track-body"><div class="track-segment seg-sfx" style="left:0%;width:30%;"></div><div class="track-segment seg-sfx" style="left:32%;width:40%;"></div><div class="track-segment seg-sfx" style="left:74%;width:25%;"></div></div></div>
+          <div class="timeline-track"><span class="track-label">💬 Subs</span><div class="track-body"><div class="track-segment" style="left:5%;width:10%;background:rgba(34,197,94,0.25);border:1px solid rgba(34,197,94,0.4);font-size:9px;"><span>1</span></div><div class="track-segment" style="left:18%;width:8%;background:rgba(34,197,94,0.25);border:1px solid rgba(34,197,94,0.4);font-size:9px;"><span>2</span></div><div class="track-segment" style="left:30%;width:12%;background:rgba(34,197,94,0.25);border:1px solid rgba(34,197,94,0.4);font-size:9px;"><span>3</span></div></div></div>
+        </div>
+        <div class="grid-2 gap-4">
+          <div class="card" style="padding:14px;">
+            <div style="font-size:12px;font-weight:700;margin-bottom:10px;">📝 Subtitle Segments</div>
+            <div style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;">
+              <div class="card card-sm" style="padding:8px 10px;background:rgba(34,211,238,0.05);border-color:rgba(34,211,238,0.2);"><div style="font-size:10px;color:var(--text-lo);font-family:var(--mono);">00:00:32 → 00:00:36</div><div style="font-size:12px;margin:2px 0;">We were in the edge of the city.</div><div style="font-size:12px;color:var(--cyan);">আমরা শহরের প্রান্তে ছিলাম।</div></div>
+              <div class="card card-sm" style="padding:8px 10px;"><div style="font-size:10px;color:var(--text-lo);font-family:var(--mono);">00:01:05 → 00:01:11</div><div style="font-size:12px;margin:2px 0;">Dreams feel real while we're in them.</div><div style="font-size:12px;color:var(--cyan);">স্বপ্ন বাস্তব মনে হয় যখন আমরা সেখানে থাকি।</div></div>
+              <div class="card card-sm" style="padding:8px 10px;"><div style="font-size:10px;color:var(--text-lo);font-family:var(--mono);">00:01:44 → 00:01:49</div><div style="font-size:12px;margin:2px 0;">An idea is like a virus.</div><div style="font-size:12px;color:var(--cyan);">একটি ধারণা একটি ভাইরাসের মতো।</div></div>
+            </div>
+          </div>
+          <div class="card" style="padding:14px;">
+            <div style="font-size:12px;font-weight:700;margin-bottom:10px;">🤖 AI Actions</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="toast('🎙 Transcribing with Whisper medium...','ok')">🎙 Transcribe Selection</button>
+              <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="toast('🌐 Translating EN → Bangla...','ok')">🌐 Translate Segment</button>
+              <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="toast('🔊 Generating TTS via Edge TTS...','ok')">🔊 Generate TTS Voice</button>
+              <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="toast('🎭 Running EmotionEngine...','ok')">🎭 Detect Emotion</button>
+              <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="toast('📊 Analyzing audio levels via FFmpeg...','ok')">📊 Audio Analysis</button>
+              <button class="btn btn-primary" style="margin-top:4px;justify-content:center;" onclick="document.getElementById('dub-modal').classList.add('open')">🎬 Full Pipeline Dub</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ HARDWARE ══ -->
+      <div class="screen" id="screen-hardware">
+        <div class="section-title">💻 Hardware Diagnostics</div>
+        <div class="section-sub">Auto-detects CPU, RAM, GPU, VRAM and assigns performance tier</div>
+        <div class="grid-2 gap-6">
+          <div>
+            <div class="card" style="text-align:center;padding:24px;margin-bottom:16px;">
+              <div class="glow-ring"><span class="glow-ring-inner">🏆</span></div>
+              <div style="font-size:22px;font-weight:900;color:var(--cyan);">MID_GPU</div>
+              <div style="font-size:13px;color:var(--text-mid);margin-top:4px;">Performance Tier Assigned</div>
+              <div style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+                <span class="pill pill-cyan">4 workers</span><span class="pill pill-green">CUDA 12.1</span>
+              </div>
+            </div>
+            <div class="card" style="padding:14px;">
+              <div style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--text-mid);letter-spacing:1px;text-transform:uppercase;">Tier Thresholds</div>
+              <div class="hw-row"><span class="hw-key">ULTRA_CUDA</span><span class="hw-val" style="color:var(--yellow);">≥12 GB VRAM + FFmpeg</span></div>
+              <div class="hw-row"><span class="hw-key">MID_GPU ✓</span><span class="hw-val" style="color:var(--cyan);">4–12 GB VRAM</span></div>
+              <div class="hw-row"><span class="hw-key">CPU_BASIC</span><span class="hw-val" style="color:var(--text-lo);">&lt;4 GB VRAM</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <div style="font-size:12px;font-weight:700;margin-bottom:12px;color:var(--text-mid);letter-spacing:1px;text-transform:uppercase;">Detected Hardware</div>
+            <div class="hw-row"><span class="hw-key">OS</span><span class="hw-val">Windows 11 x64</span></div>
+            <div class="hw-row"><span class="hw-key">CPU Cores</span><span class="hw-val">12</span></div>
+            <div class="hw-row"><span class="hw-key">RAM</span><span class="hw-val">16.0 GB</span></div>
+            <div class="hw-row"><span class="hw-key">GPU</span><span class="hw-val">NVIDIA RTX 3060</span></div>
+            <div class="hw-row"><span class="hw-key">VRAM</span><span class="hw-val">12.0 GB</span></div>
+            <div class="hw-row"><span class="hw-key">CUDA</span><span class="hw-val" style="color:var(--green);">12.1 ✓</span></div>
+            <div class="hw-row"><span class="hw-key">FFmpeg</span><span class="hw-val" style="color:var(--green);">6.1 ✓</span></div>
+            <div class="hw-row"><span class="hw-key">Benchmark</span><span class="hw-val">38.2 ms</span></div>
+            <div class="hw-row"><span class="hw-key">Concurrency</span><span class="hw-val">4 workers</span></div>
+            <div style="margin-top:16px;display:flex;gap:8px;">
+              <button class="btn btn-primary btn-sm" onclick="runHardwareSim()">🔄 Re-Run</button>
+              <button class="btn btn-ghost btn-sm" onclick="toast('📋 Report copied','ok')">📋 Copy JSON</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ VOICES ══ -->
+      <div class="screen" id="screen-voices">
+        <div class="section-title">🎤 Voice Manager</div>
+        <div class="section-sub">Manage TTS voice profiles for characters in your dubbing projects</div>
+        <div style="display:flex;gap:10px;margin-bottom:16px;">
+          <input class="input-field" style="max-width:280px;" placeholder="🔍 Search voices..."/>
+          <select class="input-field" style="max-width:160px;"><option>All Languages</option><option>Bangla (bn-BD)</option><option>Hindi (hi-IN)</option></select>
+          <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="toast('➕ Voice profile created','ok')">➕ New Voice</button>
+        </div>
+        <div class="grid-2 gap-3">
+          <div class="voice-card"><div class="voice-avatar" style="background:rgba(34,211,238,0.1);">👨</div><div style="flex:1;"><div style="font-size:13px;font-weight:700;">Protagonist — Bangla Male</div><div style="font-size:11px;color:var(--text-mid);">bn-BD-NabanitaNeural · Deep</div><div style="display:flex;gap:6px;margin-top:4px;"><span class="pill pill-cyan">Active</span><span class="pill pill-blue">Cobb</span></div></div><button class="btn btn-ghost btn-icon btn-sm" onclick="toast('🔊 Playing preview...','ok')">▶</button></div>
+          <div class="voice-card"><div class="voice-avatar" style="background:rgba(168,85,247,0.1);">👩</div><div style="flex:1;"><div style="font-size:13px;font-weight:700;">Female Lead — Bangla</div><div style="font-size:11px;color:var(--text-mid);">bn-BD-PradeepNeural · Warm</div><div style="display:flex;gap:6px;margin-top:4px;"><span class="pill pill-green">Active</span><span class="pill pill-purple">Mal</span></div></div><button class="btn btn-ghost btn-icon btn-sm" onclick="toast('🔊 Playing preview...','ok')">▶</button></div>
+          <div class="voice-card"><div class="voice-avatar" style="background:rgba(245,158,11,0.1);">👴</div><div style="flex:1;"><div style="font-size:13px;font-weight:700;">Elder — Bangla</div><div style="font-size:11px;color:var(--text-mid);">bn-BD-BashirNeural · Gravelly</div><div style="display:flex;gap:6px;margin-top:4px;"><span class="pill pill-yellow">Draft</span></div></div><button class="btn btn-ghost btn-icon btn-sm" onclick="toast('🔊 Playing preview...','ok')">▶</button></div>
+          <div class="voice-card"><div class="voice-avatar" style="background:rgba(34,197,94,0.1);">🎭</div><div style="flex:1;"><div style="font-size:13px;font-weight:700;">Narrator — Hindi</div><div style="font-size:11px;color:var(--text-mid);">hi-IN-MadhurNeural · Neutral</div><div style="display:flex;gap:6px;margin-top:4px;"><span class="pill pill-green">Active</span><span class="pill pill-blue">Interstellar</span></div></div><button class="btn btn-ghost btn-icon btn-sm" onclick="toast('🔊 Playing preview...','ok')">▶</button></div>
+        </div>
+        <div class="card" style="margin-top:16px;padding:14px;">
+          <div style="font-size:12px;font-weight:700;margin-bottom:10px;">🔊 Test TTS Voice</div>
+          <div class="input-row">
+            <div class="input-group" style="flex:3;"><label class="input-label">Test Text</label><input class="input-field" value="আমরা স্বপ্নের মধ্যে আছি।" id="tts-test-text"/></div>
+            <div class="input-group" style="flex:1;"><label class="input-label">Voice</label><select class="input-field"><option>bn-BD-NabanitaNeural</option><option>hi-IN-MadhurNeural</option></select></div>
+            <button class="btn btn-primary" style="flex-shrink:0;margin-top:17px;" onclick="toast('🔊 Generating TTS via Edge TTS...','ok')">▶ Generate</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ PROJECTS ══ -->
+      <div class="screen" id="screen-projects">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+          <div><div class="section-title">📁 Projects</div><div class="section-sub">All dubbing workspaces</div></div>
+          <button class="btn btn-primary" onclick="document.getElementById('proj-modal').classList.add('open')">➕ New Project</button>
+        </div>
+        <div class="grid-3 gap-4">
+          <div class="project-card" onclick="showScreen('timeline')">
+            <div class="project-thumb">🎭<div class="lang-flag">→ বাং</div></div>
+            <div style="font-size:14px;font-weight:700;">Inception (2010)</div>
+            <div style="font-size:11px;color:var(--text-mid);margin:4px 0;">EN → Bangla · 148 min · 24fps</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">
+              <div style="font-size:11px;color:var(--text-mid);display:flex;justify-content:space-between;"><span>Transcription</span><span style="color:var(--green);">100%</span></div>
+              <div class="progress-track"><div class="progress-fill green" style="width:100%"></div></div>
+              <div style="font-size:11px;color:var(--text-mid);display:flex;justify-content:space-between;"><span>Translation</span><span style="color:var(--cyan);">76%</span></div>
+              <div class="progress-track"><div class="progress-fill" style="width:76%"></div></div>
+              <div style="font-size:11px;color:var(--text-mid);display:flex;justify-content:space-between;"><span>TTS Dubbing</span><span style="color:var(--yellow);">41%</span></div>
+              <div class="progress-track"><div class="progress-fill yellow" style="width:41%"></div></div>
+            </div>
+          </div>
+          <div class="project-card" onclick="showScreen('timeline')">
+            <div class="project-thumb">🌌<div class="lang-flag">→ हिं</div></div>
+            <div style="font-size:14px;font-weight:700;">Interstellar (2014)</div>
+            <div style="font-size:11px;color:var(--text-mid);margin:4px 0;">EN → Hindi · 169 min</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">
+              <div style="font-size:11px;color:var(--text-mid);display:flex;justify-content:space-between;"><span>Transcription</span><span style="color:var(--green);">100%</span></div>
+              <div class="progress-track"><div class="progress-fill green" style="width:100%"></div></div>
+              <div style="font-size:11px;color:var(--text-mid);display:flex;justify-content:space-between;"><span>Translation</span><span style="color:var(--yellow);">22%</span></div>
+              <div class="progress-track"><div class="progress-fill yellow" style="width:22%"></div></div>
+            </div>
+          </div>
+          <div class="project-card" onclick="showScreen('timeline')">
+            <div class="project-thumb">🤖<div class="lang-flag">→ বাং</div></div>
+            <div style="font-size:14px;font-weight:700;">Terminator 2 (1991)</div>
+            <div style="font-size:11px;color:var(--text-mid);margin:4px 0;">EN → Bangla · 137 min</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">
+              <div style="font-size:11px;color:var(--text-mid);display:flex;justify-content:space-between;"><span>Transcription</span><span style="color:var(--yellow);">55%</span></div>
+              <div class="progress-track"><div class="progress-fill yellow" style="width:55%"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ LOGS ══ -->
+      <div class="screen" id="screen-logs">
+        <div class="section-title">📋 System Logs</div>
+        <div class="section-sub">Real-time pipeline and worker logs</div>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">
+            <span class="pill pill-green" style="cursor:pointer;">INFO</span>
+            <span class="pill pill-yellow" style="cursor:pointer;">WARN</span>
+            <span class="pill pill-red" style="cursor:pointer;">ERROR</span>
+            <button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="clearLogs()">🗑 Clear</button>
+          </div>
+          <div id="log-output" style="font-family:var(--mono);font-size:11px;padding:12px 14px;height:400px;overflow-y:auto;background:#050A12;line-height:2;">
+            <div><span style="color:var(--text-lo);">16:30:01</span> <span style="color:var(--cyan);">[INFO]</span> GPU detected: NVIDIA RTX 3060 (12.0 GB VRAM)</div>
+            <div><span style="color:var(--text-lo);">16:30:02</span> <span style="color:var(--cyan);">[INFO]</span> Tier assigned: MID_GPU | concurrency=4</div>
+            <div><span style="color:var(--text-lo);">16:30:03</span> <span style="color:var(--yellow);">[WARN]</span> OPENROUTER_API_KEY not set</div>
+            <div><span style="color:var(--text-lo);">16:30:03</span> <span style="color:var(--yellow);">[WARN]</span> PYANNOTE_TOKEN not set — diarization disabled</div>
+            <div><span style="color:var(--text-lo);">16:30:05</span> <span style="color:var(--cyan);">[INFO]</span> FFmpeg 6.1 detected at C:\ffmpeg\bin\ffmpeg.exe</div>
+            <div><span style="color:var(--text-lo);">16:30:06</span> <span style="color:var(--cyan);">[INFO]</span> Faster-Whisper medium loaded (CUDA)</div>
+            <div><span style="color:var(--text-lo);">16:30:07</span> <span style="color:var(--red);">[ERROR]</span> Demucs model not found — stem separation skipped</div>
+            <div><span style="color:var(--text-lo);">16:30:08</span> <span style="color:var(--cyan);">[INFO]</span> Studio ready. Desktop shell initialized.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ SETTINGS ══ -->
+      <div class="screen" id="screen-settings">
+        <div class="section-title">🔧 Settings</div>
+        <div class="section-sub">Application and pipeline configuration</div>
+        <div class="grid-2 gap-4">
+          <div class="card">
+            <div style="font-size:13px;font-weight:700;margin-bottom:14px;">General</div>
+            <div class="input-group"><label class="input-label">Default Source Language</label><select class="input-field"><option>English (en-US)</option></select></div>
+            <div class="input-group"><label class="input-label">Default Target Language</label><select class="input-field"><option>Bangla (bn-BD)</option><option>Hindi (hi-IN)</option></select></div>
+            <div class="input-group"><label class="input-label">Export Format</label><select class="input-field"><option>MP4 (H.264 AAC)</option><option>MKV</option><option>MP4 (HEVC)</option></select></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;color:var(--text-mid);">Offline Mode (block all external calls)</span><label class="switch"><input type="checkbox" id="offline-mode"/><span class="slider"></span></label></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;color:var(--text-mid);">Agent Loop (LLM quality check)</span><label class="switch"><input type="checkbox" checked/><span class="slider"></span></label></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;"><span style="font-size:13px;color:var(--text-mid);">Skip diarization (fast mode)</span><label class="switch"><input type="checkbox"/><span class="slider"></span></label></div>
+          </div>
+          <div class="card">
+            <div style="font-size:13px;font-weight:700;margin-bottom:14px;">Pipeline Parameters</div>
+            <div class="input-group"><label class="input-label">Max Agent Iterations</label><input class="input-field" type="number" value="20"/></div>
+            <div class="input-group"><label class="input-label">Quality Threshold (0.0–1.0)</label><input class="input-field" type="number" value="0.80" step="0.05"/></div>
+            <div class="input-group"><label class="input-label">Worker Concurrency</label><input class="input-field" type="number" value="4" min="1" max="16"/></div>
+            <div class="input-group"><label class="input-label">Whisper Model</label><select class="input-field"><option>medium</option><option>large-v3</option><option>small</option></select></div>
+            <button class="btn btn-primary" style="width:100%;margin-top:4px;justify-content:center;" onclick="toast('✅ Settings saved to .env','ok')">💾 Save Settings</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const pages={dashboard:'Dashboard',projects:'Projects',timeline:'Timeline Editor',providers:'AI Providers',voices:'Voice Manager',models:'Local Models',setup:'Setup Wizard',hardware:'Hardware Diagnostics',kaggle:'Kaggle / HF / Ollama',logs:'System Logs',settings:'Settings'};
+
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const s=document.getElementById('screen-'+name);if(s)s.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')?.includes("'"+name+"'"))n.classList.add('active');});
+  document.getElementById('topbar-page').textContent=pages[name]||name;
+}
+
+function toast(msg,type='info'){
+  const c=document.getElementById('toast-container');
+  const t=document.createElement('div');
+  t.className='toast '+(type==='ok'?'ok':type==='err'?'err':type==='warn'?'warn':'');
+  const i={ok:'✅',err:'❌',warn:'⚠️',info:'ℹ️'};
+  t.innerHTML=`<span>${i[type]||'ℹ️'}</span><span>${msg}</span>`;
+  c.appendChild(t);setTimeout(()=>t.remove(),3500);
+}
+
+function toggleStep(header){
+  const body=header.nextElementSibling;const chev=header.querySelector('.step-chevron');const isOpen=body.classList.contains('open');
+  document.querySelectorAll('.setup-step-body').forEach(b=>b.classList.remove('open'));
+  document.querySelectorAll('.step-chevron').forEach(c=>c.classList.remove('open'));
+  if(!isOpen){body.classList.add('open');chev.classList.add('open');}
+}
+
+function buildWaveform(){
+  const c=document.getElementById('waveform-canvas');if(!c)return;c.innerHTML='';
+  for(let i=0;i<90;i++){const b=document.createElement('div');b.className='wave-bar'+(i<11?' played':'');const h=Math.max(8,Math.abs(Math.sin(i*0.22)*Math.cos(i*0.08)*Math.sin(i*0.41+0.2))*60+8);b.style.height=h+'px';c.appendChild(b);}
+}
+buildWaveform();
+
+let playing=false,playPos=11,playInterval=null;
+function togglePlay(){
+  playing=!playing;const btn=document.getElementById('play-btn');
+  if(playing){btn.textContent='⏸ Pause';btn.className='btn btn-danger btn-sm';
+    playInterval=setInterval(()=>{playPos=Math.min(89,playPos+1);updatePlayhead();if(playPos>=89){playing=false;clearInterval(playInterval);btn.textContent='▶ Play';btn.className='btn btn-primary btn-sm';playPos=0;}},120);
+  }else{btn.textContent='▶ Play';btn.className='btn btn-primary btn-sm';clearInterval(playInterval);}
+}
+function updatePlayhead(){
+  document.querySelectorAll('.wave-bar').forEach((b,i)=>b.classList.toggle('played',i<=playPos));
+  const ph=document.getElementById('playhead');if(ph)ph.style.left=((playPos/90)*100)+'%';
+}
+
+function runHardwareSim(){toast('🔄 Running diagnostics...','info');setTimeout(()=>toast('✅ RTX 3060 · 12GB VRAM → MID_GPU tier assigned','ok'),1800);}
+function runDoctorSim(){toast('🩺 Running aidub doctor...','info');setTimeout(()=>toast('⚠ PYANNOTE_TOKEN, OPENROUTER_API_KEY not set','warn'),1000);setTimeout(()=>toast('✅ FFmpeg ✓ · Whisper ✓ · EdgeTTS ✓ · GPU ✓','ok'),2200);}
+
+function _startDemucsDownload(fillId,statusId,btnId){
+  const fill=document.getElementById(fillId);const status=document.getElementById(statusId);const btn=document.getElementById(btnId);
+  if(!fill||!status)return;if(btn){btn.disabled=true;btn.textContent='⬇ Installing...';}
+  let pct=0;fill.style.background='linear-gradient(90deg,var(--cyan),var(--blue))';toast('⬇ Installing Demucs...','info');
+  const iv=setInterval(()=>{pct+=Math.random()*7+2;if(pct>=100)pct=100;fill.style.width=pct+'%';status.textContent='Downloading htdemucs... '+Math.round(pct)+'%';
+    if(pct>=100){clearInterval(iv);status.textContent='✅ Demucs installed!';if(btn){btn.textContent='✓ Done';btn.className='btn btn-green btn-sm';}toast('✅ Demucs installed! Stem separation enabled.','ok');}
+  },200);
+}
+function startDemucsDownload(){_startDemucsDownload('demucs-fill','demucs-status','demucs-btn');}
+function startDemucsDownloadM(){_startDemucsDownload('demucs-fill-m','demucs-status-m',null);}
+
+function saveProvider(n){toast('✅ '+n+' credentials saved to .env','ok');}
+function savePyannoteToken(){const v=document.getElementById('pyannote-token-input').value;if(!v||!v.startsWith('hf_')){toast('❌ Invalid — must start with hf_','err');return;}toast('✅ PYANNOTE_TOKEN saved to .env','ok');}
+function saveHFToken(){const v=document.getElementById('hf-token-input').value;if(!v||!v.startsWith('hf_')){toast('❌ Invalid — must start with hf_','err');return;}toast('✅ HUGGINGFACE_TOKEN saved to .env','ok');}
+
+const API_BASE = window.AIDUB_API_BASE || 'http://127.0.0.1:8765';
+async function startDubJob(){
+  document.getElementById('dub-modal').classList.remove('open');
+  toast('Launching pipeline via bridge...', 'ok');
+  try {
+    const res = await fetch(API_BASE + '/api/doctor');
+    const data = await res.json();
+    toast('Bridge connected: ' + (data.checks ? data.checks.length + ' checks' : 'OK'), 'ok');
+  } catch(e) {
+    toast('Bridge not reachable. Start: python -m aidub.ui.demo_bridge', 'err');
+  }
+  return;
+
+  document.getElementById('dub-modal').classList.remove('open');
+  toast('🚀 Pipeline: Probe → Transcribe → Translate → TTS → Mix → Mux','ok');
+  setTimeout(()=>toast('🎙 Stage 1/6: FFprobe media scan...','info'),800);
+  setTimeout(()=>toast('🎤 Stage 2/6: Whisper transcription...','info'),2200);
+  setTimeout(()=>toast('🌐 Stage 3/6: Translation via OpenRouter...','info'),4000);
+  setTimeout(()=>toast('⚠ Paused — OPENROUTER_API_KEY not set. Go to AI Providers.','err'),5500);
+}
+function clearLogs(){document.getElementById('log-output').innerHTML='<div style="color:var(--text-lo);font-style:italic;">Log cleared.</div>';toast('🗑 Logs cleared','info');}
+
+const statusCycle=['Ready','Analyzing Hardware...','Ready','Whisper loaded','Ready'];let statusIdx=0;
+setInterval(()=>{statusIdx=(statusIdx+1)%statusCycle.length;const el=document.getElementById('status-text');const dot=document.getElementById('status-dot');if(el)el.textContent=statusCycle[statusIdx];if(dot)dot.className='status-dot'+(statusCycle[statusIdx].includes('...')?' warn':'');},4000);
+
+setInterval(()=>{const log=document.getElementById('log-output');if(!log)return;if(Math.random()>0.65){const now=new Date().toTimeString().slice(0,8);const msgs=[`<span style="color:var(--text-lo);">${now}</span> <span style="color:var(--cyan);">[INFO]</span> worker heartbeat OK`,`<span style="color:var(--text-lo);">${now}</span> <span style="color:var(--yellow);">[WARN]</span> Gemini key pool rate limit approaching`,`<span style="color:var(--text-lo);">${now}</span> <span style="color:var(--cyan);">[INFO]</span> Frame rendered in ${Math.floor(Math.random()*20+5)}ms`];const div=document.createElement('div');div.innerHTML=msgs[Math.floor(Math.random()*msgs.length)];log.appendChild(div);log.scrollTop=log.scrollHeight;}},3000);
+</script>
+</body>
+</html>

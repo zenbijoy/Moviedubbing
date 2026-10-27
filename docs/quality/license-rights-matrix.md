@@ -37,6 +37,9 @@ source-separation, or lip-sync production route in this matrix.
 | MuseTalk-class route | Fast lip-sync preview | UNVERIFIED | Exact code/weights, training-data rights, likeness/biometric scope, watermark/provenance and commercial terms unresolved | Exact package/weight evidence, consent scope, visual safety/QC, provenance and per-territory review | Vision + Legal/Privacy |
 | LatentSync-class route | Final lip-sync candidate | UNVERIFIED | Same visual/likeness and supply-chain evidence unresolved | Exact package/weight evidence plus final-render quality and fallback review | Vision + Legal/Privacy |
 | C2PA implementation/tooling | Generated-media provenance | UNVERIFIED | Implementation, container support, signing key custody and interoperability not selected | Exact SDK/tooling license, signing/key design, compatibility results and disclosure policy | Security + Export |
+| Inter Font Family | UI Typography (OFL 1.1) | APPROVED | Free open-source redistribution with UI | Bundled in resources/fonts/ | Desktop UI |
+| Noto Sans Bengali | Bengali Typography (OFL 1.1) | APPROVED | Free open-source redistribution with UI, full conjunct rendering | Bundled in resources/fonts/ | Desktop UI |
+| Lucide Iconography | Crisp 16/20px vector icons (ISC) | APPROVED | Free open-source permissive license with UI | Bundled in resources/icons/ | Desktop UI |
 
 Candidate family names describe evaluation targets only. Approval never transfers from one fork,
 package version, model card, checkpoint, quantization, fine-tune, or provider SKU to another.

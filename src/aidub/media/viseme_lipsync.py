@@ -18,19 +18,15 @@ from __future__ import annotations
 import logging
 import math
 import shutil
-import subprocess
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import soundfile as sf
 from PIL import Image
 from scipy.ndimage import gaussian_filter
 
-from aidub.contracts.base import ContractModel, Identifier
-from aidub.media.ffmpeg_ops import _ffmpeg_exe, _run, duration, probe
+from aidub.media.ffmpeg_ops import _ffmpeg_exe, _run, probe
 
 logger = logging.getLogger(__name__)
 
@@ -99,13 +95,14 @@ class VisemeLipSyncEngine:
 
         # Normalize envelope to [0.0, 1.0] with noise-floor gating
         max_val = np.percentile(envelope, 95) if len(envelope) > 0 else 0.1
-        if max_val < 1e-4:
-            max_val = 1e-4
+        max_val = max(max_val, 1e-4)
 
         norm_env = np.clip(envelope / max_val, 0.0, 1.0)
         # Apply noise floor gating (speech below 8% is silence / closed mouth)
         noise_gate = 0.08
-        norm_env = np.where(norm_env < noise_gate, 0.0, (norm_env - noise_gate) / (1.0 - noise_gate))
+        norm_env = np.where(
+            norm_env < noise_gate, 0.0, (norm_env - noise_gate) / (1.0 - noise_gate)
+        )
 
         # Temporal smoothing to prevent erratic frame jitter
         smoothed = np.zeros_like(norm_env)
@@ -184,7 +181,7 @@ class VisemeLipSyncEngine:
         if shift_px == 0:
             return frame_rgb
 
-        h, w = frame_rgb.shape[:2]
+        _h, _w = frame_rgb.shape[:2]
         out_frame = frame_rgb.copy()
 
         # Extract mouth patch
@@ -272,16 +269,15 @@ class VisemeLipSyncEngine:
             r_fps = v_stream.get("r_frame_rate", "24/1")
             try:
                 from fractions import Fraction
+
                 frac = Fraction(r_fps)
                 if float(frac) > 0:
                     fps = float(frac)
             except Exception:
                 fps = 24.0
         format_info = info.get("format", {})
-        try:
-            dur_s = float(format_info.get("duration") or duration(tgt_a))
-        except Exception:
-            dur_s = duration(tgt_a)
+        shot_dur = float(format_info.get("duration") or 0.0)
+        logger.debug("viseme_lipsync: processing shot (duration ~ %.2fs)", shot_dur)
 
         # Temporary workspace for frame extraction
         shot_work = Path(work_dir) / f"viseme_{out_v.stem}"
@@ -312,7 +308,9 @@ class VisemeLipSyncEngine:
             frame_files = sorted(frames_dir.glob("frame_*.png"))
             num_frames = len(frame_files)
             if num_frames == 0:
-                logger.warning("No frames extracted for shot %s; falling back to source", out_v.name)
+                logger.warning(
+                    "No frames extracted for shot %s; falling back to source", out_v.name
+                )
                 shutil.copy2(src_v, out_v)
                 return out_v
 
@@ -320,7 +318,9 @@ class VisemeLipSyncEngine:
             envelope = self._extract_audio_envelope(tgt_a, fps, num_frames)
 
             # 3. Detect mouth ROI on representative frame
-            sample_img = Image.open(frame_files[min(num_frames // 2, num_frames - 1)]).convert("RGB")
+            sample_img = Image.open(frame_files[min(num_frames // 2, num_frames - 1)]).convert(
+                "RGB"
+            )
             sample_np = np.array(sample_img)
             roi = self._locate_mouth_roi(sample_np)
             feather_mask = self._create_feather_mask(roi.w, roi.h)
@@ -379,12 +379,13 @@ class VisemeLipSyncEngine:
             _run(reencode_cmd)
 
             if out_v.is_file() and out_v.stat().st_size > 0:
-                logger.info("viseme_lipsync: successfully rendered lip-synced shot -> %s", out_v.name)
+                logger.info(
+                    "viseme_lipsync: successfully rendered lip-synced shot -> %s", out_v.name
+                )
                 return out_v
-            else:
-                logger.warning("viseme_lipsync: output video empty; falling back to source")
-                shutil.copy2(src_v, out_v)
-                return out_v
+            logger.warning("viseme_lipsync: output video empty; falling back to source")
+            shutil.copy2(src_v, out_v)
+            return out_v
 
         finally:
             shutil.rmtree(shot_work, ignore_errors=True)

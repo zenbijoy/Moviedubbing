@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 
 # Force offscreen rendering for headless capture
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFont, QPainter, QPixmap
+from PySide6.QtGui import QColor, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication
 
 from aidub.ui.dub_dialog import DubbingErrorDialog
@@ -41,8 +40,12 @@ def capture_all() -> None:
     # 2. Running state
     print("Capturing running.png...", flush=True)
     window.update_dub_progress("ASR", 35, "Transcribing dialogue with Whisper (Large-v3)...")
-    window.studio.ai_overlay.set_progress("[ASR] Transcribing dialogue with Whisper (Large-v3)...", 35)
-    window.studio._show_status("Stage: ASR (35%) · Transcribing dialogue with Whisper (Large-v3)...")
+    window.studio.ai_overlay.set_progress(
+        "[ASR] Transcribing dialogue with Whisper (Large-v3)...", 35
+    )
+    window.studio._show_status(
+        "Stage: ASR (35%) · Transcribing dialogue with Whisper (Large-v3)..."
+    )
     app.processEvents()
 
     pix_running = window.grab()

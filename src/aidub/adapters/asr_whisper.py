@@ -290,7 +290,9 @@ class FasterWhisperAdapter(SpeechRecognizer):
                 raw_segments = list(segments)
             except Exception as exc2:
                 if fallback_model != "base":
-                    logger.warning("Retry with %s failed (%s); falling back to base", fallback_model, exc2)
+                    logger.warning(
+                        "Retry with %s failed (%s); falling back to base", fallback_model, exc2
+                    )
                     self._model_instance = faster_whisper.WhisperModel(
                         "base",
                         device="cpu",

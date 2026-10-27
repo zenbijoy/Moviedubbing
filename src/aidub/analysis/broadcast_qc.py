@@ -99,7 +99,9 @@ class BroadcastQCCertificate:
 
     def to_formatted_certificate(self) -> str:
         """Generate human-readable studio compliance certificate."""
-        status_badge = "★ PASSED - BROADCAST CERTIFIED" if self.passed else "✖ FAILED - REMEDIATION REQUIRED"
+        status_badge = (
+            "★ PASSED - BROADCAST CERTIFIED" if self.passed else "✖ FAILED - REMEDIATION REQUIRED"
+        )
         lines = [
             "=" * 70,
             "          AIDUB STUDIO BROADCAST DELIVERY QC CERTIFICATE",
@@ -135,7 +137,9 @@ class BroadcastQCEngine:
     """
 
     @classmethod
-    def get_k_weighting_filters(cls, fs: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def get_k_weighting_filters(
+        cls, fs: int
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         Compute biquad filter coefficients for ITU-R BS.1770-4 K-weighting at arbitrary sample rates.
 
@@ -149,12 +153,18 @@ class BroadcastQCEngine:
 
         a_gain = pow(10.0, gain_db / 40.0)
         w0_s = 2.0 * math.pi * f0_shelf / fs
-        alpha_s = math.sin(w0_s) / 2.0 * math.sqrt((a_gain + 1.0 / a_gain) * (1.0 / q_shelf - 1.0) + 2.0)
+        alpha_s = (
+            math.sin(w0_s) / 2.0 * math.sqrt((a_gain + 1.0 / a_gain) * (1.0 / q_shelf - 1.0) + 2.0)
+        )
         cos_w0_s = math.cos(w0_s)
 
-        b0_s = a_gain * ((a_gain + 1.0) + (a_gain - 1.0) * cos_w0_s + 2.0 * math.sqrt(a_gain) * alpha_s)
+        b0_s = a_gain * (
+            (a_gain + 1.0) + (a_gain - 1.0) * cos_w0_s + 2.0 * math.sqrt(a_gain) * alpha_s
+        )
         b1_s = -2.0 * a_gain * ((a_gain - 1.0) + (a_gain + 1.0) * cos_w0_s)
-        b2_s = a_gain * ((a_gain + 1.0) + (a_gain - 1.0) * cos_w0_s - 2.0 * math.sqrt(a_gain) * alpha_s)
+        b2_s = a_gain * (
+            (a_gain + 1.0) + (a_gain - 1.0) * cos_w0_s - 2.0 * math.sqrt(a_gain) * alpha_s
+        )
         a0_s = (a_gain + 1.0) - (a_gain - 1.0) * cos_w0_s + 2.0 * math.sqrt(a_gain) * alpha_s
         a1_s = 2.0 * ((a_gain - 1.0) - (a_gain + 1.0) * cos_w0_s)
         a2_s = (a_gain + 1.0) - (a_gain - 1.0) * cos_w0_s - 2.0 * math.sqrt(a_gain) * alpha_s
@@ -198,7 +208,9 @@ class BroadcastQCEngine:
         return filtered
 
     @classmethod
-    def compute_true_peak(cls, samples: np.ndarray, oversample_factor: int = 4) -> tuple[float, float]:
+    def compute_true_peak(
+        cls, samples: np.ndarray, oversample_factor: int = 4
+    ) -> tuple[float, float]:
         """
         Compute Sample Peak (dBFS) and True-Peak (dBTP) using 4x polyphase sinc interpolation.
         Catches inter-sample peaks that standard peak meters miss.
@@ -240,9 +252,9 @@ class BroadcastQCEngine:
         # Channel gains according to ITU-R BS.1770-4 (Left, Right, Center = 1.0; LFE = 0.0; Surrounds = 1.41)
         channel_weights = np.ones(channels, dtype=np.float32)
         if channels >= 6:
-            channel_weights[3] = 0.0      # LFE
-            channel_weights[4] = 1.4125   # Ls
-            channel_weights[5] = 1.4125   # Rs
+            channel_weights[3] = 0.0  # LFE
+            channel_weights[4] = 1.4125  # Ls
+            channel_weights[5] = 1.4125  # Rs
 
         # 3. Gated Block Analysis (400ms rectangular window, 75% overlap = 100ms hop)
         block_len = int(0.400 * fs)
@@ -406,7 +418,9 @@ class BroadcastQCEngine:
                 f"(Exceeds maximum allowable {criteria.max_lra_lu:.1f} LU)."
             )
         if has_clipping:
-            actions.append("Digital 0 dBFS clipping detected! Re-render master stems with 32-bit float headroom.")
+            actions.append(
+                "Digital 0 dBFS clipping detected! Re-render master stems with 32-bit float headroom."
+            )
 
         return BroadcastQCCertificate(
             media_name=media_name,

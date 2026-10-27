@@ -35,7 +35,9 @@ def qapp() -> QApplication | None:
 
 def test_viseme_timeline_generation_bengali() -> None:
     text = "বন্ধু কথা বলতে আসছিল"
-    cues = LipSyncVisemeEngine.generate_viseme_timeline(text, start_time_s=1.0, duration_s=2.5, language="bn")
+    cues = LipSyncVisemeEngine.generate_viseme_timeline(
+        text, start_time_s=1.0, duration_s=2.5, language="bn"
+    )
 
     assert len(cues) >= 3
     # Check start and end boundaries
@@ -49,7 +51,9 @@ def test_viseme_timeline_generation_bengali() -> None:
 
 def test_viseme_timeline_generation_english() -> None:
     text = "Peter bought five apples"
-    cues = LipSyncVisemeEngine.generate_viseme_timeline(text, start_time_s=0.0, duration_s=2.0, language="en")
+    cues = LipSyncVisemeEngine.generate_viseme_timeline(
+        text, start_time_s=0.0, duration_s=2.0, language="en"
+    )
 
     assert len(cues) >= 3
     viseme_groups = {c.viseme for c in cues}
@@ -59,7 +63,9 @@ def test_viseme_timeline_generation_english() -> None:
 
 def test_lip_sync_compliance_itu_r_bt1359() -> None:
     text = "Synchronized dialogue test"
-    cues = LipSyncVisemeEngine.generate_viseme_timeline(text, start_time_s=0.0, duration_s=1.5, language="en")
+    cues = LipSyncVisemeEngine.generate_viseme_timeline(
+        text, start_time_s=0.0, duration_s=1.5, language="en"
+    )
 
     # 1. Perfect 0ms alignment
     rep_0 = LipSyncVisemeEngine.evaluate_lip_sync_compliance(cues, offset_ms=0.0)
@@ -87,7 +93,9 @@ def test_lip_sync_compliance_itu_r_bt1359() -> None:
 
 def test_interpolate_mouth_geometry() -> None:
     text = "Open mouth vowel test"
-    cues = LipSyncVisemeEngine.generate_viseme_timeline(text, start_time_s=0.0, duration_s=1.0, language="en")
+    cues = LipSyncVisemeEngine.generate_viseme_timeline(
+        text, start_time_s=0.0, duration_s=1.0, language="en"
+    )
 
     geom = LipSyncVisemeEngine.interpolate_mouth_geometry(cues, playhead_s=0.5)
     assert isinstance(geom, VisemeGeometry)

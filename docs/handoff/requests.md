@@ -15,7 +15,7 @@ This file records requests from the **ENGINE** agent for the **UI** and **QA** a
       output=out_path,
       tgt_lang=self.target_lang,
       keep_music=self.quality_profile != "fast",  # False for fast profile
-      diarize=self.quality_profile != "fast",     # False for fast profile
+      diarize=self.quality_profile != "fast",  # False for fast profile
       lipsync=self.lipsync,
       lipsync_tier=self.lipsync_tier,
       voice_name=self.voice_name,

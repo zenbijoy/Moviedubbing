@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
 import pytest
 
 from aidub.media.surround_mixer import SurroundSoundMixer
@@ -30,8 +31,10 @@ def test_surround_mixer_runs_ffmpeg_with_channel_mapping(tmp_path: Path):
         m.returncode = 0
         return m
 
-    with patch("aidub.media.surround_mixer._run", side_effect=fake_run), \
-         patch("aidub.media.surround_mixer.duration", return_value=12.5):
+    with (
+        patch("aidub.media.surround_mixer._run", side_effect=fake_run),
+        patch("aidub.media.surround_mixer.duration", return_value=12.5),
+    ):
         result = SurroundSoundMixer.mix_5point1(
             dialogue_wav=dia,
             background_music_wav=bg,
@@ -54,6 +57,7 @@ def test_real_5point1_mixing_mono_dialogue_stereo_music(tmp_path: Path):
     import math
     import struct
     import wave
+
     from aidub.media.ffmpeg_ops import probe
 
     # 1. Create real mono dialogue
@@ -88,4 +92,3 @@ def test_real_5point1_mixing_mono_dialogue_stereo_music(tmp_path: Path):
     info = probe(res)
     audio_stream = next(s for s in info["streams"] if s["codec_type"] == "audio")
     assert audio_stream["channels"] == 6
-

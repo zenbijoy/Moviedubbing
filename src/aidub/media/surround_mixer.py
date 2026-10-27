@@ -110,7 +110,9 @@ class SurroundSoundMixer:
             str(out),
         ]
         _run(cmd)
-        logger.info("5.1 Surround Sound master synthesized: %s (Duration=%.1fs)", out.name, duration(out))
+        logger.info(
+            "5.1 Surround Sound master synthesized: %s (Duration=%.1fs)", out.name, duration(out)
+        )
         return out
 
 

@@ -15,15 +15,21 @@ from aidub.media.ffmpeg_ops import _ffmpeg_exe, _run, probe
 
 def _create_test_clip(path: Path, duration_s: float = 1.0) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    _run([
-        _ffmpeg_exe(),
-        "-y",
-        "-f", "lavfi",
-        "-i", f"color=c=blue:s=320x240:d={duration_s}:r=24",
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        str(path),
-    ])
+    _run(
+        [
+            _ffmpeg_exe(),
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            f"color=c=blue:s=320x240:d={duration_s}:r=24",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            str(path),
+        ]
+    )
     return path
 
 
@@ -48,7 +54,9 @@ def test_dual_audio_master_export(tmp_path: Path) -> None:
 
     # Subtitle file
     sub_file = tmp_path / "subs.srt"
-    sub_file.write_text("1\n00:00:00,000 --> 00:00:01,000\nHello World\nহ্যালো বিশ্ব\n", encoding="utf-8")
+    sub_file.write_text(
+        "1\n00:00:00,000 --> 00:00:01,000\nHello World\nহ্যালো বিশ্ব\n", encoding="utf-8"
+    )
 
     out_mkv = tmp_path / "dual_master.mkv"
 

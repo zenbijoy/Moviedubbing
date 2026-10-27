@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,7 +12,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtMultimedia import QAudioDevice, QMediaDevices
 from PySide6.QtWidgets import QApplication
 
-from aidub.ui.dub_dialog import DubDialog, DubbingErrorDialog
+from aidub.ui.dub_dialog import DubbingErrorDialog, DubDialog
 from aidub.ui.screens.timeline_editor import TimelineScreen
 from aidub.ui.studio_window import AIDubStudioWindow
 

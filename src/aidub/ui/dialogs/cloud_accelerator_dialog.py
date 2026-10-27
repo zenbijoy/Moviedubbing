@@ -38,7 +38,6 @@ try:
         QFileDialog,
         QFrame,
         QGridLayout,
-        QGroupBox,
         QHBoxLayout,
         QLabel,
         QLineEdit,
@@ -79,6 +78,7 @@ if _QT:
 
         def run(self) -> None:
             try:
+
                 def _progress_cb(pct: int, msg: str) -> None:
                     self.progress_signal.emit(pct, msg)
 
@@ -176,16 +176,24 @@ if _QT:
             info_grid.setVerticalSpacing(6)
 
             m_name = Path(self.movie_path).name if self.movie_path else "Active Timeline Movie"
-            lang_label = "বাংলা (Bengali)" if self.target_language == "bn" else self.target_language.upper()
+            lang_label = (
+                "বাংলা (Bengali)" if self.target_language == "bn" else self.target_language.upper()
+            )
 
             info_grid.addWidget(QLabel("<span style='color:#64748B;'>Target Video:</span>"), 0, 0)
             info_grid.addWidget(QLabel(f"<b>{m_name}</b>"), 0, 1)
 
             info_grid.addWidget(QLabel("<span style='color:#64748B;'>Language:</span>"), 0, 2)
-            info_grid.addWidget(QLabel(f"<span style='color:#38BDF8;'><b>{lang_label}</b></span>"), 0, 3)
+            info_grid.addWidget(
+                QLabel(f"<span style='color:#38BDF8;'><b>{lang_label}</b></span>"), 0, 3
+            )
 
-            info_grid.addWidget(QLabel("<span style='color:#64748B;'>AI Voice Engine:</span>"), 1, 0)
-            info_grid.addWidget(QLabel(f"<b>{self.voice_engine.upper()} (Neural Voice Clone)</b>"), 1, 1)
+            info_grid.addWidget(
+                QLabel("<span style='color:#64748B;'>AI Voice Engine:</span>"), 1, 0
+            )
+            info_grid.addWidget(
+                QLabel(f"<b>{self.voice_engine.upper()} (Neural Voice Clone)</b>"), 1, 1
+            )
 
             lipsync_status = (
                 "<span style='color:#22C55E;'><b>Active (NVIDIA Cloud Accelerated)</b></span>"
@@ -219,12 +227,17 @@ if _QT:
             kt_lay.addWidget(k_intro)
 
             # Kaggle Credentials Group
-            saved = load_kaggle_credentials()
+            try:
+                saved = load_kaggle_credentials()
+            except Exception:
+                saved = None
             u_init = saved.username if saved else ""
             k_init = saved.key if saved else ""
 
             cred_card = QFrame(kaggle_tab)
-            cred_card.setStyleSheet("QFrame { background: #131A2B; border: 1px solid #1E293B; border-radius: 8px; padding: 10px; }")
+            cred_card.setStyleSheet(
+                "QFrame { background: #131A2B; border: 1px solid #1E293B; border-radius: 8px; padding: 10px; }"
+            )
             cc_lay = QVBoxLayout(cred_card)
             cc_lay.setSpacing(8)
 
@@ -301,7 +314,9 @@ if _QT:
                 "border-radius: 6px; padding: 7px 14px; font-size: 11px; font-weight: 600; }"
                 "QPushButton:hover { background: #0284C7; color: #FFF; border-color: #0EA5E9; }"
             )
-            open_k_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://www.kaggle.com/code")))
+            open_k_btn.clicked.connect(
+                lambda: QDesktopServices.openUrl(QUrl("https://www.kaggle.com/code"))
+            )
             k_sub_row.addWidget(open_k_btn)
             kt_lay.addLayout(k_sub_row)
 
@@ -327,7 +342,9 @@ if _QT:
 
             # 3-Step Guided Cards
             steps_card = QFrame(colab_tab)
-            steps_card.setStyleSheet("QFrame { background: #131A2B; border: 1px solid #1E293B; border-radius: 8px; padding: 12px; }")
+            steps_card.setStyleSheet(
+                "QFrame { background: #131A2B; border: 1px solid #1E293B; border-radius: 8px; padding: 12px; }"
+            )
             sc_lay = QVBoxLayout(steps_card)
             sc_lay.setSpacing(10)
 
@@ -336,9 +353,14 @@ if _QT:
             s1_badge = QLabel("1", steps_card)
             s1_badge.setFixedSize(22, 22)
             s1_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            s1_badge.setStyleSheet("background: #0284C7; color: #FFF; font-weight: 800; border-radius: 11px; font-size: 11px;")
+            s1_badge.setStyleSheet(
+                "background: #0284C7; color: #FFF; font-weight: 800; border-radius: 11px; font-size: 11px;"
+            )
             s1_row.addWidget(s1_badge)
-            s1_txt = QLabel("<b>Pack Project Input:</b> Creates a compressed package of your source media and cues.", steps_card)
+            s1_txt = QLabel(
+                "<b>Pack Project Input:</b> Creates a compressed package of your source media and cues.",
+                steps_card,
+            )
             s1_txt.setStyleSheet("font-size: 11px; color: #CBD5E1;")
             s1_row.addWidget(s1_txt, 1)
             self.colab_pack_btn = QPushButton("📦 Pack Input (.zip)", steps_card)
@@ -357,9 +379,14 @@ if _QT:
             s2_badge = QLabel("2", steps_card)
             s2_badge.setFixedSize(22, 22)
             s2_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            s2_badge.setStyleSheet("background: #D97706; color: #FFF; font-weight: 800; border-radius: 11px; font-size: 11px;")
+            s2_badge.setStyleSheet(
+                "background: #D97706; color: #FFF; font-weight: 800; border-radius: 11px; font-size: 11px;"
+            )
             s2_row.addWidget(s2_badge)
-            s2_txt = QLabel("<b>Export Colab Notebook:</b> Generates customized .ipynb script for Colab T4 runtime.", steps_card)
+            s2_txt = QLabel(
+                "<b>Export Colab Notebook:</b> Generates customized .ipynb script for Colab T4 runtime.",
+                steps_card,
+            )
             s2_txt.setStyleSheet("font-size: 11px; color: #CBD5E1;")
             s2_row.addWidget(s2_txt, 1)
             self.colab_btn = QPushButton("⚡ Export Notebook", steps_card)
@@ -378,7 +405,9 @@ if _QT:
                 "border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: 600; }"
                 "QPushButton:hover { color: #FFF; border-color: #64748B; }"
             )
-            open_colab_link.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://colab.research.google.com/")))
+            open_colab_link.clicked.connect(
+                lambda: QDesktopServices.openUrl(QUrl("https://colab.research.google.com/"))
+            )
             s2_row.addWidget(open_colab_link)
             sc_lay.addLayout(s2_row)
 
@@ -387,9 +416,14 @@ if _QT:
             s3_badge = QLabel("3", steps_card)
             s3_badge.setFixedSize(22, 22)
             s3_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            s3_badge.setStyleSheet("background: #059669; color: #FFF; font-weight: 800; border-radius: 11px; font-size: 11px;")
+            s3_badge.setStyleSheet(
+                "background: #059669; color: #FFF; font-weight: 800; border-radius: 11px; font-size: 11px;"
+            )
             s3_row.addWidget(s3_badge)
-            s3_txt = QLabel("<b>Import Deliverables:</b> Load finished video, stem audio & subtitles back into Timeline.", steps_card)
+            s3_txt = QLabel(
+                "<b>Import Deliverables:</b> Load finished video, stem audio & subtitles back into Timeline.",
+                steps_card,
+            )
             s3_txt.setStyleSheet("font-size: 11px; color: #CBD5E1;")
             s3_row.addWidget(s3_txt, 1)
             self.import_colab_btn = QPushButton("📥 1-Click Import", steps_card)
@@ -407,7 +441,9 @@ if _QT:
 
             # Webhook Bridge Card
             wb_card = QFrame(colab_tab)
-            wb_card.setStyleSheet("QFrame { background: #0E1524; border: 1px solid #1E293B; border-radius: 8px; padding: 10px; }")
+            wb_card.setStyleSheet(
+                "QFrame { background: #0E1524; border: 1px solid #1E293B; border-radius: 8px; padding: 10px; }"
+            )
             wb_lay = QHBoxLayout(wb_card)
             wb_lay.setSpacing(12)
 
@@ -421,7 +457,9 @@ if _QT:
             self.webhook_toggle_btn.clicked.connect(self._toggle_webhook_server)
             wb_lay.addWidget(self.webhook_toggle_btn)
 
-            self.webhook_status_lbl = QLabel("Bridge server: Inactive (enable for zero-click direct sync from Colab)", wb_card)
+            self.webhook_status_lbl = QLabel(
+                "Bridge server: Inactive (enable for zero-click direct sync from Colab)", wb_card
+            )
             self.webhook_status_lbl.setStyleSheet("font-size: 10px; color: #94A3B8;")
             self.webhook_status_lbl.setWordWrap(True)
             wb_lay.addWidget(self.webhook_status_lbl, 1)
@@ -446,7 +484,9 @@ if _QT:
             layout.addWidget(self.prog_bar)
 
             self.status_lbl = QLabel("", self)
-            self.status_lbl.setStyleSheet("font-size: 11px; color: #38BDF8; font-weight: 600; padding: 2px 4px;")
+            self.status_lbl.setStyleSheet(
+                "font-size: 11px; color: #38BDF8; font-weight: 600; padding: 2px 4px;"
+            )
             self.status_lbl.setVisible(False)
             layout.addWidget(self.status_lbl)
 
@@ -482,7 +522,9 @@ if _QT:
             user = self.u_edit.text().strip()
             key = self.k_edit.text().strip()
             if not user or not key:
-                QMessageBox.warning(self, "Invalid Credentials", "Please enter both Kaggle Username and API Key.")
+                QMessageBox.warning(
+                    self, "Invalid Credentials", "Please enter both Kaggle Username and API Key."
+                )
                 return
 
             save_kaggle_credentials(user, key)
@@ -528,14 +570,18 @@ if _QT:
             if not ok:
                 self.prog_bar.setVisible(False)
                 self.status_lbl.setVisible(False)
-                QMessageBox.critical(self, "Launch Failed", f"Could not push job to Kaggle API:\n{res}")
+                QMessageBox.critical(
+                    self, "Launch Failed", f"Could not push job to Kaggle API:\n{res}"
+                )
                 return
 
             # Start Auto-Sync Polling Worker
             w_dir = Path(self.movie_path).parent if self.movie_path else Path.cwd()
             self.push_btn.setEnabled(False)
             self.cancel_sync_btn.setVisible(True)
-            self.status_lbl.setText(f"✓ Job dispatched! Live Cloud URL: {res}\nPolling Kaggle GPU status...")
+            self.status_lbl.setText(
+                f"✓ Job dispatched! Live Cloud URL: {res}\nPolling Kaggle GPU status..."
+            )
 
             self._worker = _KaggleSyncWorker(client, slug, w_dir)
             self._worker.progress_signal.connect(self._on_sync_progress)
@@ -549,7 +595,9 @@ if _QT:
 
         def _on_sync_completed(self, res: CloudSyncResult) -> None:
             self.prog_bar.setValue(100)
-            self.status_lbl.setText(f"✓ Cloud Deliverables Synced ({res.total_files} files, {res.total_bytes / (1024*1024):.1f} MB)!")
+            self.status_lbl.setText(
+                f"✓ Cloud Deliverables Synced ({res.total_files} files, {res.total_bytes / (1024 * 1024):.1f} MB)!"
+            )
             self.push_btn.setEnabled(True)
             self.cancel_sync_btn.setVisible(False)
             self._sync_result = res
@@ -569,7 +617,9 @@ if _QT:
             self.push_btn.setEnabled(True)
             self.cancel_sync_btn.setVisible(False)
             self.status_lbl.setText(f"Cloud execution error: {err_msg}")
-            QMessageBox.critical(self, "Cloud Execution Error", f"Kaggle Cloud Job Failed:\n{err_msg}")
+            QMessageBox.critical(
+                self, "Cloud Execution Error", f"Kaggle Cloud Job Failed:\n{err_msg}"
+            )
 
         def _cancel_sync_worker(self) -> None:
             if self._worker:
@@ -593,7 +643,9 @@ if _QT:
                     "Upload this .zip directly to Google Drive or Colab file browser.",
                 )
             except Exception as exc:
-                QMessageBox.critical(self, "Packaging Error", f"Could not create input bundle:\n{exc}")
+                QMessageBox.critical(
+                    self, "Packaging Error", f"Could not create input bundle:\n{exc}"
+                )
 
         def _import_colab_output_bundle(self) -> None:
             chosen, _ = QFileDialog.getOpenFileName(
@@ -610,7 +662,11 @@ if _QT:
             if res.success:
                 self._on_sync_completed(res)
             else:
-                QMessageBox.critical(self, "Import Error", f"Could not import Colab deliverables:\n{res.error_message}")
+                QMessageBox.critical(
+                    self,
+                    "Import Error",
+                    f"Could not import Colab deliverables:\n{res.error_message}",
+                )
 
         def _toggle_webhook_server(self) -> None:
             if self._webhook_server and self._webhook_server.is_running:
@@ -639,10 +695,16 @@ if _QT:
                     f"Active: {url}\nToken: {token[:8]}... (Paste into Colab cell 6 for instant zero-click auto sync!)"
                 )
             else:
-                QMessageBox.warning(self, "Bridge Error", f"Could not start webhook server on port {DEFAULT_BRIDGE_PORT}.")
+                QMessageBox.warning(
+                    self,
+                    "Bridge Error",
+                    f"Could not start webhook server on port {DEFAULT_BRIDGE_PORT}.",
+                )
 
         def _generate_notebook(self) -> None:
-            default_name = f"dubbing_gpu_{Path(self.movie_path).stem if self.movie_path else 'movie'}.ipynb"
+            default_name = (
+                f"dubbing_gpu_{Path(self.movie_path).stem if self.movie_path else 'movie'}.ipynb"
+            )
             save_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save Kaggle Dubbing Notebook",
@@ -675,7 +737,9 @@ if _QT:
                 QMessageBox.critical(self, "Export Failed", f"Could not create notebook:\n{exc}")
 
         def _generate_colab_notebook(self) -> None:
-            default_name = f"colab_dubbing_{Path(self.movie_path).stem if self.movie_path else 'movie'}.ipynb"
+            default_name = (
+                f"colab_dubbing_{Path(self.movie_path).stem if self.movie_path else 'movie'}.ipynb"
+            )
             save_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save Google Colab Dubbing Notebook",
@@ -705,7 +769,9 @@ if _QT:
                 )
             except Exception as exc:
                 logger.exception("Failed exporting Colab notebook: %s", exc)
-                QMessageBox.critical(self, "Export Failed", f"Could not create Colab notebook:\n{exc}")
+                QMessageBox.critical(
+                    self, "Export Failed", f"Could not create Colab notebook:\n{exc}"
+                )
 
 
 __all__ = ["KaggleAcceleratorDialog"]

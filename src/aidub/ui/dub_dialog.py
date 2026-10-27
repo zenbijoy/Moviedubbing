@@ -124,9 +124,7 @@ if _QT:
             header.setStyleSheet("color: #4F8CFF;")
             layout.addWidget(header)
 
-            subtitle = QLabel(
-                "Select the localization language and dubbing quality profile.", self
-            )
+            subtitle = QLabel("Select the localization language and dubbing quality profile.", self)
             subtitle.setStyleSheet("color: #9CA3AF; font-size: 12px;")
             layout.addWidget(subtitle)
 
@@ -149,7 +147,8 @@ if _QT:
             prof_lay.setSpacing(10)
 
             self.quality_radio = QRadioButton(
-                "Quality Profile — Theatrical Master (Diarization, Stems, Multi-Voice)", profile_group
+                "Quality Profile — Theatrical Master (Diarization, Stems, Multi-Voice)",
+                profile_group,
             )
             self.fast_radio = QRadioButton(
                 "Fast Profile — Rapid Draft Preview (Single pass, High speed)", profile_group
@@ -176,7 +175,9 @@ if _QT:
             # Voice Generation Engine
             adv_lay.addWidget(QLabel("Voice Generation Engine:", advanced_group))
             self.voice_engine_combo = QComboBox(advanced_group)
-            self.voice_engine_combo.addItem("Studio Expressive (Gemini Flash AI - Human Emotion)", "gemini_tts")
+            self.voice_engine_combo.addItem(
+                "Studio Expressive (Gemini Flash AI - Human Emotion)", "gemini_tts"
+            )
             self.voice_engine_combo.addItem("Microsoft Edge Neural TTS (Standard Fast)", "edge_tts")
             adv_lay.addWidget(self.voice_engine_combo)
 
@@ -189,8 +190,12 @@ if _QT:
             adv_lay.addWidget(self.lipsync_chk)
 
             self.lipsync_tier_combo = QComboBox(advanced_group)
-            self.lipsync_tier_combo.addItem("Studio Viseme (Local Real-Time Mouth Sync)", "studio_viseme")
-            self.lipsync_tier_combo.addItem("LatentSync (Cinema Quality Diffusion)", "cinema_quality")
+            self.lipsync_tier_combo.addItem(
+                "Studio Viseme (Local Real-Time Mouth Sync)", "studio_viseme"
+            )
+            self.lipsync_tier_combo.addItem(
+                "LatentSync (Cinema Quality Diffusion)", "cinema_quality"
+            )
             self.lipsync_tier_combo.addItem("MuseTalk (Fast Neural Preview)", "preview_fast")
             adv_lay.addWidget(self.lipsync_tier_combo)
 
@@ -215,8 +220,12 @@ if _QT:
             adv_lay.addWidget(QLabel("Broadcast Delivery Spec (ITU-R BS.1770-4):", advanced_group))
             self.qc_combo = QComboBox(advanced_group)
             self.qc_combo.addItem("Netflix 5.1 Surround (-24 LUFS, TP <= -1.0 dBTP)", "netflix")
-            self.qc_combo.addItem("EBU R128 European Broadcast (-23 LUFS, TP <= -1.0 dBTP)", "ebu_r128")
-            self.qc_combo.addItem("YouTube / Web 4K UHD (-14 LUFS, High Dynamic Range)", "youtube_web")
+            self.qc_combo.addItem(
+                "EBU R128 European Broadcast (-23 LUFS, TP <= -1.0 dBTP)", "ebu_r128"
+            )
+            self.qc_combo.addItem(
+                "YouTube / Web 4K UHD (-14 LUFS, High Dynamic Range)", "youtube_web"
+            )
             self.qc_combo.addItem("Theatrical Master Archive (-27 LUFS)", "theatrical")
             adv_lay.addWidget(self.qc_combo)
 
@@ -323,7 +332,9 @@ if _QT:
             self.title_lbl = QLabel(title, self)
             self.title_lbl.setStyleSheet("font-size: 16px; font-weight: 800; color: #F43F5E;")
             self.msg_lbl = QLabel(
-                message or "A step in the dubbing pipeline requires attention or hardware calibration.", self
+                message
+                or "A step in the dubbing pipeline requires attention or hardware calibration.",
+                self,
             )
             self.msg_lbl.setWordWrap(True)
             self.msg_lbl.setStyleSheet("color: #94A3B8; font-size: 12px; margin-top: 2px;")

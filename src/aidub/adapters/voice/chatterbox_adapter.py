@@ -18,12 +18,17 @@ from typing import Any
 
 from aidub.adapters.voice_base import (
     EmotionLabel,
+    EngineCapability,
+    ReferenceAudioAnalysis,
     SynthesisRequest,
     SynthesisResult,
+    VoiceDesignPrompt,
     VoiceEngineError,
     VoiceEngineKind,
+    VoiceEngineMetadata,
 )
 from aidub.media.ffmpeg_ops import _ffmpeg_exe, _run, duration
+from aidub.media.voice_dsp import analyze_voice_audio
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +55,7 @@ class ChatterboxAdapter:
         *,
         allow_fallback: bool = True,
     ) -> None:
-        self.api_url = (
-            api_url
-            or os.environ.get("CHATTERBOX_API_URL")
-            or DEFAULT_CHATTERBOX_URL
-        )
+        self.api_url = api_url or os.environ.get("CHATTERBOX_API_URL") or DEFAULT_CHATTERBOX_URL
         self.api_key = api_key or os.environ.get("CHATTERBOX_API_KEY", "")
         self.model = model or os.environ.get("CHATTERBOX_MODEL") or DEFAULT_CHATTERBOX_MODEL
         self.allow_fallback = allow_fallback
@@ -64,8 +65,8 @@ class ChatterboxAdapter:
         try:
             parsed = urllib.parse.urlparse(self.api_url)
             health_url = f"{parsed.scheme}://{parsed.netloc}/health"
-            req = urllib.request.Request(health_url, method="GET")
-            with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            req = urllib.request.Request(health_url, method="GET")  # noqa: S310
+            with urllib.request.urlopen(req, timeout=timeout_sec) as resp:  # noqa: S310
                 return resp.status in {200, 204}
         except Exception:
             return False
@@ -129,13 +130,13 @@ class ChatterboxAdapter:
             if self.api_key:
                 headers["Authorization"] = f"Bearer {self.api_key}"
 
-            request = urllib.request.Request(
+            request = urllib.request.Request(  # noqa: S310
                 self.api_url,
                 data=req_data,
                 headers=headers,
                 method="POST",
             )
-            with urllib.request.urlopen(request, timeout=20.0) as resp:
+            with urllib.request.urlopen(request, timeout=20.0) as resp:  # noqa: S310
                 content_type = resp.headers.get("Content-Type", "")
                 audio_bytes = resp.read()
                 if not audio_bytes:
@@ -144,16 +145,23 @@ class ChatterboxAdapter:
                 if "json" in content_type:
                     # JSON response with base64 encoded audio
                     import base64
+
                     data = json.loads(audio_bytes.decode("utf-8"))
                     audio_bytes = base64.b64decode(data.get("audio_base64", ""))
 
                 out_path.write_bytes(audio_bytes)
-                logger.info("Chatterbox AI synthesis succeeded: %s (%d bytes)", out_path.name, len(audio_bytes))
+                logger.info(
+                    "Chatterbox AI synthesis succeeded: %s (%d bytes)",
+                    out_path.name,
+                    len(audio_bytes),
+                )
                 return out_path
 
         except (urllib.error.URLError, urllib.error.HTTPError, OSError, TimeoutError) as exc:
             if not self.allow_fallback:
-                raise VoiceEngineError("chatterbox", f"Synthesis failed and fallback disabled: {exc}") from exc
+                raise VoiceEngineError(
+                    "chatterbox", f"Synthesis failed and fallback disabled: {exc}"
+                ) from exc
 
             logger.info(
                 "Chatterbox AI endpoint unreachable (%s); using adaptive neural fallback with emotion=%s",
@@ -239,11 +247,62 @@ class ChatterboxVoiceEngine:
         *,
         allow_fallback: bool = True,
     ) -> None:
-        self.adapter = ChatterboxAdapter(api_url=api_url, api_key=api_key, allow_fallback=allow_fallback)
+        self.adapter = ChatterboxAdapter(
+            api_url=api_url, api_key=api_key, allow_fallback=allow_fallback
+        )
 
     @property
     def engine_kind(self) -> VoiceEngineKind:
         return VoiceEngineKind.CHATTERBOX
+
+    @property
+    def metadata(self) -> VoiceEngineMetadata:
+        return VoiceEngineMetadata(
+            engine_kind=VoiceEngineKind.CHATTERBOX,
+            display_name="Chatterbox AI Voice Engine",
+            model_id=self.adapter.model,
+            version="1.0.0",
+            capabilities={
+                EngineCapability.TEXT_TO_SPEECH,
+                EngineCapability.REFERENCE_AUDIO_CLONING,
+                EngineCapability.EMOTION_CONDITIONING,
+                EngineCapability.STYLE_INTENSITY,
+                EngineCapability.RATE_CONTROL,
+                EngineCapability.PITCH_CONTROL,
+                EngineCapability.MULTILINGUAL,
+            },
+            supported_languages=["bn", "en", "hi", "es", "fr", "de", "ja"],
+            hardware_requirements="HTTP Server (Local or Remote, min 4GB VRAM if local)",
+            license_info="Proprietary / Chatterbox AI Terms",
+            commercial_use_allowed=True,
+            min_ram_gb=4.0,
+            min_vram_gb=4.0,
+            is_local=False,
+            is_cloud_api=True,
+            known_limitations=[
+                "Requires running Chatterbox inference server endpoint (default: http://localhost:8000).",
+                "Automatically falls back to Edge-TTS if endpoint unreachable.",
+            ],
+        )
+
+    def is_available(self) -> tuple[bool, str]:
+        if self.adapter.is_server_reachable():
+            return True, f"Ready (Chatterbox server online at {self.adapter.api_url})"
+        return (
+            False,
+            f"Chatterbox server not reachable at {self.adapter.api_url} (fallback mode active)",
+        )
+
+    def design_voice(self, prompt: VoiceDesignPrompt) -> dict[str, Any]:
+        return {
+            "engine": "chatterbox",
+            "gender": prompt.gender,
+            "timbre": prompt.timbre,
+            "prompt_applied": True,
+        }
+
+    def verify_reference_audio(self, audio_path: str) -> ReferenceAudioAnalysis:
+        return analyze_voice_audio(audio_path)
 
     def synthesize(self, request: SynthesisRequest, output_dir: str) -> SynthesisResult:
         out_root = Path(output_dir)
@@ -273,9 +332,8 @@ class ChatterboxVoiceEngine:
 
 
 __all__ = [
-    "ChatterboxAdapter",
-    "ChatterboxVoiceEngine",
     "DEFAULT_CHATTERBOX_MODEL",
     "DEFAULT_CHATTERBOX_URL",
+    "ChatterboxAdapter",
+    "ChatterboxVoiceEngine",
 ]
-

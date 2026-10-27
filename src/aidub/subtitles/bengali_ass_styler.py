@@ -126,7 +126,9 @@ class BengaliAssStyler:
                 if raw_src and norm_tgt:
                     # In ASS, \\N creates a clean styled line break
                     stacked_text = f"{norm_tgt}\\N{{\\rEnglish_Source}}{raw_src}"
-                    events.append(f"Dialogue: 0,{st_ts},{en_ts},Bengali_Main,,0,0,0,,{stacked_text}")
+                    events.append(
+                        f"Dialogue: 0,{st_ts},{en_ts},Bengali_Main,,0,0,0,,{stacked_text}"
+                    )
                 elif norm_tgt:
                     events.append(f"Dialogue: 0,{st_ts},{en_ts},Bengali_Main,,0,0,0,,{norm_tgt}")
                 elif raw_src:
@@ -134,7 +136,9 @@ class BengaliAssStyler:
             elif style_preset == BengaliSubtitleStyle.BROADCAST_SDH:
                 speaker = str(seg.get("speaker", "")).strip()
                 spk_prefix = f"{{\\c&H80FFFF&}}{speaker}: {{\\rBengali_Main}}" if speaker else ""
-                events.append(f"Dialogue: 0,{st_ts},{en_ts},Bengali_Main,,0,0,0,,{spk_prefix}{norm_tgt}")
+                events.append(
+                    f"Dialogue: 0,{st_ts},{en_ts},Bengali_Main,,0,0,0,,{spk_prefix}{norm_tgt}"
+                )
 
         out_content = "\n".join(header + events) + "\n"
         out_p.write_text(out_content, encoding="utf-8-sig")

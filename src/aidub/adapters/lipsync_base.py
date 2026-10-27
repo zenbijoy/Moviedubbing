@@ -86,33 +86,14 @@ def run_configured_lipsync(
         raise FileNotFoundError(f"lip-sync source video does not exist: {source_video}")
     if not target_audio.is_file():
         raise FileNotFoundError(f"lip-sync target audio does not exist: {target_audio}")
+    opts = options or LipSyncOptions()
     command_template = os.environ.get(command_environment_variable, "").strip()
     if not command_template:
-        import logging
-        logging.getLogger(__name__).info(
-            "%s not configured; using native viseme speech-envelope lip synchronizer for %s",
-            command_environment_variable,
-            output_path.name,
+        raise RuntimeError(
+            f"{command_environment_variable} is not configured; set it to the installed "
+            "model command using {video}, {audio}, and {output} placeholders. "
+            "No lip-sync output was created."
         )
-        from aidub.media.viseme_lipsync import VisemeLipSyncEngine
-
-        viseme_engine = VisemeLipSyncEngine(
-            feather_margin_px=opts.feather_margin_px,
-        )
-        viseme_engine.synthesize_lip_sync(
-            source_video_path=source_video,
-            target_audio_path=target_audio,
-            output_video_path=output_path,
-            work_dir=output_path.parent,
-        )
-        metadata = probe(output_path)
-        format_duration = float(metadata.get("format", {}).get("duration") or 0.0)
-        fps_val = opts.fps
-        rendered_frames = max(1, round(format_duration * fps_val))
-        return rendered_frames, round(format_duration * 1_000)
-
-
-    opts = options or LipSyncOptions()
     format_vars = {
         "video": str(source_video.resolve()),
         "audio": str(target_audio.resolve()),

@@ -328,10 +328,11 @@ class CharacterVoiceToneCloningEngine:
             or os.getenv("RVC_ENDPOINT_URL")
             or os.getenv("AIDUB_RVC_COMMAND")
             or character.tone_profiles.get("rvc_model_path")
+            or os.getenv("AIDUB_RVC_MODEL_PATH")
         )
         if not has_active_rvc and not character.reference_audio_paths:
             raise CharacterVoiceCloningUnavailableError(
-                "Character voice cloning is unavailable: no consent-aware RVC or other voice-conversion "
+                "Character voice cloning is unavailable: no consent-aware RVC model (.pth) or index (.index) / "
                 "backend is configured. Use the studio's ordinary target-language TTS voice instead."
             )
 

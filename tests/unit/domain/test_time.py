@@ -1,7 +1,7 @@
 from fractions import Fraction
 
 import pytest
-from hypothesis import given
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from pydantic import ValidationError
 
@@ -159,6 +159,7 @@ def test_cross_rate_intersection_chooses_an_exact_common_clock() -> None:
     assert intersection.duration.seconds == 1
 
 
+@settings(suppress_health_check=[HealthCheck.too_slow])
 @given(
     start=st.integers(min_value=0, max_value=10**9),
     duration=st.integers(min_value=2, max_value=10**7),

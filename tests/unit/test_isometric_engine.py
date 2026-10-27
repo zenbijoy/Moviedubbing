@@ -4,8 +4,6 @@ Tests for Isometric Syllable-Constrained Translation & Dialogue Adaptation Engin
 
 from __future__ import annotations
 
-import pytest
-
 from aidub.translation.isometric_engine import (
     IsometricCandidate,
     IsometricReport,
@@ -49,8 +47,8 @@ def test_adapt_bengali_text_contraction() -> None:
 def test_optimize_dialogue_selects_best_candidate() -> None:
     candidates = [
         "খুব বেশি পরিমাণে কথা বলতে থাকা ঠিক হবে না",  # Very long (~15 syllables)
-        "আমাদের যাওয়া উচিত",                         # Moderate (~7 syllables)
-        "যাব",                                       # Very short (2 syllables)
+        "আমাদের যাওয়া উচিত",  # Moderate (~7 syllables)
+        "যাব",  # Very short (2 syllables)
     ]
 
     report = IsometricTranslationEngine.optimize_dialogue(
@@ -65,5 +63,7 @@ def test_optimize_dialogue_selects_best_candidate() -> None:
     assert report.ideal_syllable_budget > 0
     assert len(report.all_evaluated_candidates) >= 3
     # The best candidate should have the highest isometric score
-    assert report.best_candidate.isometric_score >= report.all_evaluated_candidates[-1].isometric_score
+    assert (
+        report.best_candidate.isometric_score >= report.all_evaluated_candidates[-1].isometric_score
+    )
     assert report.best_candidate.text in [c.text for c in report.all_evaluated_candidates]

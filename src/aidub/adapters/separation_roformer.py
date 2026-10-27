@@ -11,9 +11,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import shutil
-import sys
 from pathlib import Path
-from typing import Any, Self
+from typing import Self
 
 from pydantic import Field, model_validator
 

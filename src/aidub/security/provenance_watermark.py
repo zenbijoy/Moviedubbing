@@ -106,7 +106,9 @@ class AIProvenanceWatermarker:
             return samples
 
         # Deterministic pseudorandom noise sequence based on secret key
-        rng = np.random.RandomState(int(hashlib.sha256(self._secret_key.encode()).hexdigest()[:8], 16))
+        rng = np.random.RandomState(
+            int(hashlib.sha256(self._secret_key.encode()).hexdigest()[:8], 16)
+        )
         pn_sequence = rng.choice([-1.0, 1.0], size=frame_len).astype(np.float32)
 
         # Mid-frequency band (e.g. indices 50 to 250 in 1024-point DCT)
@@ -130,9 +132,7 @@ class AIProvenanceWatermarker:
 
         return out
 
-    def verify_watermark_signal(
-        self, samples: np.ndarray, expected_provenance_id: str
-    ) -> bool:
+    def verify_watermark_signal(self, samples: np.ndarray, expected_provenance_id: str) -> bool:
         """
         Extract and verify watermark presence in audio samples via correlation analysis.
         """
@@ -150,7 +150,9 @@ class AIProvenanceWatermarker:
         if num_frames < len(bits):
             return False
 
-        rng = np.random.RandomState(int(hashlib.sha256(self._secret_key.encode()).hexdigest()[:8], 16))
+        rng = np.random.RandomState(
+            int(hashlib.sha256(self._secret_key.encode()).hexdigest()[:8], 16)
+        )
         pn_sequence = rng.choice([-1.0, 1.0], size=frame_len).astype(np.float32)
 
         band_start = 50

@@ -4,11 +4,7 @@ Unit tests for Real C2PA Content Credentials Signing and DCT Audio Watermarking.
 
 from __future__ import annotations
 
-import io
-import wave
-
 import numpy as np
-import pytest
 
 from aidub.security.c2pa_manifest import C2PAManifest, C2PAManifestBuilder
 from aidub.security.provenance_watermark import AIProvenanceWatermarker
@@ -42,7 +38,7 @@ def test_c2pa_manifest_signing_and_verification() -> None:
 
 
 def test_signal_domain_audio_watermarking_and_extraction() -> None:
-    watermarker = AIProvenanceWatermarker(configured=True, secret_key="watermark_master_seed")
+    watermarker = AIProvenanceWatermarker(configured=True, secret_key="watermark_master_seed")  # noqa: S106
 
     # Generate 5 seconds of 48kHz audio (240,000 samples)
     fs = 48000

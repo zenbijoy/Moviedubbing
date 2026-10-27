@@ -6,8 +6,6 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
-import pytest
-
 from aidub.contracts.base import Identifier
 from aidub.interchange.edl_fcpxml_adapter import EDLFCPXMLAdapter, SMPTETimecode
 from aidub.interchange.otio_adapter import OTIOClip, OTIOTimeline, OTIOTrack
@@ -85,7 +83,7 @@ def test_fcpxml_1_10_export_structure() -> None:
     fcpxml_str = adapter.export_fcpxml(timeline)
 
     # Validate that it is well-formed XML
-    root = ET.fromstring(fcpxml_str)
+    root = ET.fromstring(fcpxml_str)  # noqa: S314
     assert root.tag == "fcpxml"
     assert root.attrib.get("version") == "1.10"
 

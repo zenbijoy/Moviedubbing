@@ -5,9 +5,6 @@ Tests for Two-Stage Synthesis with Character RVC v2 Voice Conversion in DubbingE
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
 
 from aidub.pipeline.config import PipelineConfig
 from aidub.pipeline.engine import DubbingEngine
@@ -37,6 +34,7 @@ def test_rvc_conversion_invoked_during_tts_stage(tmp_path: Path) -> None:
         rvc_cloning=True,
     )
     engine = DubbingEngine(cfg)
+    assert engine is not None
 
     # Verify RvcVoiceConversionAdapter integration works as expected
     from aidub.ai.voice.rvc_cloning_engine import RvcVoiceConversionAdapter
@@ -44,4 +42,3 @@ def test_rvc_conversion_invoked_during_tts_stage(tmp_path: Path) -> None:
     adapter = RvcVoiceConversionAdapter()
     assert adapter is not None
     assert hasattr(adapter, "convert_timbre")
-

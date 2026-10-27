@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from pydantic import ValidationError
@@ -53,8 +53,20 @@ def test_roformer_separate_fallback_execution(tmp_path: Path) -> None:
 
     # Mock DemucsSeparationAdapter to return a valid result
     mock_stems = (
-        SeparatedStem(stem_kind=StemKind.DIALOGUE, stem_path=str(tmp_path / "vocals.wav"), sample_rate=44100, channels=2, sample_count=44100),
-        SeparatedStem(stem_kind=StemKind.MUSIC, stem_path=str(tmp_path / "music.wav"), sample_rate=44100, channels=2, sample_count=44100),
+        SeparatedStem(
+            stem_kind=StemKind.DIALOGUE,
+            stem_path=str(tmp_path / "vocals.wav"),
+            sample_rate=44100,
+            channels=2,
+            sample_count=44100,
+        ),
+        SeparatedStem(
+            stem_kind=StemKind.MUSIC,
+            stem_path=str(tmp_path / "music.wav"),
+            sample_rate=44100,
+            channels=2,
+            sample_count=44100,
+        ),
     )
     mock_res = SourceSeparationResult(
         engine=SpeechEngineIdentity(
@@ -68,7 +80,9 @@ def test_roformer_separate_fallback_execution(tmp_path: Path) -> None:
         me_preserved=True,
     )
 
-    with patch("aidub.adapters.separation_demucs.DemucsSeparationAdapter.separate", return_value=mock_res):
+    with patch(
+        "aidub.adapters.separation_demucs.DemucsSeparationAdapter.separate", return_value=mock_res
+    ):
         res = adapter.separate(str(fake_source), str(tmp_path / "out"))
 
     assert res.me_preserved is True

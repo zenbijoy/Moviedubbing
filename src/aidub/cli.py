@@ -15,7 +15,6 @@ from pydantic import ValidationError
 
 from aidub import __version__
 from aidub.application import OpenedProject, ProjectPackageError, ProjectPackageService
-from aidub.pipeline.errors import PipelineError, exit_code_for_error
 from aidub.diagnostics import (
     DubbingDiagnosticReport,
     SystemDiagnosticReport,
@@ -44,6 +43,7 @@ from aidub.media import (
     full_fingerprint,
 )
 from aidub.media.commands import DerivativeSpec
+from aidub.pipeline.errors import PipelineError, exit_code_for_error
 
 EXIT_OK = 0
 EXIT_FAILURE = 1
@@ -562,11 +562,14 @@ def _handle_kaggle(
 
     if getattr(arguments, "run", False) or getattr(arguments, "input", None):
         import re
+
         from aidub.cloud.cloud_sync_bridge import CloudSyncEngine
 
         client = KaggleClient()
         if not client.is_configured:
-            stdout.write("Error: Kaggle credentials not configured. Please set KAGGLE_USERNAME and KAGGLE_KEY in environment or ~/.kaggle/kaggle.json\n")
+            stdout.write(
+                "Error: Kaggle credentials not configured. Please set KAGGLE_USERNAME and KAGGLE_KEY in environment or ~/.kaggle/kaggle.json\n"
+            )
             return EXIT_FAILURE
 
         inp_video = getattr(arguments, "input", None)
@@ -581,7 +584,9 @@ def _handle_kaggle(
             voice_engine=v_eng,
             enable_lipsync=True,
         )
-        stdout.write(f"⚡ Pushing autonomous movie dubbing notebook to Kaggle GPU (@{client.creds.username}/{slug})...\n")
+        stdout.write(
+            f"⚡ Pushing autonomous movie dubbing notebook to Kaggle GPU (@{client.creds.username}/{slug})...\n"
+        )
         ok, res_url = client.push_kernel(
             kernel_slug=slug,
             title=title,
@@ -680,7 +685,7 @@ def _handle_export_master(
     stdout: TextIO = sys.stdout,
     stderr: TextIO = sys.stderr,
 ) -> int:
-    del dependencies, stderr
+    del dependencies
     from aidub.media.broadcast_exporter import BroadcastMasterExporter
 
     preset_val = getattr(arguments, "preset", "youtube_4k")
@@ -882,19 +887,45 @@ def build_parser() -> argparse.ArgumentParser:
     gui.set_defaults(handler=_handle_gui)
 
     kaggle = commands.add_parser("kaggle", help="Kaggle free Cloud GPU accelerator tools")
-    kaggle.add_argument("--export-notebook", type=Path, help="export a ready-to-run Kaggle GPU dubbing notebook (.ipynb)")
-    kaggle.add_argument("--check", action="store_true", help="verify Kaggle API credentials and connectivity")
-    kaggle.add_argument("--target-lang", default="bn", help="target language for dubbing notebook (default: bn)")
-    kaggle.add_argument("--voice-engine", default="chatterbox", help="voice engine for notebook (default: chatterbox)")
-    kaggle.add_argument("--run", action="store_true", help="push and run dubbing kernel on Kaggle GPU and sync output")
-    kaggle.add_argument("--input", "-i", type=Path, help="source movie video path for Kaggle GPU dubbing")
+    kaggle.add_argument(
+        "--export-notebook",
+        type=Path,
+        help="export a ready-to-run Kaggle GPU dubbing notebook (.ipynb)",
+    )
+    kaggle.add_argument(
+        "--check", action="store_true", help="verify Kaggle API credentials and connectivity"
+    )
+    kaggle.add_argument(
+        "--target-lang", default="bn", help="target language for dubbing notebook (default: bn)"
+    )
+    kaggle.add_argument(
+        "--voice-engine",
+        default="chatterbox",
+        help="voice engine for notebook (default: chatterbox)",
+    )
+    kaggle.add_argument(
+        "--run",
+        action="store_true",
+        help="push and run dubbing kernel on Kaggle GPU and sync output",
+    )
+    kaggle.add_argument(
+        "--input", "-i", type=Path, help="source movie video path for Kaggle GPU dubbing"
+    )
     kaggle.set_defaults(handler=_handle_kaggle)
 
-    retake_cmd = commands.add_parser("retake", help="ADR single-line dialogue re-synthesis and timeline retake")
-    retake_cmd.add_argument("--work-dir", type=Path, required=True, help="path to project work directory")
-    retake_cmd.add_argument("--index", type=int, required=True, help="0-indexed utterance number to replace")
+    retake_cmd = commands.add_parser(
+        "retake", help="ADR single-line dialogue re-synthesis and timeline retake"
+    )
+    retake_cmd.add_argument(
+        "--work-dir", type=Path, required=True, help="path to project work directory"
+    )
+    retake_cmd.add_argument(
+        "--index", type=int, required=True, help="0-indexed utterance number to replace"
+    )
     retake_cmd.add_argument("--text", type=str, required=True, help="new localized dialogue text")
-    retake_cmd.add_argument("--target-lang", default="bn", help="target language code (default: bn)")
+    retake_cmd.add_argument(
+        "--target-lang", default="bn", help="target language code (default: bn)"
+    )
     retake_cmd.add_argument("--voice-name", help="TTS voice override")
     retake_cmd.add_argument("--rate", type=int, default=0, help="rate offset percent (-50..+100)")
     retake_cmd.add_argument("--pitch", type=int, default=0, help="pitch offset Hz (-50..+50)")
@@ -902,11 +933,21 @@ def build_parser() -> argparse.ArgumentParser:
     retake_cmd.add_argument("--json", action="store_true", dest="output_json")
     retake_cmd.set_defaults(handler=_handle_retake)
 
-    export_cmd = commands.add_parser("export-master", help="broadcast and multi-audio deliverable exporter")
-    export_cmd.add_argument("--video", type=Path, required=True, help="input source or dubbed video file")
-    export_cmd.add_argument("--dubbed-audio", type=Path, required=True, help="master dubbed audio track")
-    export_cmd.add_argument("--orig-audio", type=Path, help="original production audio track (required for dual_audio)")
-    export_cmd.add_argument("--output", type=Path, required=True, help="destination deliverable (.mp4, .mkv)")
+    export_cmd = commands.add_parser(
+        "export-master", help="broadcast and multi-audio deliverable exporter"
+    )
+    export_cmd.add_argument(
+        "--video", type=Path, required=True, help="input source or dubbed video file"
+    )
+    export_cmd.add_argument(
+        "--dubbed-audio", type=Path, required=True, help="master dubbed audio track"
+    )
+    export_cmd.add_argument(
+        "--orig-audio", type=Path, help="original production audio track (required for dual_audio)"
+    )
+    export_cmd.add_argument(
+        "--output", type=Path, required=True, help="destination deliverable (.mp4, .mkv)"
+    )
     export_cmd.add_argument(
         "--preset",
         default="youtube_4k",
@@ -914,9 +955,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="mastering delivery profile",
     )
     export_cmd.add_argument("--subtitles", type=Path, help="SRT or VTT subtitle track to embed")
-    export_cmd.add_argument("--burn-subtitles", action="store_true", help="hardcode subtitles into video stream")
-    export_cmd.add_argument("--orig-lang", default="eng", help="ISO code for original audio track (default: eng)")
-    export_cmd.add_argument("--target-lang", default="ben", help="ISO code for dubbed audio track (default: ben)")
+    export_cmd.add_argument(
+        "--burn-subtitles", action="store_true", help="hardcode subtitles into video stream"
+    )
+    export_cmd.add_argument(
+        "--orig-lang", default="eng", help="ISO code for original audio track (default: eng)"
+    )
+    export_cmd.add_argument(
+        "--target-lang", default="ben", help="ISO code for dubbed audio track (default: ben)"
+    )
     export_cmd.set_defaults(handler=_handle_export_master)
     return parser
 

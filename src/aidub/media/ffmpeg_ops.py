@@ -17,11 +17,26 @@ def _ffmpeg_exe() -> str:
     Return the path to a working ffmpeg binary.
 
     Resolution order:
-      1. imageio-ffmpeg bundled binary (no PATH dependency, always works)
-      2. System PATH ffmpeg (fallback for CI / server environments)
+      1. AIDUB_FFMPEG_PATH environment variable (explicit override)
+      2. Bundled bin/ffmpeg.exe (relative to package install)
+      3. imageio-ffmpeg bundled binary (no PATH dependency, always works)
+      4. System PATH ffmpeg (fallback for CI / server environments)
 
-    Raises RuntimeError if neither is found.
+    Raises RuntimeError if none is found.
     """
+    import os
+
+    env_path = os.environ.get("AIDUB_FFMPEG_PATH", "").strip()
+    if env_path and Path(env_path).is_file():
+        return env_path
+
+    bundled = Path(__file__).resolve().parent.parent.parent.parent / "bin" / "ffmpeg.exe"
+    if bundled.is_file():
+        return str(bundled)
+    bundled_unix = Path(__file__).resolve().parent.parent.parent.parent / "bin" / "ffmpeg"
+    if bundled_unix.is_file():
+        return str(bundled_unix)
+
     try:
         import imageio_ffmpeg
 
@@ -30,13 +45,15 @@ def _ffmpeg_exe() -> str:
             return str(exe)
     except Exception:
         pass
-    # Fallback: system PATH
+
     sys_exe = shutil.which("ffmpeg")
     if sys_exe:
         return sys_exe
+
     raise RuntimeError(
-        "ffmpeg not found. Install imageio-ffmpeg (uv add imageio-ffmpeg) "
-        "or add ffmpeg to your system PATH (https://ffmpeg.org/download.html)."
+        "ffmpeg not found. Set AIDUB_FFMPEG_PATH, install imageio-ffmpeg "
+        "(uv add imageio-ffmpeg), or add ffmpeg to your system PATH "
+        "(https://ffmpeg.org/download.html)."
     )
 
 
@@ -44,10 +61,25 @@ def _ffprobe_exe() -> str | None:
     """
     Return the path to a working ffprobe binary, or None if unavailable.
 
-    imageio-ffmpeg only ships ffmpeg on Windows (not ffprobe), so this may
-    return None. Callers must fall back to ffmpeg-based probing in that case.
+    Resolution order:
+      1. AIDUB_FFPROBE_PATH environment variable (explicit override)
+      2. Bundled bin/ffprobe.exe (relative to package install)
+      3. imageio-ffmpeg binary directory (co-located ffprobe)
+      4. System PATH ffprobe
     """
-    # Check imageio-ffmpeg binary directory for a co-located ffprobe
+    import os
+
+    env_path = os.environ.get("AIDUB_FFPROBE_PATH", "").strip()
+    if env_path and Path(env_path).is_file():
+        return env_path
+
+    bundled = Path(__file__).resolve().parent.parent.parent.parent / "bin" / "ffprobe.exe"
+    if bundled.is_file():
+        return str(bundled)
+    bundled_unix = Path(__file__).resolve().parent.parent.parent.parent / "bin" / "ffprobe"
+    if bundled_unix.is_file():
+        return str(bundled_unix)
+
     try:
         import imageio_ffmpeg
 
@@ -57,7 +89,7 @@ def _ffprobe_exe() -> str | None:
                 return str(candidate)
     except Exception:
         pass
-    # System PATH ffprobe
+
     return shutil.which("ffprobe")
 
 
@@ -413,9 +445,7 @@ def dynamic_sidechain_mix(
         _run(cmd)
         return out_p
     except Exception as exc:
-        logger.warning(
-            "dynamic_sidechain_mix failed (%s); falling back to static mix.", exc
-        )
+        logger.warning("dynamic_sidechain_mix failed (%s); falling back to static mix.", exc)
         return mix(voice_path, music_path, out_path)
 
 

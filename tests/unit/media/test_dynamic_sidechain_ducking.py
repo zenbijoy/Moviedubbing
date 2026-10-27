@@ -12,7 +12,9 @@ import pytest
 from aidub.media.ffmpeg_ops import dynamic_sidechain_mix, probe
 
 
-def _generate_sine_wav(path: Path, duration_s: float = 2.0, freq: float = 440.0, volume: float = 0.5) -> Path:
+def _generate_sine_wav(
+    path: Path, duration_s: float = 2.0, freq: float = 440.0, volume: float = 0.5
+) -> Path:
     sr = 44100
     num_samples = int(duration_s * sr)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -52,7 +54,9 @@ def test_dynamic_sidechain_mix_creates_valid_output(tmp_path: Path) -> None:
     assert float(info["format"]["duration"]) >= 1.4
 
 
-def test_dynamic_sidechain_mix_fallback_on_invalid_filter(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_dynamic_sidechain_mix_fallback_on_invalid_filter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     voice = _generate_sine_wav(tmp_path / "voice.wav", duration_s=1.0)
     music = _generate_sine_wav(tmp_path / "music.wav", duration_s=1.0)
     out_wav = tmp_path / "fallback.wav"

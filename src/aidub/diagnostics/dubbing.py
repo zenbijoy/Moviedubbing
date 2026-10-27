@@ -137,7 +137,7 @@ def _check_faster_whisper() -> DubbingCheckResult:
 def _check_pyannote_token() -> DubbingCheckResult:
     """Check that a pyannote HuggingFace token is configured and pyannote.audio is installed."""
     pyannote_installed = _package_version("pyannote.audio") is not None
-    token = os.environ.get("PYANNOTE_TOKEN") or os.environ.get("HF_TOKEN")
+    token = os.environ.get("AIDUB_PYANNOTE_TOKEN") or os.environ.get("PYANNOTE_TOKEN") or os.environ.get("HF_TOKEN")
 
     if token and pyannote_installed:
         return DubbingCheckResult(
@@ -280,7 +280,9 @@ def _check_lipsync() -> DubbingCheckResult:
         detail="NOT CONFIGURED (AIDUB_MUSETALK_COMMAND or AIDUB_LATENTSYNC_COMMAND not set)",
         fix=(
             "Set AIDUB_MUSETALK_COMMAND or AIDUB_LATENTSYNC_COMMAND in .env "
-            "with {video}, {audio}, and {output} placeholders (e.g. 'python LatentSync/inference.py --video {video} --audio {audio} --output {output}')"
+            "with {video}, {audio}, and {output} placeholders."
+            " Clone MuseTalk: https://github.com/TMElyralab/MuseTalk; "
+            "Clone LatentSync: https://github.com/bytedance/LatentSync"
         ),
         optional=True,
     )

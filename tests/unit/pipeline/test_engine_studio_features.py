@@ -4,19 +4,13 @@ Unit tests for DubbingEngine integration with Isometric Alignment, RIR Reverb, B
 
 from __future__ import annotations
 
-import io
-import json
-import math
 import wave
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import numpy as np
-import pytest
 
 from aidub.pipeline.config import PipelineConfig
-from aidub.pipeline.engine import DubbingEngine
-from aidub.pipeline.manifest import PipelineManifest, PipelineOutputs
+from aidub.pipeline.manifest import PipelineOutputs
 
 
 def create_mock_wav(path: Path, duration_s: float = 2.0, fs: int = 48000) -> Path:
@@ -64,7 +58,7 @@ def test_dubbing_engine_qc_and_nle_generation(tmp_path: Path) -> None:
     in_video.touch()
     out_video = tmp_path / "movie_bn.mp4"
 
-    cfg = PipelineConfig(
+    _cfg = PipelineConfig(
         input=in_video,
         output=out_video,
         work_dir=work_dir,
@@ -80,16 +74,19 @@ def test_dubbing_engine_qc_and_nle_generation(tmp_path: Path) -> None:
 
     # Test Broadcast QC engine direct generation on final_audio
     from aidub.analysis.broadcast_qc import BroadcastQCEngine, DeliverySpec
+
     qc_metrics = BroadcastQCEngine.analyze_wav_file(final_audio)
-    qc_cert = BroadcastQCEngine.evaluate_compliance(qc_metrics, spec=DeliverySpec.NETFLIX, media_name=out_video.name)
+    qc_cert = BroadcastQCEngine.evaluate_compliance(
+        qc_metrics, spec=DeliverySpec.NETFLIX, media_name=out_video.name
+    )
 
     assert qc_cert.target_spec == DeliverySpec.NETFLIX
     assert isinstance(qc_cert.gain_correction_db, float)
 
     # Test NLE EDL & FCPXML generation on test dialogue segments
+    from aidub.contracts.base import Identifier
     from aidub.interchange.edl_fcpxml_adapter import EDLFCPXMLAdapter
     from aidub.interchange.otio_adapter import OTIOClip, OTIOTimeline, OTIOTrack
-    from aidub.contracts.base import Identifier
 
     clip = OTIOClip(
         clip_id=Identifier("c1"),
@@ -99,7 +96,9 @@ def test_dubbing_engine_qc_and_nle_generation(tmp_path: Path) -> None:
         media_reference_path=str(dub_vocals),
     )
     track = OTIOTrack(track_id=Identifier("t1"), kind="Audio", clips=[clip])
-    timeline = OTIOTimeline(timeline_id=Identifier("tl"), name="Test_Film", frame_rate=24.0, tracks=[track])
+    timeline = OTIOTimeline(
+        timeline_id=Identifier("tl"), name="Test_Film", frame_rate=24.0, tracks=[track]
+    )
 
     adapter = EDLFCPXMLAdapter()
     edl_out = adapter.export_cmx3600_edl(timeline)

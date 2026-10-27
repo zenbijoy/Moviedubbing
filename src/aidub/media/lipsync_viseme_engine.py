@@ -23,13 +23,13 @@ class VisemeGroup(enum.Enum):
     Standard Disney / MPEG-4 visual mouth shape groups (Visemes).
     """
 
-    SILENCE = "silence"            # Mouth resting, lips closed or slightly parted
-    BILABIAL = "bilabial"          # B, P, M (lips firmly closed together)
-    LABIODENTAL = "labiodental"    # F, V (upper incisors on lower lip)
-    DENTAL_ALVEOLAR = "dental"     # T, D, S, Z, N, L (teeth close, tongue to alveolar ridge)
-    VELAR_PALATAL = "velar"        # K, G, NG, SH, CH, J (mid/back tongue arching)
-    OPEN_VOWEL = "open_vowel"      # AA, AH, AY, AW (jaw open, maximum vertical aperture)
-    ROUNDED_VOWEL = "rounded_vowel"# OO, UW, OW, W (lips rounded, puckered aperture)
+    SILENCE = "silence"  # Mouth resting, lips closed or slightly parted
+    BILABIAL = "bilabial"  # B, P, M (lips firmly closed together)
+    LABIODENTAL = "labiodental"  # F, V (upper incisors on lower lip)
+    DENTAL_ALVEOLAR = "dental"  # T, D, S, Z, N, L (teeth close, tongue to alveolar ridge)
+    VELAR_PALATAL = "velar"  # K, G, NG, SH, CH, J (mid/back tongue arching)
+    OPEN_VOWEL = "open_vowel"  # AA, AH, AY, AW (jaw open, maximum vertical aperture)
+    ROUNDED_VOWEL = "rounded_vowel"  # OO, UW, OW, W (lips rounded, puckered aperture)
     SPREAD_VOWEL = "spread_vowel"  # EE, IH, EY (horizontal lip corner retraction)
 
 
@@ -37,22 +37,38 @@ class VisemeGroup(enum.Enum):
 class VisemeGeometry:
     """Normalized mouth geometric aperture coordinates (0.0 to 1.0)."""
 
-    openness: float    # 0.0 = completely shut, 1.0 = fully open jaw
-    width: float       # 0.0 = puckered / rounded, 1.0 = wide smile / spread
+    openness: float  # 0.0 = completely shut, 1.0 = fully open jaw
+    width: float  # 0.0 = puckered / rounded, 1.0 = wide smile / spread
     lip_protrusion: float  # 0.0 = flat, 1.0 = fully protruded puckered lips
-    teeth_visible: bool    # True if upper or lower dentition is exposed
+    teeth_visible: bool  # True if upper or lower dentition is exposed
 
 
 # Static anatomical mouth geometry definitions per viseme group
 VISEME_GEOMETRIES: dict[VisemeGroup, VisemeGeometry] = {
-    VisemeGroup.SILENCE: VisemeGeometry(openness=0.05, width=0.50, lip_protrusion=0.05, teeth_visible=False),
-    VisemeGroup.BILABIAL: VisemeGeometry(openness=0.00, width=0.52, lip_protrusion=0.10, teeth_visible=False),
-    VisemeGroup.LABIODENTAL: VisemeGeometry(openness=0.15, width=0.58, lip_protrusion=0.12, teeth_visible=True),
-    VisemeGroup.DENTAL_ALVEOLAR: VisemeGeometry(openness=0.20, width=0.65, lip_protrusion=0.08, teeth_visible=True),
-    VisemeGroup.VELAR_PALATAL: VisemeGeometry(openness=0.35, width=0.55, lip_protrusion=0.15, teeth_visible=False),
-    VisemeGroup.OPEN_VOWEL: VisemeGeometry(openness=0.88, width=0.62, lip_protrusion=0.10, teeth_visible=True),
-    VisemeGroup.ROUNDED_VOWEL: VisemeGeometry(openness=0.45, width=0.25, lip_protrusion=0.85, teeth_visible=False),
-    VisemeGroup.SPREAD_VOWEL: VisemeGeometry(openness=0.30, width=0.88, lip_protrusion=0.02, teeth_visible=True),
+    VisemeGroup.SILENCE: VisemeGeometry(
+        openness=0.05, width=0.50, lip_protrusion=0.05, teeth_visible=False
+    ),
+    VisemeGroup.BILABIAL: VisemeGeometry(
+        openness=0.00, width=0.52, lip_protrusion=0.10, teeth_visible=False
+    ),
+    VisemeGroup.LABIODENTAL: VisemeGeometry(
+        openness=0.15, width=0.58, lip_protrusion=0.12, teeth_visible=True
+    ),
+    VisemeGroup.DENTAL_ALVEOLAR: VisemeGeometry(
+        openness=0.20, width=0.65, lip_protrusion=0.08, teeth_visible=True
+    ),
+    VisemeGroup.VELAR_PALATAL: VisemeGeometry(
+        openness=0.35, width=0.55, lip_protrusion=0.15, teeth_visible=False
+    ),
+    VisemeGroup.OPEN_VOWEL: VisemeGeometry(
+        openness=0.88, width=0.62, lip_protrusion=0.10, teeth_visible=True
+    ),
+    VisemeGroup.ROUNDED_VOWEL: VisemeGeometry(
+        openness=0.45, width=0.25, lip_protrusion=0.85, teeth_visible=False
+    ),
+    VisemeGroup.SPREAD_VOWEL: VisemeGeometry(
+        openness=0.30, width=0.88, lip_protrusion=0.02, teeth_visible=True
+    ),
 }
 
 
@@ -78,10 +94,10 @@ class VisemeCue:
 class LipSyncComplianceReport:
     """ITU-R BT.1359-1 Compliance and slip-and-slide alignment metric report."""
 
-    offset_ms: float                # Applied audio offset in milliseconds
-    compliance_score: float         # 0.0 to 1.0 (1.0 = flawless alignment)
-    is_broadcast_compliant: bool   # Within ITU-R BT.1359-1 (-45ms to +125ms)
-    lead_lag_status: str            # "In Sync", "Audio Leading Video", "Audio Lagging Video"
+    offset_ms: float  # Applied audio offset in milliseconds
+    compliance_score: float  # 0.0 to 1.0 (1.0 = flawless alignment)
+    is_broadcast_compliant: bool  # Within ITU-R BT.1359-1 (-45ms to +125ms)
+    lead_lag_status: str  # "In Sync", "Audio Leading Video", "Audio Lagging Video"
     total_visemes: int
     open_mouth_duration_s: float
     remediation_advice: str
@@ -217,11 +233,13 @@ class LipSyncVisemeEngine:
         gaussian_score = math.exp(-pow(offset_ms / (sigma * 1.414), 2))
         compliance_score = max(0.0, min(1.0, round(gaussian_score, 3)))
 
-        is_compliant = (-45.0 <= offset_ms <= 125.0)
+        is_compliant = -45.0 <= offset_ms <= 125.0
 
         open_dur = sum(
-            c.duration_s for c in cues
-            if c.viseme in {VisemeGroup.OPEN_VOWEL, VisemeGroup.SPREAD_VOWEL, VisemeGroup.ROUNDED_VOWEL}
+            c.duration_s
+            for c in cues
+            if c.viseme
+            in {VisemeGroup.OPEN_VOWEL, VisemeGroup.SPREAD_VOWEL, VisemeGroup.ROUNDED_VOWEL}
         )
 
         if is_compliant:
@@ -268,9 +286,11 @@ class LipSyncVisemeEngine:
                     prev_geom = cues[i - 1].geometry
                     factor = progress / 0.20
                     return VisemeGeometry(
-                        openness=(1.0 - factor) * prev_geom.openness + factor * target_geom.openness,
+                        openness=(1.0 - factor) * prev_geom.openness
+                        + factor * target_geom.openness,
                         width=(1.0 - factor) * prev_geom.width + factor * target_geom.width,
-                        lip_protrusion=(1.0 - factor) * prev_geom.lip_protrusion + factor * target_geom.lip_protrusion,
+                        lip_protrusion=(1.0 - factor) * prev_geom.lip_protrusion
+                        + factor * target_geom.lip_protrusion,
                         teeth_visible=target_geom.teeth_visible or prev_geom.teeth_visible,
                     )
                 return target_geom

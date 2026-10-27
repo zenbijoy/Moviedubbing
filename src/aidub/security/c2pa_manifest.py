@@ -102,9 +102,7 @@ class C2PAManifestBuilder:
         )
 
     @classmethod
-    def verify_manifest(
-        cls, manifest: C2PAManifest, project_id: str, signing_key: str
-    ) -> bool:
+    def verify_manifest(cls, manifest: C2PAManifest, project_id: str, signing_key: str) -> bool:
         """Verify the integrity and digital signature of a C2PA manifest."""
         claim_payload = {
             "project_id": project_id,
@@ -113,9 +111,7 @@ class C2PAManifestBuilder:
             "specification": "C2PA-v1.3",
         }
         claim_json = json.dumps(claim_payload, sort_keys=True).encode("utf-8")
-        expected_sig = hmac.new(
-            signing_key.encode("utf-8"), claim_json, hashlib.sha256
-        ).hexdigest()
+        expected_sig = hmac.new(signing_key.encode("utf-8"), claim_json, hashlib.sha256).hexdigest()
 
         return hmac.compare_digest(manifest.digital_signature_sha256, expected_sig)
 

@@ -26,12 +26,17 @@ from typing import Any
 
 from aidub.adapters.voice_base import (
     EmotionLabel,
+    EngineCapability,
+    ReferenceAudioAnalysis,
     SynthesisRequest,
     SynthesisResult,
+    VoiceDesignPrompt,
     VoiceEngineError,
     VoiceEngineKind,
+    VoiceEngineMetadata,
 )
 from aidub.media.ffmpeg_ops import _ffmpeg_exe, _run, duration
+from aidub.media.voice_dsp import analyze_voice_audio
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +111,9 @@ class GeminiExpressiveTTSAdapter:
             env_key = os.environ.get("GEMINI_API_KEY", "").strip()
             if env_key:
                 return env_key
-            raise VoiceEngineError("gemini_tts", "No GEMINI_API_KEY or GEMINI_API_KEYS configured in environment.")
+            raise VoiceEngineError(
+                "gemini_tts", "No GEMINI_API_KEY or GEMINI_API_KEYS configured in environment."
+            )
         key = self._keys[self._key_index % len(self._keys)]
         self._key_index += 1
         return key
@@ -126,9 +133,8 @@ class GeminiExpressiveTTSAdapter:
             if pitch_median_hz < 165.0:
                 # Male pitch range
                 return "Fenrir" if pitch_median_hz < 130.0 else "Charon"
-            else:
-                # Female pitch range
-                return "Kore" if pitch_median_hz < 220.0 else "Aoede"
+            # Female pitch range
+            return "Kore" if pitch_median_hz < 220.0 else "Aoede"
 
         # Gender / name heuristics
         g = (gender or "").lower().strip()
@@ -138,9 +144,26 @@ class GeminiExpressiveTTSAdapter:
             return DEFAULT_FEMALE_VOICE
 
         name_lower = character_name.lower()
-        if any(term in name_lower for term in ("mrs", "ms", "miss", "lady", "she", "her", "mother", "sister", "girl", "woman")):
+        if any(
+            term in name_lower
+            for term in (
+                "mrs",
+                "ms",
+                "miss",
+                "lady",
+                "she",
+                "her",
+                "mother",
+                "sister",
+                "girl",
+                "woman",
+            )
+        ):
             return DEFAULT_FEMALE_VOICE
-        if any(term in name_lower for term in ("mr", "sir", "lord", "he", "his", "father", "brother", "boy", "man")):
+        if any(
+            term in name_lower
+            for term in ("mr", "sir", "lord", "he", "his", "father", "brother", "boy", "man")
+        ):
             return DEFAULT_MALE_VOICE
 
         return DEFAULT_MALE_VOICE
@@ -181,7 +204,10 @@ class GeminiExpressiveTTSAdapter:
         valid_voices = set(GEMINI_VOICES_MALE) | set(GEMINI_VOICES_FEMALE)
         if eff_voice not in valid_voices:
             # Map edge-tts or generic voice name to Gemini equivalent
-            if any(term in eff_voice.lower() for term in ("female", "nabanita", "tanishaa", "jenny", "kore", "aoede", "leda")):
+            if any(
+                term in eff_voice.lower()
+                for term in ("female", "nabanita", "tanishaa", "jenny", "kore", "aoede", "leda")
+            ):
                 eff_voice = "Kore"
             else:
                 eff_voice = "Fenrir"
@@ -189,11 +215,15 @@ class GeminiExpressiveTTSAdapter:
         # Determine emotional style prompt
         emo_key = ""
         if emotion:
-            emo_key = emotion.value if isinstance(emotion, EmotionLabel) else str(emotion).lower().strip()
+            emo_key = (
+                emotion.value if isinstance(emotion, EmotionLabel) else str(emotion).lower().strip()
+            )
 
         style_prompt = style_instruction
         if not style_prompt:
-            style_prompt = EMOTION_STYLE_PROMPTS.get(emo_key, "expressive natural theatrical dialogue delivery")
+            style_prompt = EMOTION_STYLE_PROMPTS.get(
+                emo_key, "expressive natural theatrical dialogue delivery"
+            )
 
         # Attempt synthesis with key rotation
         max_attempts = max(3, len(self._keys) * 2)
@@ -204,25 +234,18 @@ class GeminiExpressiveTTSAdapter:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={api_key}"
 
             payload = {
-                "contents": [{
-                    "role": "user",
-                    "parts": [{
-                        "text": clean_text,
-                        "speech_metadata": {
-                            "style": style_prompt
-                        }
-                    }]
-                }],
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{"text": clean_text, "speech_metadata": {"style": style_prompt}}],
+                    }
+                ],
                 "generationConfig": {
                     "responseModalities": ["AUDIO"],
                     "speechConfig": {
-                        "voiceConfig": {
-                            "prebuiltVoiceConfig": {
-                                "voiceName": eff_voice
-                            }
-                        }
-                    }
-                }
+                        "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": eff_voice}}
+                    },
+                },
             }
 
             try:
@@ -232,7 +255,7 @@ class GeminiExpressiveTTSAdapter:
                     headers={"Content-Type": "application/json"},
                     method="POST",
                 )
-                with urllib.request.urlopen(req, timeout=25.0) as resp:
+                with urllib.request.urlopen(req, timeout=25.0) as resp:  # noqa: S310
                     resp_data = json.loads(resp.read().decode("utf-8"))
                     candidates = resp_data.get("candidates", [])
                     if not candidates:
@@ -294,11 +317,16 @@ class GeminiExpressiveTTSAdapter:
             except urllib.error.HTTPError as exc:
                 err_msg = exc.read().decode("utf-8", errors="replace")
                 last_exc = RuntimeError(f"HTTP {exc.code}: {err_msg}")
-                logger.warning("Gemini TTS attempt %d failed (HTTP %d): %s", attempt + 1, exc.code, err_msg[:120])
+                logger.warning(
+                    "Gemini TTS attempt %d failed (HTTP %d): %s",
+                    attempt + 1,
+                    exc.code,
+                    err_msg[:120],
+                )
                 if exc.code == 429:
                     # Rate limit, continue to next rotated key immediately
                     continue
-                elif exc.code in {400, 404}:
+                if exc.code in {400, 404}:
                     # Invalid model or payload, don't spin indefinitely
                     break
             except Exception as exc:
@@ -307,7 +335,9 @@ class GeminiExpressiveTTSAdapter:
 
         # Fallback handling
         if not self.allow_fallback:
-            raise VoiceEngineError("gemini_tts", f"Gemini expressive synthesis failed: {last_exc}") from last_exc
+            raise VoiceEngineError(
+                "gemini_tts", f"Gemini expressive synthesis failed: {last_exc}"
+            ) from last_exc
 
         logger.warning(
             "Gemini Expressive TTS failed (%s); falling back to Edge-TTS neural base",
@@ -326,7 +356,9 @@ class GeminiExpressiveTTSAdapter:
         from aidub.adapters.voice.edge_tts_adapter import EdgeTTSAdapter
 
         # Clean Edge-TTS fallback
-        bn_voice = "bn-BD-NabanitaNeural" if voice in set(GEMINI_VOICES_FEMALE) else "bn-BD-PradeepNeural"
+        bn_voice = (
+            "bn-BD-NabanitaNeural" if voice in set(GEMINI_VOICES_FEMALE) else "bn-BD-PradeepNeural"
+        )
         tts = EdgeTTSAdapter(bn_voice)
 
         rate_str = "+0%"
@@ -351,6 +383,107 @@ class GeminiExpressiveTTSAdapter:
         return output_wav
 
 
+class GeminiTTSVoiceEngine:
+    """VoiceEngine protocol implementation for Gemini 3.8 Expressive Speech Generation."""
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        key_pool: Sequence[str] | None = None,
+        *,
+        model: str = GEMINI_TTS_MODEL,
+        allow_fallback: bool = True,
+    ) -> None:
+        self.adapter = GeminiExpressiveTTSAdapter(
+            api_key=api_key, key_pool=key_pool, model=model, allow_fallback=allow_fallback
+        )
+
+    @property
+    def engine_kind(self) -> VoiceEngineKind:
+        return VoiceEngineKind.GEMINI_TTS
+
+    @property
+    def metadata(self) -> VoiceEngineMetadata:
+        return VoiceEngineMetadata(
+            engine_kind=VoiceEngineKind.GEMINI_TTS,
+            display_name="Gemini 3.8 Flash Expressive TTS",
+            model_id=self.adapter.model,
+            version="3.8.0",
+            capabilities={
+                EngineCapability.TEXT_TO_SPEECH,
+                EngineCapability.EMOTION_CONDITIONING,
+                EngineCapability.STYLE_INTENSITY,
+                EngineCapability.SPEAKER_CONSISTENCY,
+                EngineCapability.MULTILINGUAL,
+            },
+            supported_languages=[
+                "en", "bn", "hi", "es", "fr", "de", "ja", "zh", "pt", "it",
+                "ko", "ar", "ru", "tr", "id", "nl", "sv",
+            ],
+            hardware_requirements="Cloud REST API (Zero local GPU)",
+            license_info="Google Cloud / Gemini API Terms",
+            commercial_use_allowed=True,
+            min_ram_gb=0.1,
+            min_vram_gb=0.0,
+            is_local=False,
+            is_cloud_api=True,
+            known_limitations=[
+                "Requires GEMINI_API_KEY environment variable or configured API key pool.",
+                "Zero-shot cloning not supported; uses curated expressive cinematic voices.",
+            ],
+        )
+
+    def is_available(self) -> tuple[bool, str]:
+        has_keys = bool(self.adapter.key_pool or os.environ.get("GEMINI_API_KEY"))
+        if has_keys:
+            return True, "Ready (Gemini API credentials detected)"
+        return (
+            False,
+            "GEMINI_API_KEY not configured (fallback mode active)",
+        )
+
+    def design_voice(self, prompt: VoiceDesignPrompt) -> dict[str, Any]:
+        is_female = prompt.gender.lower() in {"female", "woman", "girl"}
+        voice = DEFAULT_FEMALE_VOICE if is_female else DEFAULT_MALE_VOICE
+        return {
+            "voice_id": voice,
+            "gender": "female" if is_female else "male",
+            "personality": prompt.personality,
+            "timbre": prompt.timbre,
+            "prompt_applied": True,
+        }
+
+    def verify_reference_audio(self, audio_path: str) -> ReferenceAudioAnalysis:
+        return analyze_voice_audio(audio_path)
+
+    def synthesize(self, request: SynthesisRequest, output_dir: str) -> SynthesisResult:
+        out_root = Path(output_dir)
+        out_root.mkdir(parents=True, exist_ok=True)
+        out_wav = out_root / f"{request.utterance_id}_{request.seed}_gemini.wav"
+
+        voice_id = str(request.voice_profile_id) if request.voice_profile_id else None
+        res_path = self.adapter.synthesize_expressive_dialogue(
+            text=request.text,
+            output_wav=out_wav,
+            voice=voice_id,
+            emotion=request.emotion,
+            sample_rate=request.output_sample_rate,
+        )
+
+        dur_ms = round(duration(res_path) * 1000)
+        return SynthesisResult(
+            request_id=request.request_id,
+            utterance_id=request.utterance_id,
+            engine_kind=self.engine_kind,
+            output_path=str(res_path),
+            sample_rate=request.output_sample_rate,
+            duration_ms=dur_ms,
+            actual_duration_ms=dur_ms,
+            seed_used=request.seed,
+            applied_controls=[f"emotion:{request.emotion.value}", f"model:{self.adapter.model}"],
+        )
+
+
 __all__ = [
     "DEFAULT_FEMALE_VOICE",
     "DEFAULT_MALE_VOICE",
@@ -359,4 +492,5 @@ __all__ = [
     "GEMINI_VOICES_FEMALE",
     "GEMINI_VOICES_MALE",
     "GeminiExpressiveTTSAdapter",
+    "GeminiTTSVoiceEngine",
 ]

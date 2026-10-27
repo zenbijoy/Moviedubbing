@@ -45,13 +45,17 @@ def test_studio_master_bundle_generation(tmp_path: Path) -> None:
     orig_audio = _make_dummy_wav(work_dir / "vocals.wav", duration_s=4.0, freq_hz=220.0)
 
     sub_file = work_dir / "bilingual.srt"
-    sub_file.write_text("1\n00:00:01,000 --> 00:00:03,500\nHello friend\nহ্যালো বন্ধু\n", encoding="utf-8")
+    sub_file.write_text(
+        "1\n00:00:01,000 --> 00:00:03,500\nHello friend\nহ্যালো বন্ধু\n", encoding="utf-8"
+    )
 
     # Save utterances in store
     store = UtteranceStore("bn", work_dir)
-    store.save_utterances([
-        {"start": 1.0, "end": 3.5, "text": "Hello friend", "tgt": "হ্যালো বন্ধু", "speaker": 0},
-    ])
+    store.save_utterances(
+        [
+            {"start": 1.0, "end": 3.5, "text": "Hello friend", "tgt": "হ্যালো বন্ধু", "speaker": 0},
+        ]
+    )
 
     pkg_output_dir = tmp_path / "final_dist_package"
 

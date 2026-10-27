@@ -175,7 +175,10 @@ class SelectiveFaceGateLipSyncEngine:
             shot_id = f"shot_{idx:03d}"
             pct = 10 + round(70 * (idx / len(intervals)))
             if progress_cb:
-                progress_cb(pct, f"Synthesizing lip-sync for {shot_id} ({inter.start_s:.1f}s - {inter.end_s:.1f}s)...")
+                progress_cb(
+                    pct,
+                    f"Synthesizing lip-sync for {shot_id} ({inter.start_s:.1f}s - {inter.end_s:.1f}s)...",
+                )
 
             shot_in_vid = w_dir / f"{shot_id}_in.mp4"
             shot_in_aud = w_dir / f"{shot_id}_audio.wav"
@@ -191,10 +194,18 @@ class SelectiveFaceGateLipSyncEngine:
                 try:
                     applied_clip = synthesize_fn(shot_id, shot_in_vid, shot_in_aud, shot_out_vid)
                 except Exception as exc:
-                    logger.warning("Lip-sync synthesis failed for %s (%s), falling back to source shot", shot_id, exc)
+                    logger.warning(
+                        "Lip-sync synthesis failed for %s (%s), falling back to source shot",
+                        shot_id,
+                        exc,
+                    )
                     applied_clip = None
 
-            if applied_clip is None or not applied_clip.is_file() or applied_clip.stat().st_size == 0:
+            if (
+                applied_clip is None
+                or not applied_clip.is_file()
+                or applied_clip.stat().st_size == 0
+            ):
                 applied_clip = shot_in_vid
 
             processed_intervals.append((inter.start_s, inter.end_s, applied_clip))
@@ -218,28 +229,30 @@ class SelectiveFaceGateLipSyncEngine:
             progress_cb(95, "Multiplexing final master audio and video containers...")
 
         out_video.parent.mkdir(parents=True, exist_ok=True)
-        _run([
-            _ffmpeg_exe(),
-            "-y",
-            "-i",
-            str(composited_video),
-            "-i",
-            str(dub_audio),
-            "-map",
-            "0:v:0",
-            "-map",
-            "1:a:0",
-            "-c:v",
-            "copy",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "192k",
-            "-shortest",
-            "-movflags",
-            "+faststart",
-            str(out_video),
-        ])
+        _run(
+            [
+                _ffmpeg_exe(),
+                "-y",
+                "-i",
+                str(composited_video),
+                "-i",
+                str(dub_audio),
+                "-map",
+                "0:v:0",
+                "-map",
+                "1:a:0",
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "192k",
+                "-shortest",
+                "-movflags",
+                "+faststart",
+                str(out_video),
+            ]
+        )
 
         savings_pct = max(0.0, min(100.0, (1.0 - (lip_sync_dur / max(0.1, total_dur))) * 100.0))
         logger.info(
@@ -267,24 +280,26 @@ class SelectiveFaceGateLipSyncEngine:
     ) -> None:
         """Extract a sub-clip of the video using fast stream seek and re-encoding."""
         dur = max(0.1, end_s - start_s)
-        _run([
-            _ffmpeg_exe(),
-            "-y",
-            "-ss",
-            f"{start_s:.3f}",
-            "-i",
-            str(src_video),
-            "-t",
-            f"{dur:.3f}",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-crf",
-            "18",
-            "-an",
-            str(dst_segment),
-        ])
+        _run(
+            [
+                _ffmpeg_exe(),
+                "-y",
+                "-ss",
+                f"{start_s:.3f}",
+                "-i",
+                str(src_video),
+                "-t",
+                f"{dur:.3f}",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-crf",
+                "18",
+                "-an",
+                str(dst_segment),
+            ]
+        )
 
     def _splice_timeline(
         self,
@@ -324,25 +339,27 @@ class SelectiveFaceGateLipSyncEngine:
         concat_list.write_text("\n".join(lines), encoding="utf-8")
 
         # Concat demuxer
-        _run([
-            _ffmpeg_exe(),
-            "-y",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            str(concat_list),
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-crf",
-            "18",
-            "-pix_fmt",
-            "yuv420p",
-            str(output_path),
-        ])
+        _run(
+            [
+                _ffmpeg_exe(),
+                "-y",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(concat_list),
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-crf",
+                "18",
+                "-pix_fmt",
+                "yuv420p",
+                str(output_path),
+            ]
+        )
 
 
 __all__ = [

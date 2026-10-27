@@ -18,24 +18,18 @@ logger = logging.getLogger(__name__)
 
 try:
     from PySide6.QtCore import Qt, QUrl
-    from PySide6.QtGui import QFont
-    from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+    from PySide6.QtMultimedia import QAudioOutput, QMediaDevices, QMediaPlayer
     from PySide6.QtWidgets import (
         QComboBox,
         QDialog,
         QFrame,
-        QGridLayout,
-        QGroupBox,
         QHBoxLayout,
-        QHeaderView,
         QLabel,
         QLineEdit,
         QMessageBox,
         QPushButton,
         QScrollArea,
         QSpinBox,
-        QTableWidget,
-        QTableWidgetItem,
         QVBoxLayout,
         QWidget,
     )
@@ -70,7 +64,9 @@ if _QT:
             super().__init__(parent)
             self.setWindowTitle("Character Voice Casting Studio — Multi-Speaker Actor Matching")
             self.setMinimumSize(820, 560)
-            self.characters = list(characters or ["Protagonist (Speaker 0)", "Antagonist (Speaker 1)"])
+            self.characters = list(
+                characters or ["Protagonist (Speaker 0)", "Antagonist (Speaker 1)"]
+            )
             self.current_casting = dict(current_casting or {})
             self.target_language = target_language
             self._player: QMediaPlayer | None = None
@@ -78,11 +74,16 @@ if _QT:
             self.table = _TableShim(self)
 
             try:
-                self._audio_out = QAudioOutput(self)
-                self._player = QMediaPlayer(self)
-                self._player.setAudioOutput(self._audio_out)
+                if QMediaDevices.audioOutputs():
+                    self._audio_out = QAudioOutput(self)
+                    self._player = QMediaPlayer(self)
+                    self._player.setAudioOutput(self._audio_out)
+                else:
+                    self._audio_out = None
+                    self._player = None
             except Exception:
-                pass
+                self._audio_out = None
+                self._player = None
 
             self.setStyleSheet(
                 "QDialog { background: #0B0E14; color: #E2E8F0; }"
@@ -266,7 +267,15 @@ if _QT:
             lbl3.setStyleSheet("color:#64748B;font-size:9px;font-weight:700;")
             emo_box.addWidget(lbl3)
             emo_combo = QComboBox(card)
-            emo_combo.addItems(["Heroic / Confident", "Sorrow / Emotional", "Angry / Intense", "Whisper / Secret", "Neutral"])
+            emo_combo.addItems(
+                [
+                    "Heroic / Confident",
+                    "Sorrow / Emotional",
+                    "Angry / Intense",
+                    "Whisper / Secret",
+                    "Neutral",
+                ]
+            )
             if idx == 1:
                 emo_combo.setCurrentText("Sorrow / Emotional")
             emo_combo.setStyleSheet(
@@ -288,7 +297,9 @@ if _QT:
             pitch_spin.setStyleSheet(
                 "QSpinBox{background:#0B0E14;color:#38BDF8;border:1px solid #1E293B;border-radius:4px;padding:4px;font-size:11px;font-weight:bold;}"
             )
-            pitch_spin.valueChanged.connect(lambda val, l=pitch_lbl: l.setText(f"Pitch: {val:+d} Hz"))
+            pitch_spin.valueChanged.connect(
+                lambda val, lbl=pitch_lbl: lbl.setText(f"Pitch: {val:+d} Hz")
+            )
             pitch_box.addWidget(pitch_spin)
             clay.addLayout(pitch_box)
 
@@ -306,14 +317,16 @@ if _QT:
             clay.addWidget(prev_btn)
 
             self.card_layout.insertWidget(len(self._row_widgets), card)
-            self._row_widgets.append({
-                "name": name_edit,
-                "voice": voice_combo,
-                "emotion": emo_combo,
-                "pitch": pitch_spin,
-                "button": prev_btn,
-                "card": card,
-            })
+            self._row_widgets.append(
+                {
+                    "name": name_edit,
+                    "voice": voice_combo,
+                    "emotion": emo_combo,
+                    "pitch": pitch_spin,
+                    "button": prev_btn,
+                    "card": card,
+                }
+            )
 
         def _auto_match_voices(self) -> None:
             """Intelligently assign diverse voices across characters."""
@@ -343,10 +356,15 @@ if _QT:
             pitch_val = widgets["pitch"].value()
 
             import tempfile
+
             from aidub.adapters.voice.chatterbox_adapter import ChatterboxAdapter
 
             temp_wav = Path(tempfile.gettempdir()) / f"char_preview_{row}.wav"
-            text = f"আমার নাম {char_name}, আমি সিনেমার মূল দৃশ্যে কথা বলছি।" if self.target_language == "bn" else f"My name is {char_name}, speaking in this scene."
+            text = (
+                f"আমার নাম {char_name}, আমি সিনেমার মূল দৃশ্যে কথা বলছি।"
+                if self.target_language == "bn"
+                else f"My name is {char_name}, speaking in this scene."
+            )
 
             try:
                 ChatterboxAdapter().synthesize_to_file(

@@ -61,7 +61,11 @@ class VisemeLipSyncAdapter(LipSyncEngine):
         fps = opts.fps
         rendered_frames = max(1, round(dur_s * fps))
 
-        logger.info("viseme_adapter: successfully rendered lip-synced shot %s -> %s", shot_id, out_video.name)
+        logger.info(
+            "viseme_adapter: successfully rendered lip-synced shot %s -> %s",
+            shot_id,
+            out_video.name,
+        )
 
         return LipSyncResult(
             job_id=Identifier(f"job_viseme_{shot_id}"),

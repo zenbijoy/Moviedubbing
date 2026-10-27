@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -15,30 +16,26 @@ try:
         QDesktopServices,
         QDragEnterEvent,
         QDropEvent,
-        QFont,
         QKeyEvent,
         QKeySequence,
-        QLinearGradient,
         QMouseEvent,
         QPainter,
         QPaintEvent,
         QPen,
     )
     from PySide6.QtWidgets import (
-        QApplication,
-        QCheckBox,
-        QComboBox,
+        QDialog,
         QFileDialog,
         QFrame,
         QHBoxLayout,
         QLabel,
         QLineEdit,
         QMainWindow,
+        QMenu,
         QMenuBar,
         QMessageBox,
         QProgressBar,
         QPushButton,
-        QScrollArea,
         QStackedWidget,
         QToolBar,
         QVBoxLayout,
@@ -77,7 +74,8 @@ if _QT:
             import math
 
             self.bars = [
-                0.12 + 0.88 * abs(math.sin(i * 0.22) * math.cos(i * 0.08) * math.sin(i * 0.41 + 0.2))
+                0.12
+                + 0.88 * abs(math.sin(i * 0.22) * math.cos(i * 0.08) * math.sin(i * 0.41 + 0.2))
                 for i in range(60)
             ]
 
@@ -188,6 +186,28 @@ if _QT:
                 self._callback()
             super().mousePressEvent(event)
 
+    def _format_rel_time(dt: datetime) -> str:
+        try:
+            now = datetime.now(dt.tzinfo or UTC)
+            diff = now - dt
+            total_seconds = int(diff.total_seconds())
+            if total_seconds < 60:
+                return "Just now"
+            if total_seconds < 3600:
+                mins = total_seconds // 60
+                return f"{mins} min{'s' if mins > 1 else ''} ago"
+            if total_seconds < 86400:
+                hrs = total_seconds // 3600
+                return f"{hrs} hr{'s' if hrs > 1 else ''} ago"
+            days = total_seconds // 86400
+            if days == 1:
+                return "Yesterday"
+            if days < 30:
+                return f"{days} days ago"
+            return dt.strftime("%b %d, %Y")
+        except Exception:
+            return "Recently"
+
     class _ProjectCard(QFrame):
         """Card representing a video project matching Image 1."""
 
@@ -239,6 +259,7 @@ if _QT:
                 "QPushButton { background: transparent; color: #64748B; border: none; font-size: 15px; font-weight: bold; }"
                 "QPushButton:hover { color: #FFF; background: #1E293B; border-radius: 4px; }"
             )
+            dots_btn.clicked.connect(self._show_options_menu)
             top_row.addWidget(dots_btn)
             layout.addLayout(top_row)
 
@@ -254,6 +275,52 @@ if _QT:
 
             self._on_open = on_open
             self._video_path = video_path
+
+        def _show_options_menu(self) -> None:
+            menu = QMenu(self)
+            menu.setStyleSheet(
+                "QMenu { background: #141822; color: #F1F5F9; border: 1px solid #232C3E; border-radius: 6px; padding: 4px; }"
+                "QMenu::item { padding: 6px 14px; border-radius: 4px; font-size: 11px; }"
+                "QMenu::item:selected { background: #2563EB; color: #FFF; }"
+            )
+            act_open = menu.addAction("Open Project")
+            act_open.triggered.connect(
+                lambda: self._on_open(self._video_path) if self._on_open else None
+            )
+
+            if self._video_path and Path(self._video_path).exists():
+                act_explore = menu.addAction("Show in File Explorer")
+                act_explore.triggered.connect(
+                    lambda: QDesktopServices.openUrl(
+                        QUrl.fromLocalFile(str(Path(self._video_path).resolve().parent))
+                    )
+                )
+
+            act_remove = menu.addAction("Remove from Recents")
+
+            def _remove() -> None:
+                from aidub.infrastructure.catalog import ProjectCatalog, default_catalog_path
+
+                catalog = ProjectCatalog(default_catalog_path())
+                try:
+                    p = catalog.get_project_by_path(self._video_path)
+                    if p:
+                        catalog.remove_project(p.project_id)
+                except Exception:
+                    pass
+                p_widget = self.parentWidget()
+                while p_widget is not None and not hasattr(p_widget, "refresh_projects"):
+                    p_widget = p_widget.parentWidget()
+                if p_widget is not None and hasattr(p_widget, "refresh_projects"):
+                    p_widget.refresh_projects()
+
+            act_remove.triggered.connect(_remove)
+            dots = self.findChild(QPushButton)
+            menu.exec(
+                dots.mapToGlobal(dots.rect().bottomLeft())
+                if dots
+                else self.mapToGlobal(self.rect().center())
+            )
 
         def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
             if event.button() == Qt.MouseButton.LeftButton and self._on_open:
@@ -338,20 +405,26 @@ if _QT:
 
             # Section: WORKSPACE
             sec1 = QLabel("WORKSPACE", sidebar)
-            sec1.setStyleSheet("font-size: 9px; font-weight: 800; color: #475569; letter-spacing: 1px; padding-left: 6px;")
+            sec1.setStyleSheet(
+                "font-size: 9px; font-weight: 800; color: #475569; letter-spacing: 1px; padding-left: 6px;"
+            )
             sb_layout.addWidget(sec1)
             sb_layout.addWidget(_nav_btn("🏠  Home", is_active=True))
             sb_layout.addWidget(_nav_btn("🎥  Dubbed Videos", cb=window.show_studio))
             sb_layout.addWidget(_nav_btn("🎙️  Text To Speech", cb=window.open_voice_model_dialog))
             sb_layout.addWidget(_nav_btn("🔤  Text Translate", cb=window.open_isometric_dialog))
             sb_layout.addWidget(_nav_btn("☁️  Kaggle Cloud GPU", cb=window.open_kaggle_dialog))
-            sb_layout.addWidget(_nav_btn("📊  Insights  ✦ PRO", cb=window.open_broadcast_export_dialog))
+            sb_layout.addWidget(
+                _nav_btn("📊  Insights  ✦ PRO", cb=window.open_broadcast_export_dialog)
+            )
 
             sb_layout.addSpacing(10)
 
             # Section: PERSONAL
             sec2 = QLabel("PERSONAL", sidebar)
-            sec2.setStyleSheet("font-size: 9px; font-weight: 800; color: #475569; letter-spacing: 1px; padding-left: 6px;")
+            sec2.setStyleSheet(
+                "font-size: 9px; font-weight: 800; color: #475569; letter-spacing: 1px; padding-left: 6px;"
+            )
             sb_layout.addWidget(sec2)
             sb_layout.addWidget(_nav_btn("👥  Voice Library (RVC)", cb=window.open_casting_dialog))
             sb_layout.addWidget(_nav_btn("🎬  Timeline Editor", cb=window.show_studio))
@@ -360,7 +433,9 @@ if _QT:
 
             # Section: RESOURCES
             sec3 = QLabel("RESOURCES", sidebar)
-            sec3.setStyleSheet("font-size: 9px; font-weight: 800; color: #475569; letter-spacing: 1px; padding-left: 6px;")
+            sec3.setStyleSheet(
+                "font-size: 9px; font-weight: 800; color: #475569; letter-spacing: 1px; padding-left: 6px;"
+            )
             sb_layout.addWidget(sec3)
             sb_layout.addWidget(_nav_btn("🔌  Integrations", cb=window.open_preferences_dialog))
             sb_layout.addWidget(_nav_btn("❓  Help Center", cb=window.open_keyboard_shortcuts))
@@ -380,19 +455,25 @@ if _QT:
             # Top Breadcrumb & User Profile Row
             top_bar = QHBoxLayout()
             h_lbl = QLabel("HOME", main_pane)
-            h_lbl.setStyleSheet("font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 0.5px;")
+            h_lbl.setStyleSheet(
+                "font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 0.5px;"
+            )
             top_bar.addWidget(h_lbl)
             top_bar.addStretch()
 
             user_pill = QFrame(main_pane)
-            user_pill.setStyleSheet("background: #141822; border: 1px solid #232C3E; border-radius: 16px; padding: 2px 8px;")
+            user_pill.setStyleSheet(
+                "background: #141822; border: 1px solid #232C3E; border-radius: 16px; padding: 2px 8px;"
+            )
             u_lay = QHBoxLayout(user_pill)
             u_lay.setContentsMargins(4, 2, 6, 2)
             u_lay.setSpacing(6)
             u_av = QLabel("TM", user_pill)
             u_av.setFixedSize(22, 22)
             u_av.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            u_av.setStyleSheet("background: #7C3AED; color: #FFF; font-size: 10px; font-weight: 800; border-radius: 11px;")
+            u_av.setStyleSheet(
+                "background: #7C3AED; color: #FFF; font-size: 10px; font-weight: 800; border-radius: 11px;"
+            )
             u_lay.addWidget(u_av)
             u_txt = QLabel("Studio Creator ⌄", user_pill)
             u_txt.setStyleSheet("font-size: 11px; color: #E2E8F0; font-weight: 600;")
@@ -405,7 +486,10 @@ if _QT:
             greet_col.setSpacing(3)
             greet_title = QLabel("Welcome Back, Creator", main_pane)
             greet_title.setStyleSheet("font-size: 24px; font-weight: 900; color: #F8FAFC;")
-            greet_sub = QLabel("There's a lot you can do here! Start automated movie dubbing or explore studio tools.", main_pane)
+            greet_sub = QLabel(
+                "There's a lot you can do here! Start automated movie dubbing or explore studio tools.",
+                main_pane,
+            )
             greet_sub.setStyleSheet("font-size: 13px; font-weight: 500; color: #94A3B8;")
             greet_col.addWidget(greet_title)
             greet_col.addWidget(greet_sub)
@@ -472,7 +556,9 @@ if _QT:
 
             # Left Tabs: My Projects | Folders
             tabs_pill = QFrame(main_pane)
-            tabs_pill.setStyleSheet("background: #141722; border: 1px solid #1E2738; border-radius: 6px; padding: 2px;")
+            tabs_pill.setStyleSheet(
+                "background: #141722; border: 1px solid #1E2738; border-radius: 6px; padding: 2px;"
+            )
             tp_lay = QHBoxLayout(tabs_pill)
             tp_lay.setContentsMargins(2, 2, 2, 2)
             tp_lay.setSpacing(4)
@@ -504,6 +590,7 @@ if _QT:
                 "QLineEdit { background: #131722; color: #F1F5F9; border: 1px solid #1E2738; border-radius: 5px; padding: 2px 10px; font-size: 11px; }"
                 "QLineEdit:focus { border-color: #38BDF8; }"
             )
+            search_input.textChanged.connect(self._on_search_changed)
             proj_header_row.addWidget(search_input)
 
             filter_btn = QPushButton("⚙", main_pane)
@@ -512,6 +599,7 @@ if _QT:
                 "QPushButton { background: #131722; color: #94A3B8; border: 1px solid #1E2738; border-radius: 5px; font-size: 13px; }"
                 "QPushButton:hover { background: #1E2738; color: #FFF; }"
             )
+            filter_btn.clicked.connect(self.refresh_projects)
             proj_header_row.addWidget(filter_btn)
 
             prev_btn = QPushButton("‹", main_pane)
@@ -531,74 +619,163 @@ if _QT:
             mp_lay.addLayout(proj_header_row)
 
             # -----------------------------------------------------------------
-            # 5. Project Cards Grid (Matching Image 1)
+            # 5. Project Cards Container (Dynamic from ProjectCatalog)
             # -----------------------------------------------------------------
-            projects_grid = QHBoxLayout()
-            projects_grid.setSpacing(14)
-
-            # Project 1: clip_2min.mp4
-            p1 = _ProjectCard(
-                title="Camb AI video dubbing",
-                created_text="clip_2min.mp4 • Created 1 min ago",
-                dubbed_pill_text="English (India) +2",
-                video_path="clip_2min.mp4",
-                on_open=window.load_movie_and_show_editor,
-                parent=main_pane,
-            )
-            projects_grid.addWidget(p1, stretch=1)
-
-            # Project 2: clip.mp4
-            p2 = _ProjectCard(
-                title="Camb AI video dubbing",
-                created_text="clip.mp4 • Created 2 hrs ago",
-                dubbed_pill_text="English (India) +2",
-                video_path="clip.mp4",
-                on_open=window.load_movie_and_show_editor,
-                parent=main_pane,
-            )
-            projects_grid.addWidget(p2, stretch=1)
-
-            # Project 3: Demo / Master
-            p3 = _ProjectCard(
-                title="Camb AI video dubbing",
-                created_text="movie.mp4 • Created 2 hrs ago",
-                dubbed_pill_text="English (India) +2",
-                video_path="clip_2min.mp4",
-                on_open=window.load_movie_and_show_editor,
-                parent=main_pane,
-            )
-            projects_grid.addWidget(p3, stretch=1)
-
-            # Project 4: Import New Movie Tile
-            import_tile = QFrame(main_pane)
-            import_tile.setCursor(Qt.CursorShape.PointingHandCursor)
-            import_tile.setStyleSheet(
-                "QFrame { background: rgba(19, 23, 34, 0.4); border: 2px dashed #2B384E; border-radius: 10px; padding: 14px; }"
-                "QFrame:hover { background: rgba(37, 99, 235, 0.08); border-color: #38BDF8; }"
-            )
-            it_lay = QVBoxLayout(import_tile)
-            it_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            it_lay.setSpacing(6)
-            it_ico = QLabel("+", import_tile)
-            it_ico.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            it_ico.setStyleSheet("font-size: 26px; font-weight: 300; color: #38BDF8;")
-            it_lbl = QLabel("Import New Movie", import_tile)
-            it_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            it_lbl.setStyleSheet("font-size: 12px; font-weight: 700; color: #F1F5F9;")
-            it_lay.addWidget(it_ico)
-            it_lay.addWidget(it_lbl)
-
-            def _on_import_click(event: QMouseEvent) -> None:
-                if event.button() == Qt.MouseButton.LeftButton:
-                    window.open_dub_dialog()
-
-            import_tile.mousePressEvent = _on_import_click  # type: ignore[assignment]
-            projects_grid.addWidget(import_tile, stretch=1)
-
-            mp_lay.addLayout(projects_grid)
+            self.projects_container = QWidget(main_pane)
+            self.projects_layout = QHBoxLayout(self.projects_container)
+            self.projects_layout.setContentsMargins(0, 0, 0, 0)
+            self.projects_layout.setSpacing(14)
+            mp_lay.addWidget(self.projects_container)
             mp_lay.addStretch()
 
+            self.refresh_projects()
             root_layout.addWidget(main_pane, 1)
+
+        def _on_search_changed(self, text: str) -> None:
+            self.refresh_projects(text)
+
+        def refresh_projects(self, filter_text: str = "") -> None:
+            while self.projects_layout.count():
+                item = self.projects_layout.takeAt(0)
+                if item is None:
+                    continue
+                w = item.widget()
+                if w is not None:
+                    w.deleteLater()
+                else:
+                    sub = item.layout()
+                    if sub is not None:
+                        while sub.count():
+                            sub_item = sub.takeAt(0)
+                            if sub_item is not None:
+                                w2 = sub_item.widget()
+                                if w2 is not None:
+                                    w2.deleteLater()
+
+            from aidub.infrastructure.catalog import ProjectCatalog, default_catalog_path
+
+            catalog = ProjectCatalog(default_catalog_path())
+            try:
+                catalog.initialize()
+            except Exception:
+                pass
+
+            recent: list[Any] = []
+            try:
+                recent = list(catalog.list_recent(limit=6))
+            except Exception:
+                recent = []
+
+            if filter_text:
+                q = filter_text.strip().casefold()
+                recent = [
+                    p for p in recent if q in p.name.casefold() or q in str(p.path).casefold()
+                ]
+
+            if recent:
+                for proj in recent[:3]:
+                    pill_text = "Local-first"
+                    loc_dir = proj.path / "localizations"
+                    if loc_dir.is_dir():
+                        locs = [d.name for d in loc_dir.iterdir() if d.is_dir()]
+                        if locs:
+                            pill_text = f"{locs[0]} +{len(locs) - 1}" if len(locs) > 1 else locs[0]
+
+                    rel_time = _format_rel_time(proj.last_opened_at)
+                    card = _ProjectCard(
+                        title=proj.name,
+                        created_text=f"{proj.path.name} • {rel_time}",
+                        dubbed_pill_text=pill_text,
+                        video_path=str(proj.path),
+                        on_open=self._window.open_project_path,
+                        parent=self.projects_container,
+                    )
+                    self.projects_layout.addWidget(card, stretch=1)
+
+                new_tile = QFrame(self.projects_container)
+                new_tile.setCursor(Qt.CursorShape.PointingHandCursor)
+                new_tile.setStyleSheet(
+                    "QFrame { background: rgba(19, 23, 34, 0.4); border: 2px dashed #2B384E; border-radius: 10px; padding: 14px; }"
+                    "QFrame:hover { background: rgba(37, 99, 235, 0.08); border-color: #38BDF8; }"
+                )
+                it_lay = QVBoxLayout(new_tile)
+                it_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                it_lay.setSpacing(6)
+                it_ico = QLabel("+", new_tile)
+                it_ico.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                it_ico.setStyleSheet("font-size: 26px; font-weight: 300; color: #38BDF8;")
+                it_lbl = QLabel("New Project / Media", new_tile)
+                it_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                it_lbl.setStyleSheet("font-size: 12px; font-weight: 700; color: #F1F5F9;")
+                it_lay.addWidget(it_ico)
+                it_lay.addWidget(it_lbl)
+
+                def _on_tile_click(event: QMouseEvent) -> None:
+                    if event.button() == Qt.MouseButton.LeftButton:
+                        self._window.create_new_project_dialog()
+
+                new_tile.mousePressEvent = _on_tile_click  # type: ignore[method-assign]
+                self.projects_layout.addWidget(new_tile, stretch=1)
+            else:
+                empty_card = QFrame(self.projects_container)
+                empty_card.setStyleSheet(
+                    "QFrame { background: #11151F; border: 1px dashed #263347; border-radius: 10px; padding: 22px; }"
+                )
+                ec_lay = QVBoxLayout(empty_card)
+                ec_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                ec_lay.setSpacing(8)
+
+                e_icon = QLabel("🎬", empty_card)
+                e_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                e_icon.setStyleSheet("font-size: 28px;")
+                ec_lay.addWidget(e_icon)
+
+                e_title = QLabel("No Recent Dubbing Projects", empty_card)
+                e_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                e_title.setStyleSheet("font-size: 14px; font-weight: 800; color: #F8FAFC;")
+                ec_lay.addWidget(e_title)
+
+                e_sub = QLabel(
+                    "Create a new project package or open an existing .aidub directory to begin.",
+                    empty_card,
+                )
+                e_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                e_sub.setStyleSheet("font-size: 11px; color: #64748B;")
+                ec_lay.addWidget(e_sub)
+
+                btn_row = QHBoxLayout()
+                btn_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                btn_row.setSpacing(10)
+
+                new_p_btn = QPushButton("+ Create New Project", empty_card)
+                new_p_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                new_p_btn.setStyleSheet(
+                    "QPushButton { background: #2563EB; color: #FFF; border: none; border-radius: 6px; padding: 6px 14px; font-size: 11px; font-weight: 700; }"
+                    "QPushButton:hover { background: #1D4ED8; }"
+                )
+                new_p_btn.clicked.connect(self._window.create_new_project_dialog)
+                btn_row.addWidget(new_p_btn)
+
+                open_p_btn = QPushButton("📂 Open Project (.aidub)…", empty_card)
+                open_p_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                open_p_btn.setStyleSheet(
+                    "QPushButton { background: #1E2738; color: #E2E8F0; border: 1px solid #2B384E; border-radius: 6px; padding: 6px 14px; font-size: 11px; font-weight: 600; }"
+                    "QPushButton:hover { background: #28354D; border-color: #38BDF8; }"
+                )
+                open_p_btn.clicked.connect(self._window.open_project_dialog)
+                btn_row.addWidget(open_p_btn)
+
+                quick_imp_btn = QPushButton("🎞 Quick Import Movie", empty_card)
+                quick_imp_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                quick_imp_btn.setStyleSheet(
+                    "QPushButton { background: transparent; color: #38BDF8; border: 1px solid #1E2738; border-radius: 6px; padding: 6px 14px; font-size: 11px; font-weight: 600; }"
+                    "QPushButton:hover { background: rgba(56, 189, 248, 0.1); }"
+                )
+                quick_imp_btn.clicked.connect(self._window.import_from_home)
+                btn_row.addWidget(quick_imp_btn)
+
+                ec_lay.addLayout(btn_row)
+                self.projects_layout.addWidget(empty_card, 1)
 
     class _StudioChrome(QFrame):
         """Frameless title/menu bar matching the production reference."""
@@ -622,7 +799,9 @@ if _QT:
             layout.addWidget(logo)
             self.app_label = QLabel("AI DUBBING STUDIO", self)
             self.app_label.setFixedWidth(148)
-            self.app_label.setStyleSheet("color:#F8FAFC;font-size:12px;font-weight:800;letter-spacing:0.5px;")
+            self.app_label.setStyleSheet(
+                "color:#F8FAFC;font-size:12px;font-weight:800;letter-spacing:0.5px;"
+            )
             layout.addWidget(self.app_label)
 
             # Modern Top Navigation Switcher: Dub vs Timeline
@@ -732,8 +911,9 @@ if _QT:
             if self.max_btn is not None:
                 self.max_btn.setText("❐" if is_maximized else "□")
 
-        def set_project(self, project_name: str) -> None:
-            self.project_label.setText(f"{project_name} - Bengali Dub ⌄")
+        def set_project(self, project_name: str, target_lang: str | None = None) -> None:
+            suffix = f" - {target_lang}" if target_lang else ""
+            self.project_label.setText(f"{project_name}{suffix} ⌄")
             self.project_label.setToolTip(project_name)
 
         def set_telemetry(self, report: object) -> None:
@@ -839,6 +1019,7 @@ if _QT:
             self.stack.addWidget(self.studio)
             self.stack.setCurrentWidget(self.home_view)
             self.setCentralWidget(self.stack)
+            self._active_project: Any | None = None
 
             self.setObjectName("AIDubStudioWindow")
             self.setAcceptDrops(True)
@@ -860,11 +1041,22 @@ if _QT:
             self._telemetry_worker.start()
             self._apply_locale(self._locale_service.locale)
 
+            from aidub.infrastructure.preferences import load_user_preferences
+
+            self._user_prefs = load_user_preferences()
+            if self._user_prefs.theme != "studio_dark":
+                try:
+                    self._set_theme(self._user_prefs.theme)
+                except Exception:
+                    pass
+
         def _build_toolbar(self) -> None:
             toolbar = QToolBar("Main Dubbing Toolbar", self)
             toolbar.setObjectName("MainToolBar")
             toolbar.setMovable(False)
-            toolbar.setVisible(False)  # Hidden to eliminate clutter; chrome tabs provide sleek navigation!
+            toolbar.setVisible(
+                False
+            )  # Hidden to eliminate clutter; chrome tabs provide sleek navigation!
             toolbar.setStyleSheet(
                 "QToolBar#MainToolBar {"
                 "  background: #0B0E14;"
@@ -892,7 +1084,9 @@ if _QT:
                 "}"
             )
             self.dub_action = toolbar.addAction("Dub")
-            self.dub_action.setToolTip("Dub Movie (pick language & Fast/Quality profile) — Ctrl+Enter")
+            self.dub_action.setToolTip(
+                "Dub Movie (pick language & Fast/Quality profile) — Ctrl+Enter"
+            )
             self.dub_action.setShortcut(QKeySequence("Ctrl+Enter"))
             self.dub_action.triggered.connect(self.open_dub_dialog)
 
@@ -904,7 +1098,9 @@ if _QT:
             toolbar.addSeparator()
 
             self.toolbar_stage_label = QLabel("", toolbar)
-            self.toolbar_stage_label.setStyleSheet("color:#38BDF8;font-size:11px;font-weight:600;padding:0 6px;")
+            self.toolbar_stage_label.setStyleSheet(
+                "color:#38BDF8;font-size:11px;font-weight:600;padding:0 6px;"
+            )
             self.toolbar_stage_label.setVisible(False)
             toolbar.addWidget(self.toolbar_stage_label)
 
@@ -932,6 +1128,8 @@ if _QT:
             self.studio.cancel_active_job()
 
         def update_dub_progress(self, stage: str, percent: int, message: str) -> None:
+            if hasattr(self, "toolbar"):
+                self.toolbar.setVisible(True)
             if hasattr(self, "toolbar_progress_bar"):
                 self.toolbar_progress_bar.setVisible(True)
                 self.toolbar_progress_bar.setValue(percent)
@@ -969,21 +1167,126 @@ if _QT:
 
         def show_home(self) -> None:
             self.stack.setCurrentWidget(self.home_view)
+            if hasattr(self, "chrome"):
+                self.chrome.nav_dub_btn.setStyleSheet(
+                    "QPushButton{background:#E11D48;color:#FFF;border:none;border-radius:4px;"
+                    "padding:4px 14px;font-size:11px;font-weight:700;}"
+                )
+                self.chrome.nav_studio_btn.setStyleSheet(
+                    "QPushButton{background:#162030;color:#94A3B8;border:1px solid #233045;border-radius:4px;"
+                    "padding:4px 14px;font-size:11px;font-weight:600;}"
+                    "QPushButton:hover{background:#202B40;color:#FFF;}"
+                )
 
         def show_studio(self) -> None:
             self.stack.setCurrentWidget(self.studio)
+            if hasattr(self, "chrome"):
+                self.chrome.nav_studio_btn.setStyleSheet(
+                    "QPushButton{background:#2563EB;color:#FFF;border:none;border-radius:4px;"
+                    "padding:4px 14px;font-size:11px;font-weight:700;}"
+                )
+                self.chrome.nav_dub_btn.setStyleSheet(
+                    "QPushButton{background:#162030;color:#94A3B8;border:1px solid #233045;border-radius:4px;"
+                    "padding:4px 14px;font-size:11px;font-weight:600;}"
+                    "QPushButton:hover{background:#202B40;color:#FFF;}"
+                )
 
         def import_from_home(self) -> None:
             self.show_studio()
             self.studio.import_media_dialog()
 
+        def create_new_project_dialog(self) -> None:
+            from aidub.ui.dialogs.new_project_dialog import NewProjectDialog
+
+            dialog = NewProjectDialog(self)
+            if dialog.exec() == QDialog.DialogCode.Accepted and dialog.created_project:
+                opened = dialog.created_project
+                self._active_project = opened
+                self.studio.load_opened_project(opened)
+                self.chrome.set_project(
+                    opened.project.name,
+                    target_lang=opened.project.settings.source_language,
+                )
+                self.show_studio()
+                self.home_view.refresh_projects()
+
+        def open_project_dialog(self) -> None:
+            selected = QFileDialog.getExistingDirectory(
+                self,
+                "Open .aidub Project Package Directory",
+                str(Path.home() / "Documents" / "AIDubStudioProjects"),
+            )
+            if selected:
+                self.open_project_path(selected)
+
+        def open_project_path(self, path_str: str | Path) -> None:
+            path = Path(path_str).resolve()
+            if (path.is_dir() and path.suffix.casefold() == ".aidub") or (
+                path.is_dir() and (path / "project.db").is_file()
+            ):
+                from aidub.application.projects import ProjectPackageService
+                from aidub.infrastructure.catalog import ProjectCatalog, default_catalog_path
+
+                catalog = ProjectCatalog(default_catalog_path())
+                try:
+                    catalog.initialize()
+                except Exception:
+                    pass
+                service = ProjectPackageService(catalog=catalog)
+                try:
+                    opened = service.open(path)
+                    self._active_project = opened
+                    self.studio.load_opened_project(opened)
+                    self.chrome.set_project(opened.project.name)
+                    self.show_studio()
+                    self.home_view.refresh_projects()
+                except Exception as exc:
+                    QMessageBox.critical(
+                        self, "Open Project Failed", f"Failed to open project package:\n{exc}"
+                    )
+            elif path.is_file():
+                self.load_movie_and_show_editor(str(path))
+            else:
+                QMessageBox.warning(self, "Invalid Path", f"Project path does not exist:\n{path}")
+
+        def save_current_project(self) -> None:
+            if hasattr(self, "_active_project") and self._active_project is not None:
+                success = self.studio.save_to_project(self._active_project)
+                if success:
+                    self.chrome.set_project(self._active_project.project.name)
+                    self.home_view.refresh_projects()
+            else:
+                reply = QMessageBox.question(
+                    self,
+                    "Save Project",
+                    "No active .aidub project package is open.\n"
+                    "Would you like to create a new project package to save this timeline?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                if reply == QMessageBox.StandardButton.Yes:
+                    self.create_new_project_dialog()
+                    if hasattr(self, "_active_project") and self._active_project is not None:
+                        self.save_current_project()
+
         def load_movie_and_show_editor(self, video_path: str) -> None:
             self.show_studio()
-            if video_path and Path(video_path).is_file():
+            if video_path and Path(video_path).exists():
                 self.studio.load_project(video_path)
 
         def open_voice_model_dialog(self) -> None:
             self.studio._open_voice_model_selector()
+
+        def open_voice_studio_dialog(self) -> None:
+            from aidub.ui.dialogs.voice_studio_dialog import VoiceStudioDialog
+
+            dlg = VoiceStudioDialog(self)
+            dlg.exec()
+
+        def open_audio_review_dialog(self) -> None:
+            from aidub.ui.dialogs.audio_review_panel import AudioReviewDialog
+
+            dlg = AudioReviewDialog(self)
+            dlg.exec()
 
         def open_casting_dialog(self) -> None:
             self.studio._open_character_casting_studio()
@@ -1001,8 +1304,93 @@ if _QT:
         def open_preferences_dialog(self) -> None:
             self.open_preferences()
 
+        def open_preferences(self) -> None:
+            from aidub.ui.preferences_dialog import PreferencesDialog
+
+            dlg = PreferencesDialog(self)
+            dlg.preferences_saved.connect(self._on_preferences_saved)
+            dlg.exec()
+
+        def _on_preferences_saved(self, prefs: Any) -> None:
+            if hasattr(prefs, "theme"):
+                self._set_theme(prefs.theme)
+
         def open_keyboard_shortcuts(self) -> None:
             self.show_keyboard_shortcuts()
+
+        def show_keyboard_shortcuts(self) -> None:
+            from aidub.ui.keyboard_shortcuts_dialog import KeyboardShortcutsDialog
+
+            dlg = KeyboardShortcutsDialog(self)
+            dlg.exec()
+
+        def export_diagnostic_bundle(self) -> None:
+            from aidub.diagnostics.support_bundle import SupportBundleGenerator
+            from aidub.infrastructure.logging import get_default_log_file
+
+            out_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Export Diagnostic Support Bundle",
+                "aidub_support_bundle.zip",
+                "ZIP Archives (*.zip)",
+            )
+            if not out_path:
+                return
+
+            gen = SupportBundleGenerator()
+            log_file = get_default_log_file()
+            extra_logs = [str(log_file)] if log_file.is_file() else []
+            try:
+                dest_parent = Path(out_path).parent
+                res = gen.generate_support_bundle(
+                    output_directory=str(dest_parent),
+                    extra_log_files=extra_logs,
+                )
+                generated_zip = Path(res.zip_path)
+                target_zip = Path(out_path)
+                if generated_zip != target_zip and target_zip.suffix.lower() == ".zip":
+                    generated_zip.replace(target_zip)
+                    res.zip_path = str(target_zip)
+
+                QMessageBox.information(
+                    self,
+                    "Support Bundle Created",
+                    f"Sanitized diagnostic bundle saved:\n{res.zip_path}\n\n"
+                    f"Included files: {res.file_count}\n"
+                    f"Redacted sensitive tokens: {res.redacted_tokens_count}\n\n"
+                    "No passwords, API keys, or media files are included in this bundle.",
+                )
+            except Exception as exc:
+                QMessageBox.critical(
+                    self, "Diagnostics Error", f"Failed to generate support bundle:\n{exc}"
+                )
+
+        def open_logs_directory(self) -> None:
+            import platformdirs
+
+            log_dir = Path(platformdirs.user_log_dir("aidub", "AIDubStudio"))
+            log_dir.mkdir(parents=True, exist_ok=True)
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(log_dir)))
+
+        def show_troubleshooting_guide(self) -> None:
+            QMessageBox.information(
+                self,
+                "Troubleshooting & Support Guide",
+                "Common Solutions:\n\n"
+                "1. Missing FFmpeg / Codec Errors:\n"
+                "   Install FFmpeg to your system PATH or place ffmpeg.exe and ffprobe.exe "
+                "in the application bin/ directory.\n\n"
+                "2. Voice Synthesis / TTS Failures:\n"
+                "   Verify network connectivity for Edge-TTS neural voices, or select an offline "
+                "voice model. Check proxy/firewall settings.\n\n"
+                "3. GPU / VRAM Out of Memory:\n"
+                "   Switch to Fast Profile in Dub Dialog, or select CPU in Studio Preferences "
+                "(Edit -> Preferences -> Force CPU Only).\n\n"
+                "4. Corrupted Projects / Power Cuts:\n"
+                "   Automatic backup recovery restores timeline_state.json.bak if an interrupted "
+                "write was detected.\n\n"
+                "For further assistance, export a sanitized bundle via Help -> Export Diagnostic Support Bundle.",
+            )
 
         def _run_hardware_wizard(self) -> None:
             from PySide6.QtWidgets import QDialog
@@ -1030,6 +1418,25 @@ if _QT:
             menu_bar.clear()
 
             file_menu = menu_bar.addMenu("File")
+            self._add_action(
+                file_menu,
+                "New Project…",
+                self.create_new_project_dialog,
+                "Ctrl+N",
+            )
+            self._add_action(
+                file_menu,
+                "Open Project Package (.aidub)…",
+                self.open_project_dialog,
+                "Ctrl+Shift+O",
+            )
+            self._add_action(
+                file_menu,
+                "Save Project",
+                self.save_current_project,
+                "Ctrl+S",
+            )
+            file_menu.addSeparator()
             self._add_action(
                 file_menu,
                 "Import Source Movie…",
@@ -1063,6 +1470,12 @@ if _QT:
                 "Export Dubbed Master Video…",
                 self.studio.export_dubbed_video,
                 "Ctrl+E",
+            )
+            self._add_action(
+                file_menu,
+                "Broadcast Master Delivery (Surround/LUFS)…",
+                self.open_broadcast_export_dialog,
+                "Ctrl+Shift+B",
             )
             self._add_action(
                 file_menu,
@@ -1124,6 +1537,13 @@ if _QT:
                 "Match Selected Timing",
                 self.studio.match_selected_timing,
             )
+            edit_menu.addSeparator()
+            self._add_action(
+                edit_menu,
+                "Preferences…",
+                self.open_preferences,
+                "Ctrl+,",
+            )
 
             clip_menu = menu_bar.addMenu("Clip")
             self._add_action(
@@ -1145,6 +1565,18 @@ if _QT:
                 clip_menu,
                 "Audio Analysis & Speech Tools…",
                 self.studio._open_audio_analysis,
+            )
+            self._add_action(
+                clip_menu,
+                "AI Voice Studio & Dialogue Lab…",
+                self.open_voice_studio_dialog,
+                "Ctrl+Shift+V",
+            )
+            self._add_action(
+                clip_menu,
+                "Dialogue Audio Review & QC Panel…",
+                self.open_audio_review_dialog,
+                "Ctrl+Shift+R",
             )
             clip_menu.addSeparator()
             self._add_action(
@@ -1281,6 +1713,24 @@ if _QT:
 
             help_menu = menu_bar.addMenu("Help")
             self._add_action(help_menu, "Command Palette…", self._open_command_palette, "Ctrl+K")
+            self._add_action(help_menu, "Keyboard Shortcuts", self.show_keyboard_shortcuts, "F1")
+            help_menu.addSeparator()
+            self._add_action(
+                help_menu,
+                "Export Diagnostic Support Bundle…",
+                self.export_diagnostic_bundle,
+            )
+            self._add_action(
+                help_menu,
+                "Open Logs Folder",
+                self.open_logs_directory,
+            )
+            self._add_action(
+                help_menu,
+                "Troubleshooting Guide",
+                self.show_troubleshooting_guide,
+            )
+            help_menu.addSeparator()
             self._add_action(help_menu, "About", self._show_about)
 
         def _open_command_palette(self) -> None:

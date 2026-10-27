@@ -79,7 +79,10 @@ def test_two_stage_voice_cloning_pipeline(tmp_path: Path) -> None:
     def _mock_synth(text: str, output_mp3_path: Path, **kwargs: object) -> None:
         _make_dummy_wav(output_mp3_path, duration_s=1.8, freq_hz=350.0)
 
-    with patch("aidub.adapters.voice.edge_tts_adapter.EdgeTTSAdapter.synthesize_to_file", side_effect=_mock_synth):
+    with patch(
+        "aidub.adapters.voice.edge_tts_adapter.EdgeTTSAdapter.synthesize_to_file",
+        side_effect=_mock_synth,
+    ):
         result: TwoStageCloningResult = cloner.synthesize_character_voice(
             text="আমি তোমাকে কখনো ভুলব না",
             output_wav_path=out_audio,
@@ -110,7 +113,10 @@ def test_two_stage_voice_cloning_fallback_no_reference(tmp_path: Path) -> None:
     def _mock_synth(text: str, output_mp3_path: Path, **kwargs: object) -> None:
         _make_dummy_wav(output_mp3_path, duration_s=1.2)
 
-    with patch("aidub.adapters.voice.edge_tts_adapter.EdgeTTSAdapter.synthesize_to_file", side_effect=_mock_synth):
+    with patch(
+        "aidub.adapters.voice.edge_tts_adapter.EdgeTTSAdapter.synthesize_to_file",
+        side_effect=_mock_synth,
+    ):
         result = cloner.synthesize_character_voice(
             text="সাধারণ ব্যাকআপ সংলাপ",
             output_wav_path=out_audio,

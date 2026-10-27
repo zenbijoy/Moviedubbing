@@ -5,13 +5,19 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
+from typing import Any
 
 from aidub.adapters.voice_base import (
+    EngineCapability,
+    ReferenceAudioAnalysis,
     SynthesisRequest,
     SynthesisResult,
+    VoiceDesignPrompt,
     VoiceEngineKind,
+    VoiceEngineMetadata,
 )
 from aidub.media.ffmpeg_ops import _ffmpeg_exe, _run, duration
+from aidub.media.voice_dsp import analyze_voice_audio
 
 logger = logging.getLogger(__name__)
 
@@ -105,11 +111,11 @@ class EdgeTTSAdapter:
         pitch_str = f"{pitch:+d}Hz" if isinstance(pitch, int) else str(pitch)
         if not rate_str.endswith("%"):
             rate_str = f"{rate_str}%"
-        if not (rate_str.startswith("+") or rate_str.startswith("-")):
+        if not rate_str.startswith(("+", "-")):
             rate_str = f"+{rate_str}"
         if not pitch_str.endswith("Hz"):
             pitch_str = f"{pitch_str}Hz"
-        if not (pitch_str.startswith("+") or pitch_str.startswith("-")):
+        if not pitch_str.startswith(("+", "-")):
             pitch_str = f"+{pitch_str}"
 
         import time
@@ -155,6 +161,54 @@ class EdgeTTSVoiceEngine:
     @property
     def engine_kind(self) -> VoiceEngineKind:
         return VoiceEngineKind.EDGE_TTS
+
+    @property
+    def metadata(self) -> VoiceEngineMetadata:
+        return VoiceEngineMetadata(
+            engine_kind=VoiceEngineKind.EDGE_TTS,
+            display_name="Microsoft Edge-TTS Neural",
+            model_id="ms-edge-neural-tts",
+            version="1.0.0",
+            capabilities={
+                EngineCapability.TEXT_TO_SPEECH,
+                EngineCapability.RATE_CONTROL,
+                EngineCapability.PITCH_CONTROL,
+                EngineCapability.MULTILINGUAL,
+            },
+            supported_languages=list(_LANGUAGE_VOICES.keys()),
+            hardware_requirements="CPU / Minimal network access (Zero GPU)",
+            license_info="Microsoft Edge Speech Service (Free tier)",
+            commercial_use_allowed=True,
+            min_ram_gb=0.1,
+            min_vram_gb=0.0,
+            is_local=False,
+            is_cloud_api=True,
+            known_limitations=[
+                "Does not support reference-audio voice cloning directly (pair with Two-Stage Cloner).",
+                "Requires network connectivity to Microsoft Edge speech websocket endpoints.",
+            ],
+        )
+
+    def is_available(self) -> tuple[bool, str]:
+        try:
+            import edge_tts  # noqa: F401
+
+            return True, "Ready (edge_tts package installed)"
+        except ImportError:
+            return False, "edge-tts package not installed (run 'pip install edge-tts')"
+
+    def design_voice(self, prompt: VoiceDesignPrompt) -> dict[str, Any]:
+        """Map design prompt to closest default gender/language neural voice."""
+        is_female = prompt.gender.lower() in {"female", "woman", "girl"}
+        voice_id = "bn-BD-NabanitaNeural" if is_female else "bn-BD-PradeepNeural"
+        return {
+            "voice_id": voice_id,
+            "gender": "female" if is_female else "male",
+            "prompt_applied": True,
+        }
+
+    def verify_reference_audio(self, audio_path: str) -> ReferenceAudioAnalysis:
+        return analyze_voice_audio(audio_path)
 
     def synthesize(self, request: SynthesisRequest, output_dir: str) -> SynthesisResult:
         output_root = Path(output_dir)

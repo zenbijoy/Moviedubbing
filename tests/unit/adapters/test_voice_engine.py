@@ -101,7 +101,20 @@ def test_edge_tts_all_supported_languages_mapped() -> None:
     )
 
     expected_langs = [
-        "bn", "hi", "es", "fr", "de", "ja", "zh", "ar", "pt", "ru", "ko", "it", "tr", "en"
+        "bn",
+        "hi",
+        "es",
+        "fr",
+        "de",
+        "ja",
+        "zh",
+        "ar",
+        "pt",
+        "ru",
+        "ko",
+        "it",
+        "tr",
+        "en",
     ]
     for lang in expected_langs:
         voice = default_voice_for_language(lang)
@@ -112,4 +125,3 @@ def test_edge_tts_all_supported_languages_mapped() -> None:
         voices = available_voices_for_language(lang)
         assert len(voices) >= 1
         assert voice in voices
-

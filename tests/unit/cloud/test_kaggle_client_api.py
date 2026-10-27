@@ -23,7 +23,9 @@ def test_client() -> KaggleClient:
 
 
 def test_kaggle_client_push_kernel_success(test_client: KaggleClient) -> None:
-    mock_resp_data = json.dumps({"url": "https://www.kaggle.com/code/testuser/aidub-feature"}).encode("utf-8")
+    mock_resp_data = json.dumps(
+        {"url": "https://www.kaggle.com/code/testuser/aidub-feature"}
+    ).encode("utf-8")
 
     mock_resp = MagicMock()
     mock_resp.read.return_value = mock_resp_data
@@ -61,11 +63,16 @@ def test_kaggle_client_download_output(test_client: KaggleClient, tmp_path: Path
     dest_dir = tmp_path / "out"
 
     # Mock JSON response listing files
-    mock_list_data = json.dumps({
-        "files": [
-            {"fileName": "dubbed_master.mp4", "url": "https://kaggle.com/download/dubbed_master.mp4"},
-        ]
-    }).encode("utf-8")
+    mock_list_data = json.dumps(
+        {
+            "files": [
+                {
+                    "fileName": "dubbed_master.mp4",
+                    "url": "https://kaggle.com/download/dubbed_master.mp4",
+                },
+            ]
+        }
+    ).encode("utf-8")
 
     mock_resp1 = MagicMock()
     mock_resp1.headers = {"Content-Type": "application/json"}
