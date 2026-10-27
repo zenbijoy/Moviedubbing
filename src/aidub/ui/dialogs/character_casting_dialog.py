@@ -153,7 +153,8 @@ if _QT:
                 ("Chatterbox: Hero Deep (Cloned)", "chatterbox_male_deep"),
                 ("Chatterbox: Emotive Female (Cloned)", "chatterbox_female_soft"),
                 ("Chatterbox: Expressive Dramatic", "chatterbox_dramatic"),
-                ("Edge-TTS: Pradeep (Male BD)", BENGALI_VOICES["male_bd"]),
+                ("Edge-TTS: Pradeep (Male BD)", BENGALI_VOICES["male_bd_pradeep"]),
+                ("Edge-TTS: Bashkar (Male BD)", BENGALI_VOICES["male_bd_bashkar"]),
                 ("Edge-TTS: Nabanita (Female BD)", BENGALI_VOICES["female_bd"]),
                 ("Edge-TTS: Tanishaa (Female IN)", BENGALI_VOICES["female_in"]),
             ]
