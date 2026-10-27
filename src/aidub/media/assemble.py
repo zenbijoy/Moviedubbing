@@ -143,36 +143,52 @@ def fit_to_slot(
 
 
 def assemble_timeline(
-    placed_segments: list[tuple[float, Path | str]],
+    placed_segments: list[tuple[float | Any, Path | str]],
     total_duration_s: float,
     output_wav: Path | str,
-    sample_rate: int = 44100,
+    sample_rate: int = 48_000,
 ) -> Path:
     """
-    Assemble placed dubbed segments into a single cohesive audio track.
+    Assemble placed dubbed segments into a single cohesive audio track at broadcast sample rate.
 
-    Uses cursor-aware positioning: segments are placed at their target timestamps,
-    with overlap prevention so dialogue turns never collide. Final audio is padded
-    to match video duration.
+    Anchors each segment strictly to its target editorial cue timestamp (preventing
+    cumulative timing drift across long-form films). Overlapping trails (e.g. reverb
+    or breath) are cleanly blended without pushing subsequent character lines out of sync.
+    Final audio is padded or conformed to match exact video duration.
 
     Args:
-        placed_segments: List of tuples (start_timestamp_s, segment_wav_path).
+        placed_segments: List of tuples (start_position, segment_wav_path).
+            start_position may be float seconds, RationalTime, or AudioSamplePosition.
         total_duration_s: Target total video duration in seconds.
         output_wav: Output WAV file path.
-        sample_rate: Target output sample rate (44100Hz default).
+        sample_rate: Target output sample rate (48000 Hz broadcast standard default).
 
     Returns:
         Path to completed audio track.
     """
     import soundfile as sf
+    from aidub.domain.time import AudioSamplePosition, RationalTime
 
-    total_samples = int(total_duration_s * sample_rate) + sample_rate
+    exact_len = int(round(total_duration_s * sample_rate))
+    total_samples = max(exact_len, 0) + sample_rate
     timeline_buf = np.zeros(total_samples, dtype=np.float32)
+
+    def _resolve_sample_index(pos: float | Any) -> int:
+        if isinstance(pos, AudioSamplePosition):
+            if pos.sample_rate == sample_rate:
+                return pos.sample_index
+            return int(round(pos.sample_index * sample_rate / pos.sample_rate))
+        if isinstance(pos, RationalTime):
+            return pos.to_audio_sample_position(sample_rate).sample_index
+        return int(round(float(pos) * sample_rate))
+
+    # Sort segments by their target start time
+    sorted_segments = sorted(placed_segments, key=lambda x: _resolve_sample_index(x[0]))
 
     cursor_sample = 0
 
-    for start_s, seg_path in sorted(placed_segments, key=lambda x: x[0]):
-        start_sample = max(int(start_s * sample_rate), cursor_sample)
+    for start_pos, seg_path in sorted_segments:
+        target_start_sample = max(0, _resolve_sample_index(start_pos))
         data, sr = sf.read(str(seg_path), dtype="float32")
 
         if data.ndim > 1:
@@ -183,20 +199,32 @@ def assemble_timeline(
 
             data = librosa.resample(data, orig_sr=sr, target_sr=sample_rate)
 
-        # Normalize phrase loudness
+        # Normalize phrase loudness according to EBU R128 / broadcast standard
         norm_data = normalize_voice(data, sample_rate)
         seg_samples = len(norm_data)
+        if seg_samples == 0:
+            continue
 
+        # In ADR-001 exact time model:
+        # We anchor strictly to target_start_sample to prevent Cascading Drift Disaster.
+        # If previous segment had a lingering tail, we log and blend rather than bumping.
+        if target_start_sample < cursor_sample:
+            overlap_ms = (cursor_sample - target_start_sample) * 1000.0 / sample_rate
+            logger.debug(
+                "Dialogue overlap of %.1f ms at sample %d. Anchoring to editorial timing to prevent drift.",
+                overlap_ms,
+                target_start_sample,
+            )
+
+        start_sample = target_start_sample
         end_sample = start_sample + seg_samples
         if end_sample > len(timeline_buf):
-            # Extend buffer if needed
             timeline_buf = np.pad(timeline_buf, (0, end_sample - len(timeline_buf)))
 
         timeline_buf[start_sample:end_sample] += norm_data
-        cursor_sample = end_sample
+        cursor_sample = max(cursor_sample, end_sample)
 
     out_p = Path(output_wav)
-    exact_len = int(total_duration_s * sample_rate)
     final_buf = timeline_buf[:exact_len]
     if len(final_buf) < exact_len:
         final_buf = np.pad(final_buf, (0, exact_len - len(final_buf)))

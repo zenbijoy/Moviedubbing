@@ -20,10 +20,13 @@ classifiers = [
 ]
 dependencies = [
   "chardet>=5.2,<6",
+  "imageio-ffmpeg>=0.5.1,<1",
   "numpy>=2.0,<3",
+  "pillow>=10.0,<12",
   "psutil>=6.0,<8",
   "pydantic>=2.12,<3",
   "pydantic-settings>=2.10,<3",
+  "scipy>=1.14,<2",
   "soundfile>=0.12,<1",
   "structlog>=25.4,<26",
   "typing-extensions>=4.15,<5",

@@ -221,3 +221,28 @@ def test_negative_rational_time_cannot_become_an_audio_position() -> None:
         AudioSamplePosition.from_rational_time(
             rt(-1), sample_rate=48_000, rounding=RoundingMode.FLOOR
         )
+
+
+def test_rational_rate_from_fps_exact_ntsc_and_cinema_mapping() -> None:
+    assert RationalRate.from_fps(23.976) == FPS_NTSC
+    assert RationalRate.from_fps(23.98) == FPS_NTSC
+    assert RationalRate.from_fps("23.976") == FPS_NTSC
+    assert RationalRate.from_fps((24000, 1001)) == FPS_NTSC
+    assert RationalRate.from_fps(24.0) == FPS_24
+    assert RationalRate.from_fps(25.0) == FPS_25
+    assert RationalRate.from_fps(29.97) == RationalRate(numerator=30_000, denominator=1_001)
+    assert RationalRate.from_fps(59.94) == RationalRate(numerator=60_000, denominator=1_001)
+    assert RationalRate.from_fps(60.0) == RationalRate(numerator=60, denominator=1)
+
+
+def test_rational_time_from_seconds_and_audio_samples() -> None:
+    # 1.0 second at 24000/1001 fps
+    r_time = RationalTime.from_seconds(1.0, FPS_NTSC)
+    # At 24000/1001, 1 sec = 23.976 frames -> rounded to 24 frames
+    assert r_time.ticks == 24
+    assert abs(r_time.to_seconds_float() - 1.001) < 0.002
+
+    # Map directly to 48kHz AudioSamplePosition
+    audio_pos = r_time.to_audio_sample_position(48_000)
+    assert audio_pos.sample_rate == 48_000
+    assert audio_pos.sample_index == 24 * 2002  # each NTSC frame is 2002 samples at 48kHz!

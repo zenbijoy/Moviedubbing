@@ -120,7 +120,6 @@ def probe(path: Path | str) -> dict[str, Any]:
                 ffprobe,
                 "-v",
                 "error",
-                "-nostdin",
                 "-print_format",
                 "json",
                 "-show_format",
@@ -412,11 +411,12 @@ def dynamic_sidechain_mix(
     threshold_linear = max(0.001, min(1.0, 10.0 ** (threshold_db / 20.0)))
 
     # [0:a] is voice (control signal), [1:a] is music (signal to duck)
+    # Split [voc] using asplit=2 so both sidechaincompress and amix receive distinct streams
     fc = (
-        f"[0:a]aformat=channel_layouts=stereo,volume={voice_gain:.2f}[voc];"
+        f"[0:a]aformat=channel_layouts=stereo,volume={voice_gain:.2f},asplit=2[voc_sc][voc_mix];"
         "[1:a]aformat=channel_layouts=stereo[mus];"
-        f"[mus][voc]sidechaincompress=threshold={threshold_linear:.5f}:ratio={ducking_ratio:.1f}:attack={attack_ms:.1f}:release={release_ms:.1f}:level_sc=1[ducked_mus];"
-        "[voc][ducked_mus]amix=inputs=2:duration=longest:dropout_transition=0:weights=1 1:normalize=0[mix];"
+        f"[mus][voc_sc]sidechaincompress=threshold={threshold_linear:.5f}:ratio={ducking_ratio:.1f}:attack={attack_ms:.1f}:release={release_ms:.1f}:level_sc=1[ducked_mus];"
+        "[voc_mix][ducked_mus]amix=inputs=2:duration=longest:dropout_transition=0:weights=1 1:normalize=0[mix];"
         "[mix]alimiter=limit=0.95:level=true[out]"
     )
 
@@ -434,11 +434,11 @@ def dynamic_sidechain_mix(
     ]
 
     if suffix == ".wav":
-        cmd.extend(["-c:a", "pcm_s16le", "-ar", "44100"])
+        cmd.extend(["-c:a", "pcm_s16le", "-ar", "48000"])
     elif suffix == ".mp3":
-        cmd.extend(["-c:a", "libmp3lame", "-b:a", "192k", "-ar", "44100"])
+        cmd.extend(["-c:a", "libmp3lame", "-b:a", "192k", "-ar", "48000"])
     else:
-        cmd.extend(["-c:a", "aac", "-b:a", "192k", "-ar", "44100"])
+        cmd.extend(["-c:a", "aac", "-b:a", "192k", "-ar", "48000"])
 
     cmd.append(str(out_p))
     try:

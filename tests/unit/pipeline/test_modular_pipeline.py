@@ -285,9 +285,9 @@ def test_mix_timeline_audio(tmp_path: Path) -> None:
 
     assert res_path.is_file()
     data, sr = sf.read(str(res_path))
-    assert sr == 44100
-    # Length should match total_duration_s (5.0s * 44100)
-    assert len(data) >= int(5.0 * 44100)
+    assert sr == 48000
+    # Length should match total_duration_s (5.0s * 48000)
+    assert len(data) >= int(5.0 * 48000)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

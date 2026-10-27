@@ -75,6 +75,56 @@ class RationalRate(DomainModel):
     def __str__(self) -> str:
         return f"{self.numerator}/{self.denominator}"
 
+    @classmethod
+    def from_fps(
+        cls,
+        fps: float | int | str | RationalRate | tuple[int, int],
+    ) -> RationalRate:
+        """Create exact RationalRate from integer, float, string, or tuple.
+
+        Accurately maps standard cinematic and broadcast frame rates:
+        - 23.976 / 23.98 fps -> 24000/1001 (NTSC Cinema)
+        - 24.0 fps -> 24/1 (Cinema Standard)
+        - 25.0 fps -> 25/1 (PAL)
+        - 29.97 fps -> 30000/1001 (NTSC Broadcast)
+        - 30.0 fps -> 30/1
+        - 50.0 fps -> 50/1 (PAL High Frame Rate)
+        - 59.94 fps -> 60000/1001 (NTSC High Frame Rate)
+        - 60.0 fps -> 60/1
+        """
+        if isinstance(fps, RationalRate):
+            return fps
+        if isinstance(fps, tuple) and len(fps) == 2:
+            return cls(numerator=int(fps[0]), denominator=int(fps[1]))
+        if isinstance(fps, str):
+            fps_str = fps.strip()
+            if "/" in fps_str:
+                parts = fps_str.split("/", 1)
+                return cls(numerator=int(parts[0]), denominator=int(parts[1]))
+            try:
+                fps = float(fps_str)
+            except ValueError as exc:
+                raise ValueError(f"Cannot parse rate from string {fps!r}") from exc
+
+        fps_float = float(fps)
+        if fps_float <= 0:
+            raise ValueError(f"Framerate must be positive, got {fps_float}")
+
+        # Integer rates (24, 25, 30, 48, 50, 60, 120, etc.)
+        if round(fps_float) == fps_float:
+            return cls(numerator=int(round(fps_float)), denominator=1)
+
+        # Standard NTSC / Cinema rates within common floating point tolerances
+        if abs(fps_float - 23.976023976) < 0.01 or abs(fps_float - 23.976) < 0.005 or abs(fps_float - 23.98) < 0.005:
+            return cls(numerator=24_000, denominator=1_001)
+        if abs(fps_float - 29.97002997) < 0.01 or abs(fps_float - 29.97) < 0.005:
+            return cls(numerator=30_000, denominator=1_001)
+        if abs(fps_float - 59.94005994) < 0.01 or abs(fps_float - 59.94) < 0.005:
+            return cls(numerator=60_000, denominator=1_001)
+
+        frac = Fraction(fps_float).limit_denominator(1001)
+        return cls(numerator=frac.numerator, denominator=frac.denominator)
+
 
 @dataclass(frozen=True, slots=True)
 class TickRescaler:
@@ -194,6 +244,37 @@ class RationalTime(DomainModel):
 
     def __str__(self) -> str:
         return f"{self.ticks}@{self.rate}"
+
+    @classmethod
+    def from_seconds(
+        cls,
+        seconds: float | int | Fraction,
+        rate: RationalRate,
+        *,
+        rounding: RoundingMode = RoundingMode.NEAREST_EVEN,
+    ) -> RationalTime:
+        """Construct exact RationalTime from seconds and target rate using explicit rounding."""
+        frac_s = Fraction(seconds) if not isinstance(seconds, Fraction) else seconds
+        tick_fraction = frac_s * Fraction(rate.numerator, rate.denominator)
+        ticks = _round_fraction(tick_fraction, rounding)
+        return cls(ticks=ticks, rate=rate)
+
+    def to_seconds_float(self) -> float:
+        """Floating point seconds for ephemeral UI or telemetry displays ONLY (ADR-001)."""
+        return float(self.seconds)
+
+    def to_audio_sample_position(
+        self,
+        sample_rate: int = 48_000,
+        *,
+        rounding: RoundingMode = RoundingMode.NEAREST_EVEN,
+    ) -> AudioSamplePosition:
+        """Directly map editorial RationalTime to sample-accurate AudioSamplePosition."""
+        return AudioSamplePosition.from_rational_time(
+            self,
+            sample_rate=sample_rate,
+            rounding=rounding,
+        )
 
 
 class TimeRange(DomainModel):

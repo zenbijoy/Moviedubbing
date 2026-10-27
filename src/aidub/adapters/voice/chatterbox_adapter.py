@@ -118,7 +118,17 @@ class ChatterboxAdapter:
         }
 
         if reference_audio and Path(reference_audio).is_file():
-            payload["reference_audio"] = str(Path(reference_audio).resolve())
+            ref_path = Path(reference_audio)
+            payload["reference_audio"] = str(ref_path.resolve())
+            try:
+                import base64
+
+                ref_bytes = ref_path.read_bytes()
+                # If audio is reasonable size (< 20MB), embed base64 so remote Kaggle/cloud endpoints can access it
+                if len(ref_bytes) < 20 * 1024 * 1024:
+                    payload["reference_audio_base64"] = base64.b64encode(ref_bytes).decode("ascii")
+            except Exception as exc:
+                logger.warning("Could not encode reference audio for remote endpoint: %s", exc)
 
         # Attempt synthesis against Chatterbox HTTP endpoint
         try:
@@ -136,7 +146,8 @@ class ChatterboxAdapter:
                 headers=headers,
                 method="POST",
             )
-            with urllib.request.urlopen(request, timeout=20.0) as resp:  # noqa: S310
+            timeout_sec = float(os.environ.get("CHATTERBOX_TIMEOUT_SEC", "90.0"))
+            with urllib.request.urlopen(request, timeout=timeout_sec) as resp:  # noqa: S310
                 content_type = resp.headers.get("Content-Type", "")
                 audio_bytes = resp.read()
                 if not audio_bytes:
@@ -147,7 +158,14 @@ class ChatterboxAdapter:
                     import base64
 
                     data = json.loads(audio_bytes.decode("utf-8"))
-                    audio_bytes = base64.b64decode(data.get("audio_base64", ""))
+                    b64_audio = data.get("audio_base64") or data.get("audio") or ""
+                    if not b64_audio:
+                        raise RuntimeError(
+                            f"Chatterbox server returned JSON without audio data: {list(data.keys())}"
+                        )
+                    audio_bytes = base64.b64decode(b64_audio)
+                    if not audio_bytes:
+                        raise RuntimeError("Chatterbox audio payload decoded to 0 bytes.")
 
                 out_path.write_bytes(audio_bytes)
                 logger.info(
@@ -157,14 +175,14 @@ class ChatterboxAdapter:
                 )
                 return out_path
 
-        except (urllib.error.URLError, urllib.error.HTTPError, OSError, TimeoutError) as exc:
+        except (urllib.error.URLError, urllib.error.HTTPError, OSError, TimeoutError, RuntimeError) as exc:
             if not self.allow_fallback:
                 raise VoiceEngineError(
                     "chatterbox", f"Synthesis failed and fallback disabled: {exc}"
                 ) from exc
 
             logger.info(
-                "Chatterbox AI endpoint unreachable (%s); using adaptive neural fallback with emotion=%s",
+                "Chatterbox AI endpoint unreachable or error (%s); using adaptive neural fallback with emotion=%s",
                 exc,
                 emotion_str,
             )
@@ -201,13 +219,17 @@ class ChatterboxAdapter:
             "whisper": ("-8%", "-3Hz"),
             "neutral": ("+0%", "+0Hz"),
         }
-        rate_offset, pitch_offset = emotion_prosody.get(emotion.lower(), ("+0%", "+0Hz"))
+        rate_offset_str, pitch_offset_str = emotion_prosody.get(emotion.lower(), ("+0%", "+0Hz"))
 
-        # Calculate final rate and pitch strings
+        # Combine user's editorial pacing and pitch with emotional offsets
         base_rate = round((pace - 1.0) * 100)
         base_pitch = round(pitch_shift * 4)
-        final_rate = f"{base_rate:+d}%" if rate_offset == "+0%" else rate_offset
-        final_pitch = f"{base_pitch:+d}Hz" if pitch_offset == "+0Hz" else pitch_offset
+
+        rate_emo_val = int(rate_offset_str.replace("%", "").replace("+", ""))
+        pitch_emo_val = int(pitch_offset_str.replace("Hz", "").replace("+", ""))
+
+        final_rate = f"{base_rate + rate_emo_val:+d}%"
+        final_pitch = f"{base_pitch + pitch_emo_val:+d}Hz"
 
         selected_voice = voice or DEFAULT_BENGALI_VOICE
         temp_mp3 = output_wav.with_suffix(".tmp.mp3")

@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-import json
-import os
-import subprocess
-import sys
-from http.server import HTTPServer, SimpleHTTPRequestHandler
-from pathlib import Path
+from http.server import SimpleHTTPRequestHandler
+from urllib.parse import urlparse
 
 
 class DemoBridgeHandler(SimpleHTTPRequestHandler):
-    def do_GET(self):
-        parsed = urlparse(self.path) if False else None
+    """Custom request handler for studio UI preview bridge."""
+
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path == "/health":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"status": "ok"}')
+            return
+        super().do_GET()

@@ -1,7 +1,10 @@
-"""User interface package."""
+"""User interface package with lazy Qt import support for headless environments."""
 
-from .application import DesktopApplication
-from .command_palette import CommandPaletteDialog
+from __future__ import annotations
+
+import importlib
+from typing import Any
+
 from .commands import Command, CommandRegistry
 from .editorial import EditorialCommandEngine, SnappingEngine
 from .keyboard_shortcuts import (
@@ -17,6 +20,21 @@ from .workspace_manager import (
     WorkspaceManager,
     WorkspacePreset,
 )
+
+_LAZY_EXPORTS = {
+    "DesktopApplication": ".application",
+    "CommandPaletteDialog": ".command_palette",
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in _LAZY_EXPORTS:
+        module = importlib.import_module(_LAZY_EXPORTS[name], __name__)
+        val = getattr(module, name)
+        globals()[name] = val
+        return val
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "DEFAULT_SHORTCUTS",

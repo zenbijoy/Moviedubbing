@@ -864,18 +864,21 @@ if _QT:
                     QVideoSink,
                 )
 
-                audio_devices = QMediaDevices.audioOutputs()
+                audio_devices = []
+                try:
+                    audio_devices = QMediaDevices.audioOutputs()
+                except Exception as dev_err:
+                    logger.warning("Could not query audio devices (headless or sandbox): %s", dev_err)
+
                 if audio_devices:
-                    self._audio_output = QAudioOutput(self)
-                    self._audio_output.setVolume(0.82)
+                    try:
+                        self._audio_output = QAudioOutput(self)
+                        self._audio_output.setVolume(0.82)
+                    except Exception as out_err:
+                        logger.warning("Could not instantiate QAudioOutput: %s", out_err)
+                        self._audio_output = None
                 else:
                     self._audio_output = None
-                    QTimer.singleShot(
-                        0,
-                        lambda: self.action_triggered.emit(
-                            "No audio output device detected; running video preview without audio"
-                        ),
-                    )
 
                 self._player = QMediaPlayer(self)
                 if self._audio_output is not None:
@@ -887,7 +890,8 @@ if _QT:
                 self._player.durationChanged.connect(self._on_player_duration_changed)
                 self._player.mediaStatusChanged.connect(self._on_media_status_changed)
                 self._player.errorOccurred.connect(self._on_player_error)
-            except (ImportError, RuntimeError):
+            except Exception as player_init_err:
+                logger.warning("QtMultimedia initialization failed (running in sandbox/headless fallback): %s", player_init_err)
                 self._player = None
                 self._video_widget = None
 

@@ -29,7 +29,7 @@ from aidub.application.translation_pipeline import (
     TranslationPipeline,
 )
 from aidub.contracts.base import ContractModel, Identifier
-from aidub.domain.time import RationalRate, RationalTime
+from aidub.domain.time import AudioSampleRange, RationalRate, RationalTime, TimeRange
 from aidub.media.assemble import assemble_timeline, fit_to_slot
 from aidub.media.ffmpeg_ops import (
     duration,
@@ -71,12 +71,19 @@ class TranscriptCue(ContractModel):
     def duration_s(self) -> float:
         return max(0.0, self.end_s - self.start_s)
 
-    def to_rational_time(self, fps: float = 24.0) -> tuple[RationalTime, RationalTime]:
-        num = round(fps * 1000)
-        rate = RationalRate(numerator=num, denominator=1000)
-        start_ticks = round(self.start_s * num / 1000)
-        end_ticks = round(self.end_s * num / 1000)
-        return RationalTime(ticks=start_ticks, rate=rate), RationalTime(ticks=end_ticks, rate=rate)
+    def to_rational_time(self, fps: float | RationalRate = 24.0) -> tuple[RationalTime, RationalTime]:
+        rate = RationalRate.from_fps(fps) if not isinstance(fps, RationalRate) else fps
+        return RationalTime.from_seconds(self.start_s, rate), RationalTime.from_seconds(self.end_s, rate)
+
+    def to_time_range(self, fps: float | RationalRate = 24.0) -> TimeRange:
+        start_rt, end_rt = self.to_rational_time(fps)
+        return TimeRange.from_start_end(start_rt, end_rt)
+
+    def to_audio_sample_range(self, sample_rate: int = 48_000) -> AudioSampleRange:
+        start_rt, end_rt = self.to_rational_time()
+        start_pos = start_rt.to_audio_sample_position(sample_rate)
+        end_pos = end_rt.to_audio_sample_position(sample_rate)
+        return AudioSampleRange(start=start_pos, sample_count=max(0, end_pos.sample_index - start_pos.sample_index))
 
 
 class TranslatedCue(ContractModel):
@@ -97,6 +104,14 @@ class TranslatedCue(ContractModel):
     def duration_s(self) -> float:
         return max(0.0, self.end_s - self.start_s)
 
+    def to_rational_time(self, fps: float | RationalRate = 24.0) -> tuple[RationalTime, RationalTime]:
+        rate = RationalRate.from_fps(fps) if not isinstance(fps, RationalRate) else fps
+        return RationalTime.from_seconds(self.start_s, rate), RationalTime.from_seconds(self.end_s, rate)
+
+    def to_time_range(self, fps: float | RationalRate = 24.0) -> TimeRange:
+        start_rt, end_rt = self.to_rational_time(fps)
+        return TimeRange.from_start_end(start_rt, end_rt)
+
 
 class SynthesizedCueTake(ContractModel):
     """Synthesized voice audio take for a specific dialogue cue."""
@@ -111,6 +126,18 @@ class SynthesizedCueTake(ContractModel):
     delta_pct: float
     flagged_for_review: bool = False
     fitted_audio_path: str = ""
+
+    def to_rational_time(self, fps: float | RationalRate = 24.0) -> tuple[RationalTime, RationalTime]:
+        rate = RationalRate.from_fps(fps) if not isinstance(fps, RationalRate) else fps
+        start_rt = RationalTime.from_seconds(self.start_s, rate)
+        end_rt = RationalTime.from_seconds(self.start_s + self.actual_duration_s, rate)
+        return start_rt, end_rt
+
+    def to_audio_sample_range(self, sample_rate: int = 48_000) -> AudioSampleRange:
+        start_rt, end_rt = self.to_rational_time()
+        start_pos = start_rt.to_audio_sample_position(sample_rate)
+        end_pos = end_rt.to_audio_sample_position(sample_rate)
+        return AudioSampleRange(start=start_pos, sample_count=max(0, end_pos.sample_index - start_pos.sample_index))
 
 
 # Offline bilingual lexicon for deterministic testing and network-isolated workstations

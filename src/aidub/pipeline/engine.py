@@ -575,23 +575,18 @@ class DubbingEngine:
                     )
                     cursor = 0.0
 
-                    speaker_refs: dict[int, Path] = {}
+                    speaker_refs: dict[Any, Path] = {}
                     has_real_rvc = bool(
                         os.environ.get("AIDUB_RVC_COMMAND") or os.environ.get("RVC_ENDPOINT_URL")
                     )
-                    if (
-                        getattr(self.cfg, "rvc_cloning", True)
-                        and not self.cfg.fast
-                        and vocals16.is_file()
-                        and has_real_rvc
-                    ):
+                    if vocals16.is_file() and not self.cfg.fast:
                         try:
                             from aidub.adapters.voice.reference_extractor import pick_reference
 
                             raw_refs = pick_reference(segs, vocals16, self.work_dir)
                             speaker_refs = {spk: path for spk, (path, _txt) in raw_refs.items()}
                             logger.info(
-                                "Extracted %d reference clips for RVC v2 voice cloning",
+                                "Extracted %d clean reference clips for character voice cloning",
                                 len(speaker_refs),
                             )
                         except Exception as exc:
@@ -703,12 +698,25 @@ class DubbingEngine:
                                         emotion=current_emo,
                                     )
                                 elif chatterbox_tts is not None:
+                                    clean_ref = (
+                                        speaker_refs.get(spk_key)
+                                        or speaker_refs.get(str(spk_key).replace("SPEAKER_", ""))
+                                        or (
+                                            Path(current_char.reference_audio_paths[0])
+                                            if (
+                                                current_char
+                                                and current_char.reference_audio_paths
+                                                and Path(current_char.reference_audio_paths[0]).is_file()
+                                            )
+                                            else None
+                                        )
+                                    )
                                     chatterbox_tts.synthesize_to_file(
                                         text=t_text,
                                         output_wav_path=out_p,
                                         voice=current_voice,
                                         emotion=current_emo,
-                                        reference_audio=vocals16 if vocals16.is_file() else None,
+                                        reference_audio=clean_ref,
                                     )
                                 else:
                                     tts.synthesize_to_file(
@@ -720,13 +728,22 @@ class DubbingEngine:
                                     )
 
                             try:
+                                spk_clean_ref = (
+                                    speaker_refs.get(spk_key)
+                                    or speaker_refs.get(str(spk_key).replace("SPEAKER_", ""))
+                                    or (
+                                        Path(char.reference_audio_paths[0])
+                                        if (char and char.reference_audio_paths and Path(char.reference_audio_paths[0]).is_file())
+                                        else None
+                                    )
+                                )
                                 emo_res, vr_report = emotion_engine.synthesize_verified_line(
                                     text=tgt_text,
                                     output_path=raw_seg_wav,
                                     synth_fn=_synth_cb,
                                     utterance_id=str(start_time),
                                     character_name=char_name,
-                                    audio_path=vocals16 if vocals16.is_file() else None,
+                                    audio_path=spk_clean_ref if (spk_clean_ref and Path(spk_clean_ref).is_file()) else (vocals16 if vocals16.is_file() else None),
                                     start_s=start_time,
                                     end_s=end_time,
                                     scene_context=f"Cinematic dialogue for {char_name}",
@@ -778,10 +795,10 @@ class DubbingEngine:
                                     refs: list[str | Path] = []
                                     if spk_num in speaker_refs and speaker_refs[spk_num].is_file():
                                         refs.append(speaker_refs[spk_num])
+                                    elif spk_key in speaker_refs and speaker_refs[spk_key].is_file():
+                                        refs.append(speaker_refs[spk_key])
                                     elif char and char.reference_audio_paths:
                                         refs.extend(char.reference_audio_paths)
-                                    elif vocals16.is_file():
-                                        refs.append(vocals16)
 
                                     if refs:
                                         rvc_adapter.convert_timbre(
