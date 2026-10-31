@@ -69,6 +69,7 @@ class IsometricCandidate:
     isometric_score: float  # 0.0 to 1.0 (1.0 = perfect mathematical match)
     is_lip_compliant: bool
     adaptation_applied: str = "none"
+    bilabial_sync_score: float = 1.0
 
 
 @dataclass
@@ -96,6 +97,41 @@ class IsometricTranslationEngine:
     """
 
     @classmethod
+    def calculate_bilabial_sync(cls, source_text: str, target_text: str) -> float:
+        """
+        Calculate bilabial consonant alignment synchrony between source and target dialogue.
+
+        In film dubbing, bilabial consonants (B/P/M/W <-> প/ফ/ব/ভ/ম) require complete
+        physical closure of the lips. Aligning relative positions creates convincing lip sync.
+
+        Returns:
+            Score between 0.0 and 1.0 (1.0 = optimal lip closure synchrony).
+        """
+        src_bilabials = set("bpmwBPMW")
+        tgt_bilabials = set("পফবভম")
+
+        src_clean = re.sub(r"[^\w\s]", "", source_text)
+        tgt_clean = re.sub(r"[^\w\s\u0980-\u09FF]", "", target_text)
+
+        src_len = max(1, len(src_clean))
+        tgt_len = max(1, len(tgt_clean))
+
+        src_pos = [i / src_len for i, ch in enumerate(src_clean) if ch in src_bilabials]
+        tgt_pos = [i / tgt_len for i, ch in enumerate(tgt_clean) if ch in tgt_bilabials]
+
+        if not src_pos and not tgt_pos:
+            return 1.0
+        if not src_pos or not tgt_pos:
+            return 0.70
+
+        # Mean minimum distance between normalized positions
+        dist_sum = sum(min(abs(sp - tp) for tp in tgt_pos) for sp in src_pos)
+        mean_dist = dist_sum / len(src_pos)
+
+        sync = math.exp(-pow(mean_dist * 3.5, 2))
+        return round(float(max(0.1, min(1.0, sync))), 3)
+
+    @classmethod
     def get_speaking_rate(cls, language: str) -> float:
         """Get baseline speaking rate (syllables/second) for a language."""
         lang_code = language.lower().split("-")[0]
@@ -120,16 +156,10 @@ class IsometricTranslationEngine:
         target_duration_s: float,
         target_language: str = "bn",
         adaptation_applied: str = "none",
+        source_text: str = "",
     ) -> IsometricCandidate:
         """
-        Evaluate an isometric candidate against target speech duration.
-
-        Mathematical Metrics:
-        - Syllable budget S_target = round(T_target * rate)
-        - Syllable deviation Delta_S = |S_actual - S_target|
-        - Estimated duration T_est = S_actual / rate
-        - Stretch ratio alpha = T_target / T_est
-        - Isometric score = exp(- (Delta_S / S_target)^2 * 4.0) * exp(- (alpha - 1.0)^2 * 8.0)
+        Evaluate an isometric candidate against target speech duration and bilabial alignment.
         """
         rate = cls.get_speaking_rate(target_language)
         dur = max(0.1, target_duration_s)
@@ -144,9 +174,16 @@ class IsometricTranslationEngine:
         # Gaussian penalty on syllable mismatch and stretch divergence
         syl_penalty = math.exp(-pow(deviation / max(1.0, float(budget)), 2) * 5.0)
         stretch_penalty = math.exp(-pow(stretch_ratio - 1.0, 2) * 10.0)
-        score = max(0.0, min(1.0, syl_penalty * stretch_penalty))
+        base_score = max(0.0, min(1.0, syl_penalty * stretch_penalty))
 
-        # Lip-sync compliant if within 15% syllable budget and stretch between 0.85 and 1.18
+        bilabial_score = 1.0
+        if source_text.strip():
+            bilabial_score = cls.calculate_bilabial_sync(source_text, text)
+            combined_score = round(base_score * 0.75 + bilabial_score * 0.25, 3)
+        else:
+            combined_score = round(base_score, 3)
+
+        # Lip-sync compliant if within 15% syllable budget and stretch between 0.85 and 1.20
         is_compliant = (deviation <= max(1, round(budget * 0.15))) and (
             0.85 <= stretch_ratio <= 1.20
         )
@@ -159,9 +196,10 @@ class IsometricTranslationEngine:
             estimated_duration_s=round(estimated_duration, 2),
             target_duration_s=round(dur, 2),
             time_stretch_ratio=round(stretch_ratio, 3),
-            isometric_score=round(score, 3),
+            isometric_score=combined_score,
             is_lip_compliant=is_compliant,
             adaptation_applied=adaptation_applied,
+            bilabial_sync_score=bilabial_score,
         )
 
     @classmethod
@@ -202,6 +240,107 @@ class IsometricTranslationEngine:
         return adapted
 
     @classmethod
+    def generate_candidate_variations(
+        cls,
+        source_text: str,
+        base_bengali_text: str,
+        target_duration_s: float,
+        target_language: str = "bn",
+    ) -> list[IsometricCandidate]:
+        """
+        Generate multiple distinct translation candidates tailored to film dubbing:
+        1. Literal / Direct (মূল অনুবাদ)
+        2. Contracted (সংক্ষেপিত)
+        3. Expanded (অনুদিত পরিবর্ধিত)
+        4. Colloquial / Conversational (চলিত কথ্য রূপ)
+        5. Bilabial Lip-Sync Optimized (ঠোঁট বন্ধকরণে সামঞ্জস্যপূর্ণ রূপ)
+        """
+        budget = cls.calculate_syllable_budget(target_duration_s, target_language)
+        candidates_map: dict[str, str] = {}
+
+        clean_base = base_bengali_text.strip()
+        if not clean_base:
+            clean_base = source_text
+
+        # 1. Literal / Base
+        candidates_map["literal"] = clean_base
+
+        # 2. Contracted
+        contracted = cls.adapt_bengali_text(clean_base, budget)
+        if contracted != clean_base:
+            candidates_map["contracted"] = contracted
+        else:
+            for pat, rep in BENGALI_CONTRACTIONS:
+                if pat.search(clean_base):
+                    candidates_map["contracted"] = pat.sub(rep, clean_base)
+                    break
+
+        # 3. Colloquial Conversational
+        colloquial = clean_base
+        colloquial_rules = [
+            (re.compile(r"করতেছি(?=[\s।?!,;]|$)"), "করছি"),
+            (re.compile(r"বলতেছি(?=[\s।?!,;]|$)"), "বলছি"),
+            (re.compile(r"যাইতেছি(?=[\s।?!,;]|$)"), "যাচ্ছি"),
+            (re.compile(r"খাইতেছি(?=[\s।?!,;]|$)"), "খাচ্ছি"),
+            (re.compile(r"তাহাকে(?=[\s।?!,;]|$)"), "তাকে"),
+            (re.compile(r"তাহাদের(?=[\s।?!,;]|$)"), "তাদের"),
+            (re.compile(r"আমার সহিত(?=[\s।?!,;]|$)"), "আমার সাথে"),
+            (re.compile(r"আমার সঙ্গে(?=[\s।?!,;]|$)"), "আমার সাথে"),
+            (re.compile(r"এই কারণে(?=[\s।?!,;]|$)"), "তাই"),
+            (re.compile(r"এই বিষয়ে(?=[\s।?!,;]|$)"), "এ নিয়ে"),
+        ]
+        for pat, rep in colloquial_rules:
+            colloquial = pat.sub(rep, colloquial)
+        if colloquial != clean_base:
+            candidates_map["colloquial"] = colloquial
+
+        # 4. Expanded (if syllables are below target budget)
+        curr_syl = SyllableAlignmentEngine.count_syllables(clean_base, language=target_language)
+        if curr_syl < budget:
+            expanded = clean_base
+            for pat, rep in BENGALI_EXPANSIONS:
+                if pat.search(expanded):
+                    expanded = pat.sub(rep, expanded)
+                    break
+            if expanded == clean_base:
+                if "না" in expanded and "কখনোই না" not in expanded:
+                    expanded = expanded.replace("না", "কখনোই না", 1)
+                elif not expanded.startswith("আসলে"):
+                    expanded = f"আসলে {expanded}"
+            candidates_map["expanded"] = expanded
+        elif curr_syl > budget and "contracted" not in candidates_map:
+            candidates_map["concise"] = re.sub(r"\b(যে|তো|তাহলে|বেশ)\b", "", clean_base).strip()
+
+        # 5. Bilabial Lip-Sync Optimized
+        src_has_bilabials = bool(re.search(r"[bpmwBPMW]", source_text))
+        tgt_has_bilabials = bool(re.search(r"[পফবভম]", clean_base))
+        if src_has_bilabials and not tgt_has_bilabials:
+            if clean_base.startswith("মনে হয়"):
+                candidates_map["lip_aligned"] = clean_base.replace("মনে হয়", "বোধহয়", 1)
+            else:
+                candidates_map["lip_aligned"] = f"বোধহয় {clean_base}"
+        elif not src_has_bilabials and tgt_has_bilabials:
+            lip_alt = clean_base.replace("বোধহয়", "মনে হয়").replace("ব্যাপারটা", "বিষয়টা")
+            if lip_alt != clean_base:
+                candidates_map["lip_aligned"] = lip_alt
+
+        results: list[IsometricCandidate] = []
+        for tag, text_cand in candidates_map.items():
+            if not text_cand.strip():
+                continue
+            cand_eval = cls.evaluate_candidate(
+                text=text_cand.strip(),
+                target_duration_s=target_duration_s,
+                target_language=target_language,
+                adaptation_applied=tag,
+                source_text=source_text,
+            )
+            results.append(cand_eval)
+
+        results.sort(key=lambda c: c.isometric_score, reverse=True)
+        return results
+
+    @classmethod
     def optimize_dialogue(
         cls,
         source_text: str,
@@ -228,6 +367,7 @@ class IsometricTranslationEngine:
                 target_duration_s=source_duration_s,
                 target_language=target_language,
                 adaptation_applied="raw_candidate",
+                source_text=source_text,
             )
             evaluated.append(cand_eval)
 
@@ -240,6 +380,7 @@ class IsometricTranslationEngine:
                         target_duration_s=source_duration_s,
                         target_language=target_language,
                         adaptation_applied="algorithmic_bengali_adaptation",
+                        source_text=source_text,
                     )
                     evaluated.append(adapted_eval)
 

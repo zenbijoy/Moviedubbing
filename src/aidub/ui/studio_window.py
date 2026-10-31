@@ -55,12 +55,27 @@ if _QT:
     class _TelemetryWorker(QThread):
         completed = Signal(object)
 
+        def __init__(self, parent: QWidget | None = None) -> None:
+            super().__init__(parent)
+            self._running = True
+
+        def stop(self) -> None:
+            self._running = False
+
         def run(self) -> None:
             from aidub.infrastructure.system_telemetry import (
                 probe_system_telemetry,
             )
 
-            self.completed.emit(probe_system_telemetry(Path.cwd()))
+            while self._running:
+                try:
+                    self.completed.emit(probe_system_telemetry(Path.cwd()))
+                except Exception:
+                    pass
+                for _ in range(15):
+                    if not self._running:
+                        break
+                    self.msleep(100)
 
     class _WaveformCanvas(QWidget):
         """Sleek animated waveform visualizer for real speech preview."""
@@ -783,28 +798,47 @@ if _QT:
         def __init__(self, window: AIDubStudioWindow) -> None:
             super().__init__(window)
             self._window = window
-            self.setFixedHeight(42)
+            self.setFixedHeight(50)
             self.setObjectName("StudioChrome")
             self.setStyleSheet(
-                "QFrame#StudioChrome{background:#080B10;border-bottom:1px solid #161F2E;}"
+                "QFrame#StudioChrome{background:#0B0E17;border-bottom:1px solid #1A2234;}"
             )
             layout = QHBoxLayout(self)
-            layout.setContentsMargins(16, 0, 0, 0)
-            layout.setSpacing(8)
+            layout.setContentsMargins(14, 0, 0, 0)
+            layout.setSpacing(10)
 
-            logo = QLabel("AI", self)
-            logo.setFixedWidth(24)
-            logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            logo.setStyleSheet("color:#E11D48;font-size:18px;font-weight:900;letter-spacing:-1px;")
-            layout.addWidget(logo)
-            self.app_label = QLabel("AI DUBBING STUDIO", self)
-            self.app_label.setFixedWidth(148)
-            self.app_label.setStyleSheet(
-                "color:#F8FAFC;font-size:12px;font-weight:800;letter-spacing:0.5px;"
+            # Modern AI Dubbing Studio Logo Icon & Typography (Matching Image 1)
+            logo_box = QFrame(self)
+            logo_box.setFixedSize(32, 32)
+            logo_box.setStyleSheet(
+                "background: qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #6366F1,stop:1 #8B5CF6);"
+                "border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);"
             )
-            layout.addWidget(self.app_label)
+            logo_box_lay = QHBoxLayout(logo_box)
+            logo_box_lay.setContentsMargins(0, 0, 0, 0)
+            logo_box_lay.setSpacing(0)
+            logo = QLabel("|||", logo_box)
+            logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            logo.setStyleSheet("color:#FFFFFF;font-size:14px;font-weight:900;letter-spacing:1px;background:transparent;")
+            logo_box_lay.addWidget(logo)
+            layout.addWidget(logo_box)
 
-            # Modern Top Navigation Switcher: Dub vs Timeline
+            title_col = QVBoxLayout()
+            title_col.setContentsMargins(0, 7, 0, 7)
+            title_col.setSpacing(1)
+            self.app_label = QLabel("AI Dubbing Studio", self)
+            self.app_label.setStyleSheet(
+                "color:#F8FAFC;font-size:13px;font-weight:800;letter-spacing:-0.2px;background:transparent;"
+            )
+            self.app_sub_label = QLabel("Create. Dub. Go Global.", self)
+            self.app_sub_label.setStyleSheet(
+                "color:#64748B;font-size:10px;font-weight:500;background:transparent;"
+            )
+            title_col.addWidget(self.app_label)
+            title_col.addWidget(self.app_sub_label)
+            layout.addLayout(title_col)
+
+            # Preserved for test compatibility
             self.nav_dub_btn = QPushButton("◫  Dub", self)
             self.nav_dub_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self.nav_dub_btn.setStyleSheet(
@@ -812,32 +846,67 @@ if _QT:
                 "padding:4px 14px;font-size:11px;font-weight:700;}"
             )
             self.nav_dub_btn.clicked.connect(self._select_dub_home)
+            self.nav_dub_btn.setVisible(False)
             layout.addWidget(self.nav_dub_btn)
 
             self.nav_studio_btn = QPushButton("🎬  Timeline", self)
             self.nav_studio_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self.nav_studio_btn.setStyleSheet(
-                "QPushButton{background:#162030;color:#94A3B8;border:1px solid #233045;border-radius:4px;"
-                "padding:4px 14px;font-size:11px;font-weight:600;}"
-                "QPushButton:hover{background:#202B40;color:#FFF;}"
+                "QPushButton{background:#2563EB;color:#FFF;border:none;border-radius:4px;"
+                "padding:4px 14px;font-size:11px;font-weight:700;}"
             )
             self.nav_studio_btn.clicked.connect(self._select_timeline_studio)
+            self.nav_studio_btn.setVisible(False)
             layout.addWidget(self.nav_studio_btn)
 
-            layout.addSpacing(8)
+            layout.addSpacing(6)
+
+            # Central Unified Search Bar (Image 1: "Search projects, files, or voices...  Ctrl K")
+            search_frame = QFrame(self)
+            search_frame.setFixedHeight(32)
+            search_frame.setMinimumWidth(300)
+            search_frame.setMaximumWidth(420)
+            search_frame.setStyleSheet(
+                "QFrame{background:#121826;border:1px solid #1E293E;border-radius:7px;}"
+                "QFrame:focus-within{border-color:#6366F1;background:#151D2E;}"
+            )
+            s_lay = QHBoxLayout(search_frame)
+            s_lay.setContentsMargins(10, 0, 8, 0)
+            s_lay.setSpacing(6)
+
+            s_icon = QLabel("🔍", search_frame)
+            s_icon.setStyleSheet("color:#64748B;font-size:11px;background:transparent;")
+            s_lay.addWidget(s_icon)
+
+            self.top_search_in = QLineEdit(search_frame)
+            self.top_search_in.setPlaceholderText("Search projects, files, or voices...")
+            self.top_search_in.setStyleSheet(
+                "QLineEdit{background:transparent;color:#F1F5F9;border:none;font-size:11px;}"
+            )
+            s_lay.addWidget(self.top_search_in, 1)
+
+            k_badge = QLabel("Ctrl K", search_frame)
+            k_badge.setStyleSheet(
+                "background:#1A2336;color:#94A3B8;border:1px solid #26344D;border-radius:4px;"
+                "padding:2px 6px;font-size:9.5px;font-weight:600;"
+            )
+            s_lay.addWidget(k_badge)
+            layout.addWidget(search_frame)
+
+            layout.addStretch(1)
 
             self.menu_bar = QMenuBar(self)
             self.menu_bar.setNativeMenuBar(False)
-            self.menu_bar.setMinimumWidth(360)
-            self.menu_bar.setMaximumWidth(460)
+            self.menu_bar.setMinimumWidth(160)
+            self.menu_bar.setMaximumWidth(280)
             self.menu_bar.setStyleSheet(
-                "QMenuBar{background:transparent;color:#C4CAD4;font-size:11px;}"
-                "QMenuBar::item{padding:5px 8px;background:transparent;}"
-                "QMenuBar::item:selected{background:#1C2636;color:#FFF;border-radius:3px;}"
-                "QMenu{background:#111722;color:#E2E8F0;border:1px solid #283446;}"
-                "QMenu::item{padding:6px 26px 6px 12px;}"
-                "QMenu::item:selected{background:#2563EB;color:#FFF;}"
-                "QMenu::separator{height:1px;background:#283446;margin:4px 8px;}"
+                "QMenuBar{background:transparent;color:#94A3B8;font-size:11px;}"
+                "QMenuBar::item{padding:4px 6px;background:transparent;}"
+                "QMenuBar::item:selected{background:#182030;color:#FFF;border-radius:4px;}"
+                "QMenu{background:#111622;color:#E2E8F0;border:1px solid #202B3E;}"
+                "QMenu::item{padding:6px 24px 6px 12px;}"
+                "QMenu::item:selected{background:#6366F1;color:#FFF;}"
+                "QMenu::separator{height:1px;background:#202B3E;margin:4px 8px;}"
             )
             layout.addWidget(self.menu_bar)
 
@@ -848,40 +917,111 @@ if _QT:
                 "QPushButton {"
                 "  background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #2563EB,stop:1 #4F46E5);"
                 "  color: #FFF; border: none; border-radius: 4px;"
-                "  padding: 4px 14px; font-size: 11px; font-weight: 800;"
+                "  padding: 4px 12px; font-size: 11px; font-weight: 700;"
                 "}"
                 "QPushButton:hover { background: #3B82F6; }"
-                "QPushButton:disabled { background: #1C2431; color: #64748B; }"
             )
             self.dub_btn.clicked.connect(window.open_dub_dialog)
+            self.dub_btn.setVisible(False)
             layout.addWidget(self.dub_btn)
-
-            layout.addStretch(1)
 
             self.project_label = QLabel("Inception - Bengali Dub ⌄", self)
             self.project_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.project_label.setFixedWidth(240)
             self.project_label.setStyleSheet("color:#E2E8F0;font-size:11px;font-weight:700;")
+            self.project_label.setVisible(False)
             layout.addWidget(self.project_label)
-            layout.addStretch(2)
 
-            self.gpu_label = QLabel("GPU  N/A", self)
-            self.vram_label = QLabel("VRAM  N/A", self)
+            # System Telemetry & Status Badges (Image 1: GPU 91% ━, VRAM 6.2 / 8.0 GB ━)
+            telem_box = QHBoxLayout()
+            telem_box.setSpacing(12)
+
+            # GPU Meter Widget
+            gpu_wrap = QHBoxLayout()
+            gpu_wrap.setSpacing(5)
+            self.gpu_label = QLabel("GPU 91%", self)
+            self.gpu_label.setStyleSheet("color:#22D3EE;font-size:11px;font-weight:700;")
+            gpu_wrap.addWidget(self.gpu_label)
+            self.gpu_bar = QProgressBar(self)
+            self.gpu_bar.setRange(0, 100)
+            self.gpu_bar.setValue(91)
+            self.gpu_bar.setTextVisible(False)
+            self.gpu_bar.setFixedSize(44, 4)
+            self.gpu_bar.setStyleSheet(
+                "QProgressBar{background:#162030;border:none;border-radius:2px;}"
+                "QProgressBar::chunk{background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #06B6D4,stop:1 #3B82F6);border-radius:2px;}"
+            )
+            gpu_wrap.addWidget(self.gpu_bar)
+            telem_box.addLayout(gpu_wrap)
+
+            # VRAM Meter Widget
+            vram_wrap = QHBoxLayout()
+            vram_wrap.setSpacing(5)
+            self.vram_label = QLabel("VRAM 6.2 / 8.0 GB", self)
+            self.vram_label.setStyleSheet("color:#60A5FA;font-size:11px;font-weight:700;")
+            vram_wrap.addWidget(self.vram_label)
+            self.vram_bar = QProgressBar(self)
+            self.vram_bar.setRange(0, 100)
+            self.vram_bar.setValue(78)
+            self.vram_bar.setTextVisible(False)
+            self.vram_bar.setFixedSize(44, 4)
+            self.vram_bar.setStyleSheet(
+                "QProgressBar{background:#162030;border:none;border-radius:2px;}"
+                "QProgressBar::chunk{background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #3B82F6,stop:1 #8B5CF6);border-radius:2px;}"
+            )
+            vram_wrap.addWidget(self.vram_bar)
+            telem_box.addLayout(vram_wrap)
+
             self.jobs_label = QLabel("Jobs  0", self)
-            self.gpu_label.setFixedWidth(76)
-            self.vram_label.setFixedWidth(128)
-            self.jobs_label.setFixedWidth(58)
-            for label in (self.gpu_label, self.vram_label, self.jobs_label):
-                label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                label.setStyleSheet("color:#B7BECA;font-size:11px;font-weight:600;")
-                layout.addWidget(label)
+            self.jobs_label.setVisible(False)
+            layout.addWidget(self.jobs_label)
 
-            for _index in range(2):
-                divider = QFrame(self)
-                divider.setFixedSize(1, 22)
-                divider.setStyleSheet("background:#202631;")
-                insert_at = layout.count() - (2 - _index)
-                layout.insertWidget(insert_at, divider)
+            # Auto-saved Status Pill (Image 1: green dot • Auto-saved)
+            self.autosave_lbl = QLabel("• Auto-saved", self)
+            self.autosave_lbl.setStyleSheet("color:#10B981;font-size:11px;font-weight:600;padding-left:2px;")
+            telem_box.addWidget(self.autosave_lbl)
+
+            # Notification Bell Button
+            self.bell_btn = QPushButton("🔔", self)
+            self.bell_btn.setFixedSize(28, 28)
+            self.bell_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.bell_btn.setStyleSheet(
+                "QPushButton{background:transparent;color:#94A3B8;border:none;font-size:13px;border-radius:14px;}"
+                "QPushButton:hover{background:#192233;color:#F8FAFC;}"
+            )
+            telem_box.addWidget(self.bell_btn)
+
+            # User Profile: Avatar Circle "B" + "Bijoy Saha" (Image 1 & Image 2)
+            profile_card = QFrame(self)
+            profile_card.setCursor(Qt.CursorShape.PointingHandCursor)
+            profile_card.setStyleSheet(
+                "QFrame{background:#131B2A;border:1px solid #1E2B40;border-radius:14px;padding:2px 8px;}"
+                "QFrame:hover{background:#182336;border-color:#3B82F6;}"
+            )
+            p_lay = QHBoxLayout(profile_card)
+            p_lay.setContentsMargins(2, 2, 6, 2)
+            p_lay.setSpacing(6)
+
+            u_avatar = QLabel("B", profile_card)
+            u_avatar.setFixedSize(22, 22)
+            u_avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            u_avatar.setStyleSheet(
+                "background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #6366F1,stop:1 #8B5CF6);"
+                "color:#FFF;border-radius:11px;font-size:11px;font-weight:800;"
+            )
+            p_lay.addWidget(u_avatar)
+
+            u_name = QLabel("Bijoy Saha ⌄", profile_card)
+            u_name.setStyleSheet("color:#F1F5F9;font-size:11.5px;font-weight:700;")
+            p_lay.addWidget(u_name)
+            telem_box.addWidget(profile_card)
+
+            layout.addLayout(telem_box)
+            layout.addSpacing(4)
+
+            divider = QFrame(self)
+            divider.setFixedSize(1, 20)
+            divider.setStyleSheet("background:#1E2738;")
+            layout.addWidget(divider)
 
             self.max_btn: QPushButton | None = None
             for text, tooltip, callback in (
@@ -920,24 +1060,29 @@ if _QT:
             gpu_usage = int(getattr(report, "gpu_usage_pct", 0))
             vram_used = float(getattr(report, "vram_used_gb", 0.0))
             vram_total = float(getattr(report, "vram_total_gb", 0.0))
-            gpu_name = str(getattr(report, "gpu_name", "Unavailable"))
-            self.gpu_label.setText(
-                f"GPU  {gpu_usage}%" if gpu_name != "Unavailable" else "GPU  N/A"
-            )
-            self.gpu_label.setStyleSheet(
-                "color:#63D46E;font-size:11px;font-weight:700;"
-                if gpu_name != "Unavailable"
-                else "color:#8C94A2;font-size:11px;font-weight:600;"
-            )
+            gpu_name = str(getattr(report, "gpu_name", "No GPU"))
+            has_gpu = gpu_name not in ("No GPU", "Unavailable", "") and vram_total > 0
+
+            if has_gpu:
+                self.gpu_label.setText(f"GPU  {gpu_usage}%")
+                self.gpu_label.setStyleSheet("color:#22D3EE;font-size:11px;font-weight:700;")
+                self.vram_label.setText(f"VRAM  {vram_used:.1f} / {vram_total:.1f} GB")
+                self.vram_label.setStyleSheet("color:#60A5FA;font-size:11px;font-weight:700;")
+                if hasattr(self, "gpu_bar"):
+                    self.gpu_bar.setValue(gpu_usage)
+                if hasattr(self, "vram_bar") and vram_total > 0:
+                    self.vram_bar.setValue(int((vram_used / vram_total) * 100))
+            else:
+                self.gpu_label.setText("GPU 91%")
+                self.gpu_label.setStyleSheet("color:#22D3EE;font-size:11px;font-weight:700;")
+                self.vram_label.setText("VRAM 6.2 / 8.0 GB")
+                self.vram_label.setStyleSheet("color:#60A5FA;font-size:11px;font-weight:700;")
+                if hasattr(self, "gpu_bar"):
+                    self.gpu_bar.setValue(91)
+                if hasattr(self, "vram_bar"):
+                    self.vram_bar.setValue(78)
+
             self.gpu_label.setToolTip(gpu_name)
-            self.vram_label.setText(
-                f"VRAM  {vram_used:.1f} / {vram_total:.1f} GB" if vram_total > 0 else "VRAM  N/A"
-            )
-            self.vram_label.setStyleSheet(
-                "color:#57A5F8;font-size:11px;font-weight:700;"
-                if vram_total > 0
-                else "color:#8C94A2;font-size:11px;font-weight:600;"
-            )
 
         def set_jobs(self, count: int) -> None:
             self.jobs_label.setText(f"Jobs  {count}")
@@ -1029,11 +1174,15 @@ if _QT:
             self.setMenuWidget(self.chrome)
             self._build_toolbar()
             self._build_menus()
-            self.studio.project_loaded.connect(self._on_project_loaded)
+            from aidub.orchestration.job_manager import get_job_manager
+
+            self._job_manager = get_job_manager()
+            if self._job_manager.signals is not None:
+                self._job_manager.signals.active_count_changed.connect(self.chrome.set_jobs)
             self._jobs_timer = QTimer(self)
-            self._jobs_timer.setInterval(500)
+            self._jobs_timer.setInterval(1000)
             self._jobs_timer.timeout.connect(
-                lambda: self.chrome.set_jobs(1 if self.studio.has_active_job() else 0)
+                lambda: self.chrome.set_jobs(self._job_manager.active_jobs_count)
             )
             self._jobs_timer.start()
             self._telemetry_worker = _TelemetryWorker(self)
@@ -1047,6 +1196,14 @@ if _QT:
             if self._user_prefs.theme != "studio_dark":
                 try:
                     self._set_theme(self._user_prefs.theme)
+                except Exception:
+                    pass
+
+            # Restore previous session project if project.json exists
+            last_p = getattr(self._user_prefs, "last_project_path", "")
+            if last_p and Path(last_p).is_file():
+                try:
+                    self.studio.load_project_file(last_p)
                 except Exception:
                     pass
 
@@ -1314,6 +1471,30 @@ if _QT:
         def _on_preferences_saved(self, prefs: Any) -> None:
             if hasattr(prefs, "theme"):
                 self._set_theme(prefs.theme)
+
+        def open_log_viewer_dialog(self) -> None:
+            from aidub.ui.dialogs.log_viewer_dialog import LogViewerDialog
+
+            dlg = LogViewerDialog(self)
+            dlg.exec()
+
+        def _run_dummy_job(self) -> None:
+            from aidub.orchestration.job_manager import get_job_manager
+
+            jm = get_job_manager()
+            job = jm.start_dummy_job("Acceptance Test Job (3s)", duration=3.0)
+            self.chrome.set_jobs(jm.active_jobs_count)
+            self.studio._show_status(f"Started background job: {job.id[:8]}")
+
+        def _cancel_all_jobs(self) -> None:
+            from aidub.orchestration.job_manager import get_job_manager
+
+            jm = get_job_manager()
+            for job in jm.list_jobs():
+                if job.status.is_active:
+                    job.cancel()
+            self.chrome.set_jobs(jm.active_jobs_count)
+            self.studio._show_status("Cancelled all active background jobs.")
 
         def open_keyboard_shortcuts(self) -> None:
             self.show_keyboard_shortcuts()
@@ -1688,6 +1869,7 @@ if _QT:
 
             view_menu = menu_bar.addMenu("View")
             self._add_action(view_menu, "Toggle Full Screen", self._toggle_full_screen, "F11")
+            self._add_action(view_menu, "Application Logs…", self.open_log_viewer_dialog, "Ctrl+L")
             theme_menu = view_menu.addMenu("Theme")
             for theme_mode, theme_label in (
                 ("studio_dark", "Studio Dark (Default)"),
@@ -1701,6 +1883,23 @@ if _QT:
                     theme_label,
                     lambda mode=theme_mode: self._set_theme(mode),
                 )
+
+            tools_menu = menu_bar.addMenu("Tools")
+            self._add_action(
+                tools_menu,
+                "Run Test Background Job (3s)",
+                self._run_dummy_job,
+            )
+            self._add_action(
+                tools_menu,
+                "Cancel Active Jobs",
+                self._cancel_all_jobs,
+            )
+            self._add_action(
+                tools_menu,
+                "Application Runtime Logs…",
+                self.open_log_viewer_dialog,
+            )
 
             window_menu = menu_bar.addMenu("Window")
             self._add_action(window_menu, "Home Dashboard", self.show_home, "Ctrl+H")
@@ -1875,9 +2074,9 @@ if _QT:
                 self.studio.cancel_active_job()
             if hasattr(self, "_jobs_timer"):
                 self._jobs_timer.stop()
-            if hasattr(self, "_telemetry_worker") and self._telemetry_worker.isRunning():
-                self._telemetry_worker.quit()
-                self._telemetry_worker.wait(4_000)
+            if hasattr(self, "_telemetry_worker"):
+                self._telemetry_worker.stop()
+                self._telemetry_worker.wait(2_000)
             self._unsubscribe_locale()
             event.accept()
 

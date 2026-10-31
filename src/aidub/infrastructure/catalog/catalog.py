@@ -53,7 +53,7 @@ CREATE INDEX idx_recent_projects_order
 def _is_link_or_reparse(path: Path) -> bool:
     try:
         info = path.lstat()
-    except FileNotFoundError:
+    except (FileNotFoundError, PermissionError, OSError):
         return False
     if stat.S_ISLNK(info.st_mode):
         return True
@@ -168,8 +168,11 @@ class ProjectCatalog:
             raise InvalidCatalogPathError("catalog database path must be absolute")
         if _is_link_or_reparse(candidate):
             raise InvalidCatalogPathError("catalog database cannot be a link/reparse point")
-        if candidate.exists() and not candidate.is_file():
-            raise InvalidCatalogPathError("catalog database path is not a regular file")
+        try:
+            if candidate.exists() and not candidate.is_file():
+                raise InvalidCatalogPathError("catalog database path is not a regular file")
+        except (PermissionError, OSError):
+            pass
         if busy_timeout_ms < 0:
             raise ValueError("busy_timeout_ms must not be negative")
         self.path = candidate.resolve(strict=False)

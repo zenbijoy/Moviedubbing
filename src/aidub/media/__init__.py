@@ -12,12 +12,15 @@ from .probe import (
     SubtitleStreamInfo,
     VideoStreamInfo,
 )
-from .runtime import MediaRuntime, MediaRuntimeInfo
+from .runtime import MediaRuntime, MediaRuntimeInfo, ensure_media_runtime_on_path
 from .stems import StemSelectionPolicy, StemSelector, StudioStemSelection
+from .thumbnail_extractor import ThumbnailExtractor, get_thumbnail_extractor
+from .waveform_cache import DEFAULT_PEAKS_PER_SECOND, WaveformCache, get_waveform_cache
 
 __all__ = [
     "AudioStreamInfo",
     "ContainerInfo",
+    "DEFAULT_PEAKS_PER_SECOND",
     "DerivativeGenerator",
     "DerivativeResult",
     "FFprobeDerivativeValidator",
@@ -32,9 +35,14 @@ __all__ = [
     "StemSelector",
     "StudioStemSelection",
     "SubtitleStreamInfo",
+    "ThumbnailExtractor",
     "ThumbnailSpec",
     "VideoStreamInfo",
+    "WaveformCache",
     "WaveformSpec",
+    "ensure_media_runtime_on_path",
     "fast_fingerprint",
     "full_fingerprint",
+    "get_thumbnail_extractor",
+    "get_waveform_cache",
 ]

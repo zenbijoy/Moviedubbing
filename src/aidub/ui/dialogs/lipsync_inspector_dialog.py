@@ -31,6 +31,7 @@ try:
         QPen,
     )
     from PySide6.QtWidgets import (
+        QComboBox,
         QDialog,
         QFrame,
         QHBoxLayout,
@@ -352,11 +353,13 @@ if _QT:
 
         def __init__(
             self,
-            utterance_index: int,
-            dialogue_text: str,
-            duration_s: float,
+            utterance_index: int = 0,
+            dialogue_text: str = "",
+            duration_s: float = 2.0,
             language: str = "bn",
             parent: QWidget | None = None,
+            total_duration_s: float | None = None,
+            **kwargs: Any,
         ) -> None:
             super().__init__(parent)
             self.setWindowTitle("Split-Screen Lip-Sync Inspector & Viseme Aligner")
@@ -367,7 +370,8 @@ if _QT:
 
             self.utterance_index = utterance_index
             self.dialogue_text = dialogue_text
-            self.duration_s = max(0.2, duration_s)
+            dur = total_duration_s if total_duration_s is not None else duration_s
+            self.duration_s = max(0.2, dur)
             self.language = language
             self._current_offset_ms: float = 0.0
 
@@ -431,6 +435,7 @@ if _QT:
             left_lbl.setStyleSheet("font-size: 10px; font-weight: bold; color: #64748B;")
             left_lay.addWidget(left_lbl)
             self.mouth_widget = _ActorMouthRoiWidget(left_container)
+            self._roi_widget = self.mouth_widget
             left_lay.addWidget(self.mouth_widget, stretch=1)
             splitter.addWidget(left_container)
 
@@ -445,6 +450,7 @@ if _QT:
             right_lay.addWidget(right_lbl)
 
             self.timeline_widget = _VisemeTimelineWidget(right_container)
+            self._timeline_widget = self.timeline_widget
             self.timeline_widget.set_cues(self.cues, self.duration_s, 0.0)
             self.timeline_widget.playhead_scrubbed.connect(self._on_playhead_scrubbed)
             right_lay.addWidget(self.timeline_widget, stretch=1)
@@ -532,32 +538,79 @@ if _QT:
             btn_row = QHBoxLayout()
             btn_row.setSpacing(6)
 
-            self.btn_nudge_left = QPushButton("◀ -1 Frame (-33ms)", ctrl_card)
+            self.btn_nudge_l5 = QPushButton("⏪ -5 Fr (-165ms)", ctrl_card)
+            self.btn_nudge_l5.setStyleSheet(
+                "QPushButton{background: #1E293B; color: #CBD5E1; border: 1px solid #334155; padding: 4px 6px; border-radius: 4px; font-size: 10px;}"
+            )
+            self.btn_nudge_l5.clicked.connect(
+                lambda: self.slip_slider.setValue(self.slip_slider.value() - 165)
+            )
+            btn_row.addWidget(self.btn_nudge_l5)
+
+            self.btn_nudge_left = QPushButton("◀ -1 Fr (-33ms)", ctrl_card)
             self.btn_nudge_left.setStyleSheet(
-                "QPushButton{background: #1E293B; color: #CBD5E1; border: 1px solid #334155; padding: 4px 8px; border-radius: 4px; font-size: 10px;}"
+                "QPushButton{background: #1E293B; color: #CBD5E1; border: 1px solid #334155; padding: 4px 6px; border-radius: 4px; font-size: 10px;}"
             )
             self.btn_nudge_left.clicked.connect(
                 lambda: self.slip_slider.setValue(self.slip_slider.value() - 33)
             )
             btn_row.addWidget(self.btn_nudge_left)
 
-            self.btn_reset_slip = QPushButton("Reset Alignment (0ms)", ctrl_card)
+            self.btn_reset_slip = QPushButton("Reset (0ms)", ctrl_card)
             self.btn_reset_slip.setStyleSheet(
-                "QPushButton{background: #1E293B; color: #CBD5E1; border: 1px solid #334155; padding: 4px 8px; border-radius: 4px; font-size: 10px;}"
+                "QPushButton{background: #1E293B; color: #CBD5E1; border: 1px solid #334155; padding: 4px 6px; border-radius: 4px; font-size: 10px;}"
             )
             self.btn_reset_slip.clicked.connect(lambda: self.slip_slider.setValue(0))
             btn_row.addWidget(self.btn_reset_slip)
 
-            self.btn_nudge_right = QPushButton("+1 Frame (+33ms) ▶", ctrl_card)
+            self.btn_nudge_right = QPushButton("+1 Fr (+33ms) ▶", ctrl_card)
             self.btn_nudge_right.setStyleSheet(
-                "QPushButton{background: #1E293B; color: #CBD5E1; border: 1px solid #334155; padding: 4px 8px; border-radius: 4px; font-size: 10px;}"
+                "QPushButton{background: #1E293B; color: #CBD5E1; border: 1px solid #334155; padding: 4px 6px; border-radius: 4px; font-size: 10px;}"
             )
             self.btn_nudge_right.clicked.connect(
                 lambda: self.slip_slider.setValue(self.slip_slider.value() + 33)
             )
             btn_row.addWidget(self.btn_nudge_right)
 
+            self.btn_nudge_r5 = QPushButton("+5 Fr (+165ms) ⏩", ctrl_card)
+            self.btn_nudge_r5.setStyleSheet(
+                "QPushButton{background: #1E293B; color: #CBD5E1; border: 1px solid #334155; padding: 4px 6px; border-radius: 4px; font-size: 10px;}"
+            )
+            self.btn_nudge_r5.clicked.connect(
+                lambda: self.slip_slider.setValue(self.slip_slider.value() + 165)
+            )
+            btn_row.addWidget(self.btn_nudge_r5)
+
+            btn_row.addSpacing(10)
+
+            # Viseme override selector
+            btn_row.addWidget(QLabel("Override Viseme:", ctrl_card))
+            self.override_viseme_combo = QComboBox(ctrl_card)
+            self.override_viseme_combo.addItems([
+                "SILENCE (Rest)",
+                "BILABIAL (B, P, M)",
+                "LABIODENTAL (F, V)",
+                "DENTAL (T, D, S, Z)",
+                "VELAR (K, G, SH, CH)",
+                "OPEN_VOWEL (AA, AH, AY)",
+                "ROUNDED_VOWEL (OO, UW, W)",
+                "SPREAD_VOWEL (EE, IH, EY)",
+            ])
+            self.override_viseme_combo.setStyleSheet(
+                "background: #131B2A; color: #38BDF8; font-size: 10px; font-weight: bold; padding: 3px;"
+            )
+            self.override_viseme_combo.currentIndexChanged.connect(self._on_override_viseme_changed)
+            btn_row.addWidget(self.override_viseme_combo)
+
             btn_row.addStretch()
+
+            self.btn_export_json = QPushButton("💾 Export Mocap (.json)", ctrl_card)
+            self.btn_export_json.setStyleSheet(
+                "QPushButton{background: #334155; color: #F1F5F9; font-weight: bold; border: none; padding: 5px 10px; border-radius: 4px; font-size: 10px;}"
+                "QPushButton:hover{background: #475569;}"
+            )
+            self.btn_export_json.clicked.connect(self._export_mocap_json)
+            btn_row.addWidget(self.btn_export_json)
 
             self.btn_play_preview = QPushButton("▶ Play Visual Sync Preview", ctrl_card)
             self.btn_play_preview.setStyleSheet(
@@ -655,7 +708,6 @@ if _QT:
                 self._toggle_playback()
             self.timeline_widget.set_playhead(self._play_pos_s)
             self._on_playhead_scrubbed(self._play_pos_s)
-
         def _on_apply_offset(self) -> None:
             offset_s = self._current_offset_ms / 1000.0
             logger.info(
@@ -666,7 +718,79 @@ if _QT:
             self.offset_applied.emit(self.utterance_index, offset_s)
             self.accept()
 
+        def _on_override_viseme_changed(self, idx: int) -> None:
+            group_map = [
+                VisemeGroup.SILENCE,
+                VisemeGroup.BILABIAL,
+                VisemeGroup.LABIODENTAL,
+                VisemeGroup.DENTAL_ALVEOLAR,
+                VisemeGroup.VELAR_PALATAL,
+                VisemeGroup.OPEN_VOWEL,
+                VisemeGroup.ROUNDED_VOWEL,
+                VisemeGroup.SPREAD_VOWEL,
+            ]
+            if 0 <= idx < len(group_map):
+                target_group = group_map[idx]
+                # Override the viseme at the current playhead
+                offset_s = self._current_offset_ms / 1000.0
+                adjusted_t = max(0.0, self._play_pos_s - offset_s)
+                for c in self.cues:
+                    if c.start_s <= adjusted_t <= c.end_s:
+                        c.viseme = target_group
+                        c.label = target_group.value.upper()[:4]
+                        from aidub.media.lipsync_viseme_engine import VISEME_GEOMETRIES
+                        c.geometry = VISEME_GEOMETRIES.get(target_group, c.geometry)
+                        break
+                self.timeline_widget.set_cues(self.cues, self.duration_s, offset_s=offset_s)
+                self._on_playhead_scrubbed(self._play_pos_s)
+
+        def _export_mocap_json(self) -> None:
+            import json
+            from PySide6.QtWidgets import QFileDialog, QMessageBox
+
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Export Viseme Mocap Rig Data", f"line_{self.utterance_index + 1}_visemes.json", "JSON (*.json)"
+            )
+            if not path:
+                return
+
+            data = {
+                "utterance_index": self.utterance_index,
+                "dialogue_text": self.dialogue_text,
+                "duration_s": self.duration_s,
+                "offset_ms": self._current_offset_ms,
+                "cues": [
+                    {
+                        "label": c.label,
+                        "viseme": c.viseme.value,
+                        "start_s": round(c.start_s + (self._current_offset_ms / 1000.0), 3),
+                        "end_s": round(c.end_s + (self._current_offset_ms / 1000.0), 3),
+                        "geometry": {
+                            "openness": c.geometry.openness,
+                            "width": c.geometry.width,
+                            "lip_protrusion": c.geometry.lip_protrusion,
+                            "teeth_visible": c.geometry.teeth_visible,
+                        },
+                    }
+                    for c in self.cues
+                ],
+            }
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+
+            QMessageBox.information(
+                self,
+                "Mocap Exported",
+                f"Successfully exported {len(self.cues)} viseme cues with geometric blendshapes to:\n{path}",
+            )
+else:
+    class LipSyncInspectorDialog:  # type: ignore
+        def __init__(self, *args, **kwargs) -> None:
+            self._roi_widget = None
+            self._timeline_widget = None
+
 
 __all__ = [
     "LipSyncInspectorDialog",
 ]
+

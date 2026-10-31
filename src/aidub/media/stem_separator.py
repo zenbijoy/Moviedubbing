@@ -62,9 +62,13 @@ def separate_stems(
             "'demucs>=4.0,<5' in the active studio environment."
         )
 
+    from aidub.media.runtime import ensure_media_runtime_on_path
+    ensure_media_runtime_on_path()
+
     demucs_exe = shutil.which("demucs")
     command = [demucs_exe] if demucs_exe else [sys.executable, "-m", "demucs"]
-    command.extend(["--two-stems", "vocals", "-n", model_name, "-o", str(out_dir), str(audio_p)])
+    # Chunking via --segment 4 to fit 4GB VRAM and prevent OOM
+    command.extend(["--two-stems", "vocals", "-n", model_name, "--segment", "4", "-o", str(out_dir), str(audio_p)])
     try:
         _run(command)
     except RuntimeError as exc:

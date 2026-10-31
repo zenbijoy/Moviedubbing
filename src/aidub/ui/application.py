@@ -27,7 +27,16 @@ class DesktopApplication:
         from PySide6.QtCore import QCoreApplication
         from PySide6.QtWidgets import QApplication
 
+        from pathlib import Path
+        from aidub.infrastructure.logging import configure_secure_logging
         from .studio_window import AIDubStudioWindow
+
+        log_path = Path.cwd() / "logs" / "app.log"
+        try:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            configure_secure_logging(log_file=log_path)
+        except Exception:
+            pass
 
         existing = QApplication.instance()
         self.application = existing or QApplication(list(argv) if argv is not None else sys.argv)

@@ -80,9 +80,36 @@ def get_real_ram_bytes() -> tuple[int, int]:
 
 def get_real_gpu_telemetry() -> tuple[str, int, float, float]:
     """
-    Probe PyTorch CUDA / NVML or system GPU.
+    Probe NVML (pynvml), nvidia-smi, or PyTorch CUDA.
     Returns (gpu_name, usage_pct, vram_used_gb, vram_total_gb).
+    If no NVIDIA GPU is available, returns ("No GPU", 0, 0.0, 0.0).
     """
+    # 1. Direct NVML interrogation via pynvml (fastest, no subprocess overhead)
+    try:
+        import pynvml
+        pynvml.nvmlInit()
+        try:
+            device_count = pynvml.nvmlDeviceGetCount()
+            if device_count > 0:
+                handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+                gpu_name = pynvml.nvmlDeviceGetName(handle)
+                if isinstance(gpu_name, bytes):
+                    gpu_name = gpu_name.decode("utf-8", errors="replace")
+                mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+                util_info = pynvml.nvmlDeviceGetUtilizationRates(handle)
+                used_gb = round(mem_info.used / (1024**3), 1)
+                total_gb = round(mem_info.total / (1024**3), 1)
+                pct = int(util_info.gpu)
+                return gpu_name, pct, used_gb, total_gb
+        finally:
+            try:
+                pynvml.nvmlShutdown()
+            except Exception:
+                pass
+    except Exception as exc:
+        logger.debug("pynvml telemetry probe fallback: %s", exc)
+
+    # 2. Fallback to nvidia-smi query
     nvidia_smi = shutil.which("nvidia-smi")
     if nvidia_smi:
         try:
@@ -95,18 +122,21 @@ def get_real_gpu_telemetry() -> tuple[str, int, float, float]:
                 text=True,
                 timeout=3,
             )
-            name, utilization, memory_used, memory_total = [
-                value.strip() for value in output.splitlines()[0].split(",")
-            ]
-            return (
-                name,
-                int(float(utilization)),
-                round(float(memory_used) / 1024.0, 1),
-                round(float(memory_total) / 1024.0, 1),
-            )
+            lines = [ln.strip() for ln in output.splitlines() if ln.strip()]
+            if lines:
+                parts = [value.strip() for value in lines[0].split(",")]
+                if len(parts) >= 4:
+                    name, utilization, memory_used, memory_total = parts[:4]
+                    return (
+                        name,
+                        int(float(utilization)),
+                        round(float(memory_used) / 1024.0, 1),
+                        round(float(memory_total) / 1024.0, 1),
+                    )
         except (OSError, subprocess.SubprocessError, ValueError, IndexError) as exc:
             logger.debug("nvidia-smi telemetry probe failed: %s", exc)
 
+    # 3. Fallback to PyTorch CUDA device properties
     try:
         import torch
 
@@ -121,7 +151,7 @@ def get_real_gpu_telemetry() -> tuple[str, int, float, float]:
     except Exception as exc:
         logger.debug("PyTorch CUDA telemetry probe fallback: %s", exc)
 
-    return "Unavailable", 0, 0.0, 0.0
+    return "No GPU", 0, 0.0, 0.0
 
 
 def probe_system_telemetry(target_dir: Path | str | None = None) -> SystemTelemetryReport:

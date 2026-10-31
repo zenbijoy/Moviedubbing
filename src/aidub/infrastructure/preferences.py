@@ -41,6 +41,15 @@ class UserPreferences(BaseModel):
     privacy_mode: PrivacyOption = "online"
     recent_projects_limit: int = Field(default=10, ge=1, le=50)
 
+    # Real Settings fields required by Studio Foundation
+    ffmpeg_path: str = ""
+    model_cache_dir: str = ""
+    asr_model_size: str = "base"
+    translation_engine: str = "nllb-200"
+    tts_voice: str = "bn-BD-PradeepNeural"
+    device: str = "auto"
+    last_project_path: str = ""
+
 
 def get_default_preferences_path() -> Path:
     """Return default writable path for user preferences JSON."""

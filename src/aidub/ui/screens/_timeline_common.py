@@ -1,0 +1,162 @@
+"""Common imports, constants, and utilities for Timeline screen modules."""
+
+from __future__ import annotations
+
+import json
+import logging
+import math
+from pathlib import Path
+from typing import Any
+
+from aidub.application.agentic_studio import (
+    AgenticStudioState,
+    AutomationStage,
+    StageStatus,
+    StudioSessionStore,
+    create_automation_plan,
+)
+from .timeline_components.constants import (
+    MIN_CLIP_WIDTH,
+    NAV_RAIL_WIDTH,
+    PX_PER_SEC_DEFAULT,
+    RULER_HEIGHT,
+    TOOL_PALETTE_WIDTH,
+    TRACK_HEADER_WIDTH,
+    TRACK_HEIGHT,
+    ClipTuple,
+    _TRACK_DEFS,
+    _format_tc,
+)
+
+logger = logging.getLogger(__name__)
+
+try:
+    from PySide6.QtCore import (
+        QLineF,
+        QPointF,
+        QRect,
+        QRectF,
+        QStandardPaths,
+        Qt,
+        QTimer,
+        QUrl,
+        Signal,
+    )
+    from PySide6.QtGui import (
+        QBrush,
+        QColor,
+        QFont,
+        QImage,
+        QKeySequence,
+        QMouseEvent,
+        QPainter,
+        QPen,
+        QPixmap,
+        QPolygonF,
+        QWheelEvent,
+    )
+    from PySide6.QtWidgets import (
+        QCheckBox,
+        QComboBox,
+        QDialog,
+        QFileDialog,
+        QFormLayout,
+        QFrame,
+        QGraphicsRectItem,
+        QGraphicsScene,
+        QGraphicsTextItem,
+        QGraphicsView,
+        QGridLayout,
+        QHBoxLayout,
+        QInputDialog,
+        QLabel,
+        QLineEdit,
+        QMenu,
+        QMessageBox,
+        QProgressBar,
+        QPushButton,
+        QScrollArea,
+        QSlider,
+        QSplitter,
+        QStackedWidget,
+        QTreeWidget,
+        QTreeWidgetItem,
+        QVBoxLayout,
+        QWidget,
+    )
+
+    _QT = True
+except ImportError:
+    _QT = False
+
+__all__ = [
+    "TRACK_HEIGHT",
+    "TRACK_HEADER_WIDTH",
+    "RULER_HEIGHT",
+    "MIN_CLIP_WIDTH",
+    "PX_PER_SEC_DEFAULT",
+    "NAV_RAIL_WIDTH",
+    "TOOL_PALETTE_WIDTH",
+    "ClipTuple",
+    "_TRACK_DEFS",
+    "_format_tc",
+    "QLineF",
+    "QPointF",
+    "QRect",
+    "QRectF",
+    "QStandardPaths",
+    "Qt",
+    "QTimer",
+    "QUrl",
+    "Signal",
+    "QBrush",
+    "QColor",
+    "QFont",
+    "QImage",
+    "QKeySequence",
+    "QMouseEvent",
+    "QPainter",
+    "QPen",
+    "QPixmap",
+    "QPolygonF",
+    "QWheelEvent",
+    "QCheckBox",
+    "QComboBox",
+    "QDialog",
+    "QFileDialog",
+    "QFormLayout",
+    "QFrame",
+    "QGraphicsRectItem",
+    "QGraphicsScene",
+    "QGraphicsTextItem",
+    "QGraphicsView",
+    "QGridLayout",
+    "QHBoxLayout",
+    "QInputDialog",
+    "QLabel",
+    "QLineEdit",
+    "QMenu",
+    "QMessageBox",
+    "QProgressBar",
+    "QPushButton",
+    "QScrollArea",
+    "QSlider",
+    "QSplitter",
+    "QStackedWidget",
+    "QTreeWidget",
+    "QTreeWidgetItem",
+    "QVBoxLayout",
+    "QWidget",
+    "_QT",
+    "Path",
+    "Any",
+    "json",
+    "logging",
+    "math",
+    "AgenticStudioState",
+    "AutomationStage",
+    "StageStatus",
+    "StudioSessionStore",
+    "create_automation_plan",
+    "logger",
+]

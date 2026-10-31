@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import logging.handlers
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -76,6 +76,61 @@ def _redact_args(
     return args
 
 
+class InAppLogHandler(logging.Handler):
+    """Thread-safe in-memory ring buffer of log records for in-app UI display."""
+
+    def __init__(self, capacity: int = 1000) -> None:
+        super().__init__()
+        from collections import deque
+        import threading
+
+        self._records: deque[str] = deque(maxlen=capacity)
+        self._callbacks: list[Callable[[str], None]] = []
+        self._lock = threading.Lock()
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            msg = self.format(record)
+            with self._lock:
+                self._records.append(msg)
+                cbs = list(self._callbacks)
+            for cb in cbs:
+                try:
+                    cb(msg)
+                except Exception:
+                    pass
+        except Exception:
+            self.handleError(record)
+
+    def get_lines(self) -> list[str]:
+        with self._lock:
+            return list(self._records)
+
+    def add_callback(self, cb: Callable[[str], None]) -> None:
+        with self._lock:
+            if cb not in self._callbacks:
+                self._callbacks.append(cb)
+
+    def remove_callback(self, cb: Callable[[str], None]) -> None:
+        with self._lock:
+            if cb in self._callbacks:
+                self._callbacks.remove(cb)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._records.clear()
+
+
+_IN_APP_HANDLER: InAppLogHandler | None = None
+
+
+def get_in_app_log_handler() -> InAppLogHandler:
+    global _IN_APP_HANDLER
+    if _IN_APP_HANDLER is None:
+        _IN_APP_HANDLER = InAppLogHandler()
+    return _IN_APP_HANDLER
+
+
 def configure_secure_logging(
     *,
     level: int = logging.INFO,
@@ -103,6 +158,15 @@ def configure_secure_logging(
     if redact:
         stream_handler.addFilter(RedactionFilter())
     root.addHandler(stream_handler)
+
+    # In-app log handler for live UI viewing
+    in_app = get_in_app_log_handler()
+    in_app.setLevel(level)
+    in_app.setFormatter(formatter)
+    if redact:
+        in_app.addFilter(RedactionFilter())
+    if in_app not in root.handlers:
+        root.addHandler(in_app)
 
     # Optional bounded rotating file handler
     if log_file is not None:
@@ -177,9 +241,11 @@ class PrivateStudioGuard:
 
 
 __all__ = [
+    "InAppLogHandler",
     "PrivateStudioGuard",
     "PrivateStudioViolation",
     "RedactionFilter",
     "configure_secure_logging",
     "get_default_log_file",
+    "get_in_app_log_handler",
 ]

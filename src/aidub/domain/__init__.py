@@ -59,6 +59,14 @@ from .media import (
     VideoStream,
 )
 from .project import PrivacyMode, Project, ProjectSettings, ProjectState, QualityPreset
+from .project_file import (
+    PROJECT_JSON_FILENAME,
+    ProjectFile,
+    ProjectFileSettings,
+    ProjectProbeInfo,
+    SegmentModel,
+    StageStatus,
+)
 from .rights import (
     ConsentRecord,
     ConsentStatus,
@@ -130,9 +138,14 @@ __all__ = [
     "MediaStream",
     "PrivacyMode",
     "Project",
+    "ProjectFile",
+    "ProjectFileSettings",
     "ProjectId",
+    "ProjectProbeInfo",
     "ProjectSettings",
     "ProjectState",
+    "SegmentModel",
+    "StageStatus",
     "Prosody",
     "QualityPreset",
     "RationalRate",

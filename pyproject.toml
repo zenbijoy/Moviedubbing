@@ -112,7 +112,6 @@ features = ["dev"]
 
 [tool.hatch.envs.default.scripts]
 test = "pytest {args:tests}"
-unit = "pytest {args:tests/unit}"
 lint = "ruff check ."
 format = "ruff format ."
 format-check = "ruff format --check ."

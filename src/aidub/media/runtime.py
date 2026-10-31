@@ -57,6 +57,10 @@ class MediaRuntime:
         path = path.resolve(strict=True)
         if not path.is_file():
             raise FileNotFoundError(f"media runtime is not a file: {path}")
+        bin_dir = str(path.parent.resolve())
+        current_path = os.environ.get("PATH", "")
+        if bin_dir not in current_path.split(os.pathsep):
+            os.environ["PATH"] = f"{bin_dir}{os.pathsep}{current_path}"
         return path
 
     def inspect(self, timeout_seconds: float = 5.0) -> MediaRuntimeInfo:
@@ -80,3 +84,10 @@ class MediaRuntime:
         match = re.search(r"\bversion\s+([^\s]+)", first_line)
         version = match.group(1) if match else "unknown"
         return MediaRuntimeInfo(ffmpeg=ffmpeg, ffprobe=ffprobe, version=version)
+
+
+def ensure_media_runtime_on_path() -> tuple[Path, Path]:
+    """Discover FFmpeg/FFprobe and export their directory to os.environ['PATH']."""
+    runtime = MediaRuntime()
+    info = runtime.inspect()
+    return info.ffmpeg, info.ffprobe
