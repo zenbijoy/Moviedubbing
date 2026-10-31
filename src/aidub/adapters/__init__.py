@@ -15,11 +15,21 @@ from .separation_demucs import (
     SourceSeparationResult,
     StemKind,
 )
+from .voice import (
+    ChatterboxAdapter,
+    ChatterboxVoiceEngine,
+    EdgeTTSAdapter,
+    EdgeTTSVoiceEngine,
+)
 
 __all__ = [
+    "ChatterboxAdapter",
+    "ChatterboxVoiceEngine",
     "DemucsSeparationAdapter",
     "DemucsSeparationOptions",
     "DiarizedSpeakerSegment",
+    "EdgeTTSAdapter",
+    "EdgeTTSVoiceEngine",
     "FasterWhisperAdapter",
     "FasterWhisperOptions",
     "PyannoteDiarizationAdapter",

@@ -71,4 +71,65 @@ class PipelineCancelled(RuntimeError):
     """Raised at a cancellation-safe stage boundary."""
 
 
+def _estimate_pitch(audio: Any, sr: int) -> float:
+    """Estimate fundamental frequency (pitch) to identify male vs female voice."""
+    import numpy as np
+
+    if len(audio) < sr * 0.05:
+        return 0.0
+    center = len(audio) // 2
+    half_win = min(1024, max(256, len(audio) // 4))
+    frame = audio[max(0, center - half_win) : min(len(audio), center + half_win)]
+    if len(frame) < 512:
+        return 0.0
+    frame = frame - np.mean(frame)
+    corr = np.correlate(frame, frame, mode="full")
+    corr = corr[len(corr) // 2 :]
+    min_lag = int(sr / 350)
+    max_lag = int(sr / 80)
+    if max_lag >= len(corr) or min_lag >= max_lag:
+        return 0.0
+    peak_lag = min_lag + int(np.argmax(corr[min_lag:max_lag]))
+    if peak_lag == 0:
+        return 0.0
+    return float(sr / peak_lag)
+
+
+def _translate_to_target(text: str, target_lang: str = "bn") -> str:
+    """Translate dialogue text to target language using Google GTX API with MyMemory fallback."""
+    cleaned = text.strip()
+    if not cleaned or cleaned == "…":
+        return cleaned
+    try:
+        import json
+        import urllib.parse
+        import urllib.request
+
+        q = urllib.parse.quote(cleaned)
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target_lang}&dt=t&q={q}"
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+        )
+        res = json.loads(urllib.request.urlopen(req, timeout=5).read().decode("utf-8"))
+        translated = "".join([part[0] for part in res[0] if part and part[0]])
+        if translated.strip():
+            return translated.strip()
+    except Exception:
+        pass
+
+    try:
+        from deep_translator import MyMemoryTranslator
+
+        m_tgt = "bn-BD" if target_lang.startswith("bn") else target_lang
+        tr = MyMemoryTranslator(source="auto", target=m_tgt).translate(cleaned)
+        if tr and tr.strip():
+            return tr.strip()
+    except Exception:
+        pass
+
+    return cleaned
+
+
+
 

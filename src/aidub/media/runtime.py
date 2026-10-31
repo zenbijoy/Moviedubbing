@@ -40,6 +40,12 @@ class MediaRuntime:
                 )
                 if candidate.is_file():
                     found = str(candidate)
+            if not found:
+                winget_bin = Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft/WinGet/Packages"
+                if winget_bin.exists():
+                    for match in winget_bin.glob(f"**/{default_name}.exe"):
+                        found = str(match)
+                        break
             if not found and default_name == "ffmpeg":
                 try:
                     import imageio_ffmpeg

@@ -142,6 +142,34 @@ def fit_to_slot(
     return time_stretch(seg_wav, out_p, ratio_clamped)
 
 
+def _resample(data: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
+    if orig_sr == target_sr or len(data) == 0:
+        return data
+    try:
+        import librosa
+        return librosa.resample(data, orig_sr=orig_sr, target_sr=target_sr)
+    except Exception:
+        pass
+    try:
+        import torch
+        import torchaudio.functional as F
+        t = torch.from_numpy(data.astype(np.float32)).unsqueeze(0)
+        res = F.resample(t, orig_freq=orig_sr, new_freq=target_sr).squeeze(0)
+        return res.numpy().astype(np.float32)
+    except Exception:
+        pass
+    try:
+        from scipy import signal
+        num = int(len(data) * target_sr / orig_sr)
+        return signal.resample(data, num).astype(np.float32)
+    except Exception:
+        pass
+    old_x = np.linspace(0, 1, len(data))
+    new_len = int(len(data) * target_sr / orig_sr)
+    new_x = np.linspace(0, 1, new_len)
+    return np.interp(new_x, old_x, data).astype(np.float32)
+
+
 def assemble_timeline(
     placed_segments: list[tuple[float | Any, Path | str]],
     total_duration_s: float,
@@ -195,9 +223,7 @@ def assemble_timeline(
             data = data.mean(axis=1)
 
         if sr != sample_rate:
-            import librosa
-
-            data = librosa.resample(data, orig_sr=sr, target_sr=sample_rate)
+            data = _resample(data, orig_sr=sr, target_sr=sample_rate)
 
         # Normalize phrase loudness according to EBU R128 / broadcast standard
         norm_data = normalize_voice(data, sample_rate)

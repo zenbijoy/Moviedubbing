@@ -28,6 +28,8 @@ class PipelineConfig:
     asr_model: str = "large-v3"
     voice_name: str | None = None
     voice_engine: str = "gemini_tts"
+    tts_engine: str = "edge_tts"
+    chatterbox_url: str | None = None
     character_voices: dict[str, str] | None = None
     rvc_cloning: bool = True
     max_stretch: float = 2.0
@@ -39,6 +41,11 @@ class PipelineConfig:
     broadcast_spec: str = "netflix"
 
     def __post_init__(self) -> None:
+        import os
+        if not self.chatterbox_url:
+            self.chatterbox_url = os.getenv("KAGGLE_CHATTERBOX_URL") or os.getenv("CHATTERBOX_API_URL")
+        if self.chatterbox_url and self.tts_engine == "edge_tts":
+            self.tts_engine = "chatterbox"
         if self.fast:
             self.keep_music = False
             self.diarize = False

@@ -104,6 +104,8 @@ if _QT:
             output_path: str | Path | None = None,
             voice_name: str | None = None,
             voice_engine: str = "gemini_tts",
+            tts_engine: str = "edge_tts",
+            chatterbox_url: str | None = None,
             character_voices: dict[str, str] | None = None,
             lipsync: bool = True,
             lipsync_tier: str = "studio_viseme",
@@ -115,6 +117,8 @@ if _QT:
             self.output_path = Path(output_path) if output_path else None
             self.voice_name = voice_name
             self.voice_engine = voice_engine
+            self.tts_engine = tts_engine
+            self.chatterbox_url = chatterbox_url
             self.character_voices = dict(character_voices or {})
             self.lipsync = lipsync
             self.lipsync_tier = lipsync_tier
@@ -173,6 +177,8 @@ if _QT:
                     lipsync_tier=self.lipsync_tier,
                     voice_name=self.voice_name,
                     voice_engine=self.voice_engine,
+                    tts_engine=self.tts_engine,
+                    chatterbox_url=self.chatterbox_url,
                     character_voices=self.character_voices,
                 )
 
@@ -549,18 +555,39 @@ if _QT:
             voice_name: str = "bn-IN-TanishaaNeural",
             output_file: str | Path = "",
             parent: Any = None,
+            reference_audio: str | Path = "",
+            chatterbox_url: str | None = None,
         ) -> None:
             super().__init__(parent)
             self.text = text
             self.voice_name = voice_name
-            self.output_file = Path(output_file) if output_file else Path("preview_voice.mp3")
+            self.output_file = Path(output_file) if output_file else Path("preview_voice.wav")
+            self.reference_audio = Path(reference_audio) if reference_audio else None
+            self.chatterbox_url = chatterbox_url
 
         def run(self) -> None:
             try:
-                from aidub.adapters.voice.edge_tts_adapter import EdgeTTSAdapter
+                import os
 
-                adapter = EdgeTTSAdapter(voice_name=self.voice_name)
-                output = adapter.synthesize_to_file(self.text, self.output_file)
+                url = (
+                    self.chatterbox_url
+                    or os.getenv("KAGGLE_CHATTERBOX_URL")
+                    or os.getenv("CHATTERBOX_API_URL")
+                )
+                if url:
+                    from aidub.adapters.voice.chatterbox_adapter import ChatterboxAdapter
+
+                    adapter = ChatterboxAdapter(server_url=url)
+                    output = adapter.synthesize_to_file(
+                        self.text,
+                        self.output_file,
+                        reference_audio_path=self.reference_audio,
+                    )
+                else:
+                    from aidub.adapters.voice.edge_tts_adapter import EdgeTTSAdapter
+
+                    adapter = EdgeTTSAdapter(voice_name=self.voice_name)
+                    output = adapter.synthesize_to_file(self.text, self.output_file)
                 self.synthesis_completed.emit(str(output))
             except Exception as exc:
                 logger.exception("TTSPreviewWorker failed: %s", exc)

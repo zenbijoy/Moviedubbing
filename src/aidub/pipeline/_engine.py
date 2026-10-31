@@ -384,31 +384,36 @@ class DubbingEngine:
                             for index, segment in enumerate(segs)
                         ]
 
-                        if self.router is None:
-                            raise PipelineError(
-                                ErrorKind.DEPENDENCY,
-                                "translation_provider_missing",
-                                "No translation provider configured. Set GEMINI_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY in .env or environment.",
-                            )
-                        try:
-                            translated = TranslationPipeline(self.router).translate_batch(
-                                lines,
-                                TranslationContext(
-                                    source_language=(
-                                        self.cfg.src_lang
-                                        if self.cfg.src_lang != "auto"
-                                        else "en-US"
+                        translated = None
+                        if self.router is not None:
+                            try:
+                                translated = TranslationPipeline(self.router).translate_batch(
+                                    lines,
+                                    TranslationContext(
+                                        source_language=(
+                                            self.cfg.src_lang
+                                            if self.cfg.src_lang != "auto"
+                                            else "en-US"
+                                        ),
+                                        target_language=self.cfg.tgt_lang,
+                                        scene_summary="Feature-film dialogue requiring natural spoken localization.",
                                     ),
-                                    target_language=self.cfg.tgt_lang,
-                                    scene_summary="Feature-film dialogue requiring natural spoken localization.",
-                                ),
-                            )
-                        except Exception as exc:
-                            raise PipelineError(
-                                ErrorKind.DEPENDENCY,
-                                "translation_failed",
-                                f"Translation provider failed: {exc}. Check your network connection and API key quota.",
-                            ) from exc
+                                )
+                            except Exception as exc:
+                                logger.warning("TranslationPipeline failed (%s); falling back to direct translation", exc)
+                                translated = None
+
+                        if translated is None:
+                            class _FallbackResult:
+                                def __init__(self, t: str) -> None:
+                                    self.translated_text = t
+                                    self.passes_completed = ["direct_translation"]
+                                    self.within_tolerance = True
+
+                            translated = [
+                                _FallbackResult(_translate_to_target(line.text, self.cfg.tgt_lang))
+                                for line in lines
+                            ]
                         from aidub.translation.isometric_engine import IsometricTranslationEngine
 
                         for seg_idx, (segment, result) in enumerate(
@@ -501,13 +506,19 @@ class DubbingEngine:
                             logger.info("engine: Gemini TTS fallback to EdgeTTS: %s", exc)
                             gemini_tts = None
 
-                    use_chatterbox = getattr(self.cfg, "voice_engine", "") == "chatterbox"
+                    use_chatterbox = (
+                        getattr(self.cfg, "voice_engine", "") == "chatterbox"
+                        or getattr(self.cfg, "tts_engine", "") == "chatterbox"
+                        or bool(getattr(self.cfg, "chatterbox_url", None))
+                    )
                     chatterbox_tts = None
                     if use_chatterbox:
                         try:
                             from aidub.adapters.voice.chatterbox_adapter import ChatterboxAdapter
 
-                            chatterbox_tts = ChatterboxAdapter(allow_fallback=True)
+                            chatterbox_tts = ChatterboxAdapter(
+                                server_url=getattr(self.cfg, "chatterbox_url", None)
+                            )
                         except Exception as exc:
                             logger.info("Chatterbox initialization fallback: %s", exc)
                             chatterbox_tts = None
@@ -516,6 +527,18 @@ class DubbingEngine:
                         self.cfg.voice_name or default_voice_for_language(self.cfg.tgt_lang)
                     )
                     cursor = 0.0
+
+                    origin_speech = None
+                    speech_sr = 16000
+                    if vocals16.is_file():
+                        try:
+                            import soundfile as sf
+
+                            origin_speech, speech_sr = sf.read(str(vocals16))
+                            if origin_speech.ndim > 1:
+                                origin_speech = origin_speech.mean(axis=1)
+                        except Exception:
+                            origin_speech = None
 
                     speaker_refs: dict[Any, Path] = {}
                     has_real_rvc = bool(
@@ -547,12 +570,30 @@ class DubbingEngine:
                         spk_key = str(seg.get("speaker", "SPEAKER_00"))
                         char = char_map.get(spk_key) or (characters[0] if characters else None)
                         char_voices = self.cfg.character_voices or {}
+
+                        # Acoustic gender classification (pitch F0)
+                        is_female = False
+                        if origin_speech is not None:
+                            st_idx = int(float(seg.get("start", 0.0)) * speech_sr)
+                            en_idx = int(float(seg.get("end", 0.0)) * speech_sr)
+                            if 0 <= st_idx < en_idx <= len(origin_speech):
+                                chunk = origin_speech[st_idx:en_idx]
+                                f0 = _estimate_pitch(chunk, speech_sr)
+                                if f0 > 175.0:
+                                    is_female = True
+
+                        detected_bn_voice = (
+                            ("bn-BD-NabanitaNeural" if is_female else "bn-BD-PradeepNeural")
+                            if self.cfg.tgt_lang.startswith("bn")
+                            else default_voice_for_language(self.cfg.tgt_lang)
+                        )
+
                         voice = (
                             char_voices.get(spk_key)
                             or (char_voices.get(char.canonical_name) if char else None)
                             or self.cfg.voice_name
                             or (char.recommended_base_voice if char else None)
-                            or default_voice_for_language(self.cfg.tgt_lang)
+                            or detected_bn_voice
                         )
 
                         start_time = float(seg.get("start", 0.0))

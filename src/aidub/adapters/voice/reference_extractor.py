@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
 
 from aidub.media.ffmpeg_ops import trim
 
@@ -12,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def pick_reference(
-    segments: list[dict[str, Any]],
+    segments: list[dict],
     vocals16_path: Path | str,
     work_dir: Path | str,
     ref_windows: dict[int, tuple[float, float]] | None = None,
@@ -52,13 +51,7 @@ def pick_reference(
 
         ref_text = candidate.get("text", "")
         ref_map[spk] = (ref_wav, ref_text)
-        logger.debug(
-            "Picked voice ref for speaker %d: %.2fs-%.2fs (text=%r)",
-            spk,
-            a,
-            end_time,
-            ref_text[:30],
-        )
+        logger.debug("Picked voice ref for speaker %d: %.2fs-%.2fs (text=%r)", spk, a, end_time, ref_text[:30])
 
     return ref_map
 
