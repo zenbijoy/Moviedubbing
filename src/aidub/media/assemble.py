@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -87,6 +88,7 @@ def fit_to_slot(
     target_dur: float,
     out_wav: Path | str,
     max_stretch: float = 2.0,
+    sample_rate: int = 48_000,
 ) -> Path:
     """
     Fit synthesized audio segment into available slot time.
@@ -99,6 +101,7 @@ def fit_to_slot(
         target_dur: Available slot room in seconds.
         out_wav: Output fitted WAV path.
         max_stretch: Maximum allowed speed-up factor (2.0 default).
+        sample_rate: Broadcast standard target sample rate (48000 Hz default).
 
     Returns:
         Path to fitted output WAV.
@@ -120,7 +123,7 @@ def fit_to_slot(
                 "-ac",
                 "1",
                 "-ar",
-                "44100",
+                str(sample_rate),
                 "-c:a",
                 "pcm_s16le",
                 str(out_p),
@@ -147,12 +150,14 @@ def _resample(data: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
         return data
     try:
         import librosa
+
         return librosa.resample(data, orig_sr=orig_sr, target_sr=target_sr)
     except Exception:
         pass
     try:
         import torch
         import torchaudio.functional as F
+
         t = torch.from_numpy(data.astype(np.float32)).unsqueeze(0)
         res = F.resample(t, orig_freq=orig_sr, new_freq=target_sr).squeeze(0)
         return res.numpy().astype(np.float32)
@@ -160,6 +165,7 @@ def _resample(data: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
         pass
     try:
         from scipy import signal
+
         num = int(len(data) * target_sr / orig_sr)
         return signal.resample(data, num).astype(np.float32)
     except Exception:

@@ -56,6 +56,12 @@ def build_stylesheet(tokens: ColorTokens | None = None) -> str:
         border-radius: {RADIUS_MD}px;
     }}
 
+    QFrame[tier="overlay"] {{
+        background-color: {t.bg_overlay};
+        border: 1px solid {t.border_strong};
+        border-radius: {RADIUS_LG}px;
+    }}
+
     /* Labels & Typography */
     QLabel {{
         background: transparent;
@@ -65,20 +71,22 @@ def build_stylesheet(tokens: ColorTokens | None = None) -> str:
     QLabel[role="display"] {{
         color: {t.text_primary};
         font-size: 22px;
-        font-weight: 700;
+        font-weight: 800;
+        letter-spacing: -0.3px;
     }}
 
     QLabel[role="title"] {{
         color: {t.text_primary};
         font-size: {FONT_TITLE}px;
-        font-weight: 600;
+        font-weight: 700;
+        letter-spacing: -0.2px;
     }}
 
     QLabel[role="panel_title"] {{
         color: {t.text_primary};
         font-size: {FONT_PANEL_TITLE}px;
-        font-weight: 600;
-        letter-spacing: 0.3px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
     }}
 
     QLabel[role="meta"] {{
@@ -99,8 +107,8 @@ def build_stylesheet(tokens: ColorTokens | None = None) -> str:
         border-radius: {RADIUS_MD}px;
         padding: 6px 14px;
         font-size: {FONT_BODY}px;
-        font-weight: 500;
-        min-height: 20px;
+        font-weight: 600;
+        min-height: 22px;
     }}
 
     QPushButton:hover {{
@@ -125,15 +133,17 @@ def build_stylesheet(tokens: ColorTokens | None = None) -> str:
 
     /* Primary Accent Button */
     QPushButton[variant="primary"], QPushButton#PrimaryActionButton {{
-        background-color: {t.accent};
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {t.accent}, stop:1 {t.accent_hover});
         color: {t.text_inverse};
-        border: 1px solid {t.accent};
-        font-weight: 600;
+        border: 1px solid {t.border_accent};
+        font-weight: 700;
+        letter-spacing: 0.2px;
     }}
 
     QPushButton[variant="primary"]:hover, QPushButton#PrimaryActionButton:hover {{
-        background-color: {t.accent_hover};
+        background: {t.accent_hover};
         border-color: {t.accent_hover};
+        color: #FFFFFF;
     }}
 
     QPushButton[variant="primary"]:pressed, QPushButton#PrimaryActionButton:pressed {{
@@ -143,15 +153,29 @@ def build_stylesheet(tokens: ColorTokens | None = None) -> str:
 
     /* AI Purple Button (Spec Sec 26: Purple = AI Generated) */
     QPushButton[variant="ai"], QPushButton#AiActionButton {{
-        background-color: {t.ai_purple};
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {t.ai_purple}, stop:1 #9333EA);
         color: #FFFFFF;
         border: 1px solid {t.ai_purple};
-        font-weight: 600;
+        font-weight: 700;
     }}
 
     QPushButton[variant="ai"]:hover, QPushButton#AiActionButton:hover {{
-        background-color: #9333EA;
-        border-color: #9333EA;
+        background: #9333EA;
+        border-color: #A855F7;
+        color: #FFFFFF;
+    }}
+
+    /* Success Button */
+    QPushButton[variant="success"] {{
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 {t.success});
+        color: #FFFFFF;
+        border: 1px solid {t.success};
+        font-weight: 700;
+    }}
+
+    QPushButton[variant="success"]:hover {{
+        background: #059669;
+        border-color: #34D399;
     }}
 
     /* Ghost Button */
@@ -172,10 +196,12 @@ def build_stylesheet(tokens: ColorTokens | None = None) -> str:
         background-color: {t.danger_subtle};
         border: 1px solid {t.danger};
         color: {t.danger};
+        font-weight: 600;
     }}
 
     QPushButton[variant="destructive"]:hover {{
         background-color: {t.danger};
+        border-color: {t.danger};
         color: #FFFFFF;
     }}
 
@@ -204,7 +230,7 @@ def build_stylesheet(tokens: ColorTokens | None = None) -> str:
         color: {t.accent};
     }}
 
-    /* Text Inputs (No fixed heights to guarantee Bengali conjuncts render) */
+    /* Text Inputs */
     QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox {{
         background-color: {t.bg_base};
         color: {t.text_primary};
@@ -231,7 +257,7 @@ def build_stylesheet(tokens: ColorTokens | None = None) -> str:
         border-radius: {RADIUS_MD}px;
         padding: 6px 12px;
         font-size: {FONT_BODY}px;
-        min-height: 20px;
+        min-height: 22px;
     }}
 
     QComboBox:hover {{
@@ -277,6 +303,7 @@ def build_stylesheet(tokens: ColorTokens | None = None) -> str:
         font-size: 11px;
         font-weight: 700;
         text-transform: uppercase;
+        letter-spacing: 0.5px;
         border: none;
         border-bottom: 1px solid {t.border_subtle};
         border-right: 1px solid {t.border_subtle};
@@ -348,7 +375,8 @@ def build_stylesheet(tokens: ColorTokens | None = None) -> str:
     }}
 
     QSlider::handle:horizontal:hover {{
-        background: {t.accent_hover};
+        background: #FFFFFF;
+        border-color: {t.accent_hover};
     }}
 
     /* Progress Bars */
@@ -360,10 +388,11 @@ def build_stylesheet(tokens: ColorTokens | None = None) -> str:
         text-align: center;
         color: {t.text_muted};
         font-size: 10px;
+        font-weight: 700;
     }}
 
     QProgressBar::chunk {{
-        background-color: {t.accent};
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {t.accent}, stop:1 {t.info});
         border-radius: 3px;
     }}
 
@@ -374,7 +403,8 @@ def build_stylesheet(tokens: ColorTokens | None = None) -> str:
         border: 1px solid {t.border_strong};
         border-radius: {RADIUS_MD}px;
         padding: 6px 10px;
-        font-size: 12px;
+        font-size: 11px;
+        font-weight: 500;
     }}
 
     /* Menus & Context Menus */
@@ -427,6 +457,44 @@ def build_stylesheet(tokens: ColorTokens | None = None) -> str:
 
     QSplitter::handle:hover {{
         background-color: {t.border_accent};
+    }}
+
+    /* Tab Widgets */
+    QTabWidget::pane {{
+        border: 1px solid {t.border_subtle};
+        background: {t.bg_surface};
+        border-radius: {RADIUS_MD}px;
+    }}
+
+    QTabBar::tab {{
+        background: {t.bg_elevated};
+        color: {t.text_muted};
+        border: 1px solid {t.border_subtle};
+        padding: 6px 14px;
+        border-top-left-radius: {RADIUS_SM}px;
+        border-top-right-radius: {RADIUS_SM}px;
+        margin-right: 2px;
+        font-size: 11px;
+        font-weight: 600;
+    }}
+
+    QTabBar::tab:hover {{
+        background: {t.bg_overlay};
+        color: {t.text_primary};
+    }}
+
+    QTabBar::tab:selected {{
+        background: {t.bg_surface};
+        color: {t.text_primary};
+        border-bottom-color: {t.bg_surface};
+        border-top: 2px solid {t.accent};
+        font-weight: 700;
+    }}
+
+    /* ScrollArea */
+    QScrollArea {{
+        background: transparent;
+        border: none;
     }}
 
     /* Status Bar */

@@ -203,19 +203,14 @@ class CharacterDetectionEngine:
             gender: str | None = None
             recommended_voice: str | None = None
             if f0 is not None:
-                if f0 < 165.0:
-                    gender = "male"
+                gender = "male" if f0 < 165.0 else "female"
+                try:
+                    from aidub.adapters.voice.edge_tts_adapter import get_voice_for_language
+
+                    recommended_voice = get_voice_for_language(target_language, gender=gender)
+                except Exception:
                     recommended_voice = (
-                        "bn-BD-PradeepNeural"
-                        if target_language.startswith("bn")
-                        else "en-US-GuyNeural"
-                    )
-                else:
-                    gender = "female"
-                    recommended_voice = (
-                        "bn-BD-NabanitaNeural"
-                        if target_language.startswith("bn")
-                        else "en-US-JennyNeural"
+                        "bn-BD-PradeepNeural" if gender == "male" else "bn-BD-NabanitaNeural"
                     )
 
             characters.append(

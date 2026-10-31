@@ -488,11 +488,14 @@ class DubbingEngine:
                     )
                     char_map = {str(c.character_id): c for c in characters}
 
-                    use_gemini = getattr(
-                        self.cfg, "voice_engine", "gemini_tts"
-                    ) == "gemini_tts" or bool(os.environ.get("GEMINI_API_KEY"))
+                    engine_choice = (
+                        getattr(self.cfg, "tts_engine", None)
+                        or getattr(self.cfg, "voice_engine", None)
+                        or "edge_tts"
+                    ).lower().strip()
+
                     gemini_tts = None
-                    if use_gemini and getattr(self.cfg, "voice_engine", "") != "edge_tts":
+                    if engine_choice == "gemini_tts":
                         try:
                             from aidub.adapters.voice.gemini_tts_adapter import (
                                 GeminiExpressiveTTSAdapter,
@@ -507,8 +510,7 @@ class DubbingEngine:
                             gemini_tts = None
 
                     use_chatterbox = (
-                        getattr(self.cfg, "voice_engine", "") == "chatterbox"
-                        or getattr(self.cfg, "tts_engine", "") == "chatterbox"
+                        engine_choice == "chatterbox"
                         or bool(getattr(self.cfg, "chatterbox_url", None))
                     )
                     chatterbox_tts = None
@@ -573,19 +575,24 @@ class DubbingEngine:
 
                         # Acoustic gender classification (pitch F0)
                         is_female = False
+                        f0 = 0.0
                         if origin_speech is not None:
                             st_idx = int(float(seg.get("start", 0.0)) * speech_sr)
                             en_idx = int(float(seg.get("end", 0.0)) * speech_sr)
                             if 0 <= st_idx < en_idx <= len(origin_speech):
                                 chunk = origin_speech[st_idx:en_idx]
                                 f0 = _estimate_pitch(chunk, speech_sr)
-                                if f0 > 175.0:
+                                if f0 > 170.0:
                                     is_female = True
+                                elif 0 < f0 <= 170.0:
+                                    is_female = False
+                                elif char and char.gender:
+                                    is_female = char.gender.lower() in {"female", "woman", "girl"}
+                        elif char and char.gender:
+                            is_female = char.gender.lower() in {"female", "woman", "girl"}
 
-                        detected_bn_voice = (
-                            ("bn-BD-NabanitaNeural" if is_female else "bn-BD-PradeepNeural")
-                            if self.cfg.tgt_lang.startswith("bn")
-                            else default_voice_for_language(self.cfg.tgt_lang)
+                        detected_voice = get_voice_for_language(
+                            self.cfg.tgt_lang, gender="female" if is_female else "male"
                         )
 
                         voice = (
@@ -593,7 +600,7 @@ class DubbingEngine:
                             or (char_voices.get(char.canonical_name) if char else None)
                             or self.cfg.voice_name
                             or (char.recommended_base_voice if char else None)
-                            or detected_bn_voice
+                            or detected_voice
                         )
 
                         start_time = float(seg.get("start", 0.0))
@@ -648,7 +655,43 @@ class DubbingEngine:
                                     e_pitch = int(p_str.replace("Hz", "").replace("+", "") or 0)
                                     eff_pitch = f"{c_pitch + e_pitch:+d}Hz"
 
-                                if gemini_tts is not None:
+                                if engine_choice == "chatterbox" and chatterbox_tts is not None:
+                                    clean_ref = (
+                                        speaker_refs.get(spk_key)
+                                        or speaker_refs.get(str(spk_key).replace("SPEAKER_", ""))
+                                        or (
+                                            Path(current_char.reference_audio_paths[0])
+                                            if (
+                                                current_char
+                                                and current_char.reference_audio_paths
+                                                and Path(current_char.reference_audio_paths[0]).is_file()
+                                            )
+                                            else None
+                                        )
+                                    )
+                                    try:
+                                        chatterbox_tts.synthesize_to_file(
+                                            text=t_text,
+                                            output_wav_path=out_p,
+                                            reference_audio_path=clean_ref,
+                                            speaker_id=spk_key,
+                                            language=self.cfg.tgt_lang,
+                                            voice=current_voice,
+                                            emotion=current_emo,
+                                        )
+                                    except Exception as exc:
+                                        logger.warning(
+                                            "Chatterbox synthesis failed (%s); falling back to EdgeTTS",
+                                            exc,
+                                        )
+                                        tts.synthesize_to_file(
+                                            text=t_text,
+                                            output_mp3_path=out_p,
+                                            voice=current_voice,
+                                            rate=eff_rate,
+                                            pitch=eff_pitch,
+                                        )
+                                elif engine_choice == "gemini_tts" and gemini_tts is not None:
                                     from aidub.adapters.voice.gemini_tts_adapter import (
                                         GeminiExpressiveTTSAdapter,
                                     )
@@ -679,27 +722,6 @@ class DubbingEngine:
                                         output_wav_path=out_p,
                                         voice=gemini_v,
                                         emotion=current_emo,
-                                    )
-                                elif chatterbox_tts is not None:
-                                    clean_ref = (
-                                        speaker_refs.get(spk_key)
-                                        or speaker_refs.get(str(spk_key).replace("SPEAKER_", ""))
-                                        or (
-                                            Path(current_char.reference_audio_paths[0])
-                                            if (
-                                                current_char
-                                                and current_char.reference_audio_paths
-                                                and Path(current_char.reference_audio_paths[0]).is_file()
-                                            )
-                                            else None
-                                        )
-                                    )
-                                    chatterbox_tts.synthesize_to_file(
-                                        text=t_text,
-                                        output_wav_path=out_p,
-                                        voice=current_voice,
-                                        emotion=current_emo,
-                                        reference_audio=clean_ref,
                                     )
                                 else:
                                     tts.synthesize_to_file(

@@ -10,7 +10,12 @@ try:
     win.show()
     app.processEvents()
     win.chrome._select_timeline_studio()
-    for _ in range(5):
+    app.processEvents()
+    if hasattr(win.studio, "workspace_splitter"):
+        win.studio.workspace_splitter.setSizes([640, 240])
+    if hasattr(win.studio, "upper_splitter"):
+        win.studio.upper_splitter.setSizes([264, 820, 440])
+    for _ in range(10):
         app.processEvents()
     pixmap = win.grab()
     pixmap.save('current_studio_timeline.png')

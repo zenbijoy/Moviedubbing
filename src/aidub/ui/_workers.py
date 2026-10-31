@@ -552,14 +552,16 @@ if _QT:
         def __init__(
             self,
             text: str,
-            voice_name: str = "bn-IN-TanishaaNeural",
+            voice_name: str | None = None,
             output_file: str | Path = "",
             parent: Any = None,
             reference_audio: str | Path = "",
             chatterbox_url: str | None = None,
+            target_lang: str = "bn",
         ) -> None:
             super().__init__(parent)
             self.text = text
+            self.target_lang = target_lang
             self.voice_name = voice_name
             self.output_file = Path(output_file) if output_file else Path("preview_voice.wav")
             self.reference_audio = Path(reference_audio) if reference_audio else None
@@ -568,25 +570,42 @@ if _QT:
         def run(self) -> None:
             try:
                 import os
+                from aidub.adapters.voice.edge_tts_adapter import (
+                    EdgeTTSAdapter,
+                    default_voice_for_language,
+                    get_voice_for_language,
+                )
+
+                eff_voice = self.voice_name
+                if not eff_voice:
+                    try:
+                        eff_voice = get_voice_for_language(self.target_lang)
+                    except Exception:
+                        eff_voice = default_voice_for_language("bn")
 
                 url = (
                     self.chatterbox_url
                     or os.getenv("KAGGLE_CHATTERBOX_URL")
                     or os.getenv("CHATTERBOX_API_URL")
                 )
+                output = None
                 if url:
-                    from aidub.adapters.voice.chatterbox_adapter import ChatterboxAdapter
+                    try:
+                        from aidub.adapters.voice.chatterbox_adapter import ChatterboxAdapter
 
-                    adapter = ChatterboxAdapter(server_url=url)
-                    output = adapter.synthesize_to_file(
-                        self.text,
-                        self.output_file,
-                        reference_audio_path=self.reference_audio,
-                    )
-                else:
-                    from aidub.adapters.voice.edge_tts_adapter import EdgeTTSAdapter
+                        adapter = ChatterboxAdapter(server_url=url)
+                        output = adapter.synthesize_to_file(
+                            self.text,
+                            self.output_file,
+                            reference_audio_path=self.reference_audio,
+                            language=self.target_lang,
+                        )
+                    except Exception as exc:
+                        logger.warning("TTSPreviewWorker: Chatterbox failed (%s); falling back to EdgeTTS", exc)
+                        output = None
 
-                    adapter = EdgeTTSAdapter(voice_name=self.voice_name)
+                if output is None:
+                    adapter = EdgeTTSAdapter(voice_name=eff_voice)
                     output = adapter.synthesize_to_file(self.text, self.output_file)
                 self.synthesis_completed.emit(str(output))
             except Exception as exc:

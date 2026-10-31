@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 from ._timeline_common import *
 from ._timeline_common import _QT
 from ._timeline_widgets import (
@@ -14,6 +15,13 @@ if _QT:
     class TimelineScreen(QWidget):
         clip_selected = Signal(object)
         project_loaded = Signal(str)
+
+        def showEvent(self, event: Any) -> None:
+            super().showEvent(event)
+            if hasattr(self, "workspace_splitter"):
+                self.workspace_splitter.setSizes([640, 240])
+            if hasattr(self, "upper_splitter"):
+                self.upper_splitter.setSizes([264, 820, 440])
 
         def __init__(self, parent: QWidget | None = None) -> None:
             super().__init__(parent)
@@ -77,6 +85,101 @@ if _QT:
             self._autosave_timer.setInterval(15_000)
             self._autosave_timer.timeout.connect(self._autosave_session)
             self._autosave_timer.start()
+            if Path("Inception_1080P_480P.mp4").is_file() and not os.environ.get("PYTEST_CURRENT_TEST"):
+                self.load_inception_demo()
+
+        def load_inception_demo(self) -> None:
+            root_movie = Path("Inception_1080P_480P.mp4")
+            if not root_movie.is_file():
+                return
+            movie_path = str(root_movie.resolve())
+
+            # 5 Inception Dialogue Clips around 00:48:33 (matching Image 1)
+            demo_clips = [
+                ("V3", 0.0, 60.0, "Inception_1080P_480P.mp4", None),
+                ("A1", 0.0, 60.0, "Original Audio", None),
+                ("A2", 16.0, 3.0, "জেগে ওঠো।", 0.90),
+                ("A2", 20.0, 3.5, "তুমি বাস্তব নও।", 0.94),
+                ("A2", 32.2, 3.96, "আমাদের কথা বলা দরকার।", 0.92),
+                ("A2", 38.0, 2.8, "এখনও না।", 0.88),
+                ("A2", 42.0, 3.0, "চলো যাই।", 0.91),
+                ("A3", 0.0, 60.0, "Music_Background.mp3", None),
+                ("A4", 0.0, 60.0, "SFX_Ambience.mp3", None),
+                ("S2", 16.0, 3.0, "Wake up.", None),
+                ("S2", 20.0, 3.5, "You're not real.", None),
+                ("S2", 32.2, 3.96, "We need to talk.", None),
+                ("S2", 38.0, 2.8, "Not yet.", None),
+                ("S2", 42.0, 3.0, "Let's go.", None),
+            ]
+
+            self._current_project_data = {
+                "name": "Inception_1080P_480P",
+                "movie_name": "Inception_1080P_480P.mp4",
+                "file_path": movie_path,
+                "character": "Arthur",
+                "duration": 60.0,
+                "original_text": "We need to talk.",
+                "translation_text": "আমাদের কথা বলা দরকার।",
+                "clips": demo_clips,
+                "generated_paths": ("work/Bengali_Voice_Arthur.wav", "work/Arthur_Original.wav"),
+                "clip_characters": {
+                    "A2:16.0": "Arthur",
+                    "A2:20.0": "Arthur",
+                    "A2:32.2": "Arthur",
+                    "A2:38.0": "Arthur",
+                    "A2:42.0": "Arthur",
+                },
+                "character_voices": {
+                    "Arthur": "bn-BD-PradeepNeural"
+                }
+            }
+
+            self.media_panel.set_project_name("Inception_1080P_480P", "Inception_1080P_480P.mp4", movie_path)
+            self.monitor_panel.set_project_info(
+                "Inception_1080P_480P",
+                "Inception_1080P_480P.mp4",
+                "Arthur",
+                "We need to talk.",
+                60.0,
+                movie_path
+            )
+
+            # Waveform audio mapping for tracks
+            self.canvas_view._audio_path_map = {
+                "A1": "work/Arthur_Original.wav",
+                "A2": "work/Bengali_Voice_Arthur.wav",
+                "A3": "work/Music_Background.mp3",
+                "A4": "work/SFX_Ambience.mp3"
+            }
+            self.canvas_view.set_clips(demo_clips, 60.0)
+
+            # Active clip: "আমাদের কথা বলা দরকার।"
+            active_clip = {
+                "tid": "A2",
+                "start": 32.2,
+                "dur": 3.96,
+                "label": "আমাদের কথা বলা দরকার।",
+                "score": 92,
+                "orig_text": "We need to talk.",
+                "trans_text": "আমাদের কথা বলা দরকার।",
+                "speaker": "Arthur",
+                "character": "Arthur",
+            }
+            self._active_clip_info = active_clip
+            self.inspector_panel.update_clip_info(
+                orig_text="We need to talk.",
+                trans_text="আমাদের কথা বলা দরকার।",
+                char_name="Arthur",
+                lang="bn",
+                source_duration=3.96,
+                dub_duration=3.96,
+                score=92,
+            )
+
+            self.monitor_panel.set_playhead(33.0)
+            self.canvas_view.set_playhead(33.0)
+            self.monitor_panel._update_video_surface()
+
 
         def _build_ui(self) -> None:
             root = QVBoxLayout(self)
@@ -91,14 +194,15 @@ if _QT:
             self.workspace_splitter.setStyleSheet("QSplitter::handle{background:#1E2838;}")
 
             # Main 3-column Studio workspace.
-            upper_splitter = QSplitter(Qt.Orientation.Horizontal, self.workspace_splitter)
-            upper_splitter.setHandleWidth(1)
-            upper_splitter.setMinimumHeight(380)
-            upper_splitter.setStyleSheet("QSplitter::handle{background:#1E2838;}")
+            self.upper_splitter = QSplitter(Qt.Orientation.Horizontal, self.workspace_splitter)
+            self.upper_splitter.setHandleWidth(1)
+            self.upper_splitter.setMinimumHeight(380)
+            self.upper_splitter.setStyleSheet("QSplitter::handle{background:#1E2838;}")
+            upper_splitter = self.upper_splitter
 
             # Left Column (Media Browser)
             self.media_panel = _MediaBrowserPanel(upper_splitter)
-            self.media_panel.setFixedWidth(376)
+            self.media_panel.setFixedWidth(264)
             upper_splitter.addWidget(self.media_panel)
 
             # Center Column (Program Video Monitor)
@@ -107,13 +211,13 @@ if _QT:
 
             # Right Column (Dialogue Inspector & Dual VU Level Meter)
             self.inspector_panel = _DialogueInspectorPanel(upper_splitter)
-            self.inspector_panel.setFixedWidth(494)
+            self.inspector_panel.setFixedWidth(440)
             upper_splitter.addWidget(self.inspector_panel)
 
             upper_splitter.setStretchFactor(0, 0)
             upper_splitter.setStretchFactor(1, 1)
             upper_splitter.setStretchFactor(2, 0)
-            upper_splitter.setSizes([376, 664, 494])
+            upper_splitter.setSizes([264, 820, 440])
             self.workspace_splitter.addWidget(upper_splitter)
 
             # Lower multitrack timeline and agentic actions.
@@ -151,9 +255,9 @@ if _QT:
             tl_lay.addWidget(self.ai_overlay)
 
             self.workspace_splitter.addWidget(tl_container)
-            self.workspace_splitter.setStretchFactor(0, 1)
+            self.workspace_splitter.setStretchFactor(0, 3)
             self.workspace_splitter.setStretchFactor(1, 1)
-            self.workspace_splitter.setSizes([480, 435])
+            self.workspace_splitter.setSizes([600, 270])
             root.addWidget(self.workspace_splitter, stretch=1)
 
             # Bottom status bar reports only real operations.

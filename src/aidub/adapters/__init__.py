@@ -20,6 +20,9 @@ from .voice import (
     ChatterboxVoiceEngine,
     EdgeTTSAdapter,
     EdgeTTSVoiceEngine,
+    available_voices_for_language,
+    default_voice_for_language,
+    get_voice_for_language,
 )
 
 __all__ = [
@@ -38,5 +41,8 @@ __all__ = [
     "SourceSeparationResult",
     "SpeakerDiarizationResult",
     "StemKind",
+    "available_voices_for_language",
     "cluster_speaker_embeddings",
+    "default_voice_for_language",
+    "get_voice_for_language",
 ]

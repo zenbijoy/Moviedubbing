@@ -14,7 +14,11 @@ from typing import Any, TypedDict
 
 from aidub.adapters.asr_whisper import FasterWhisperAdapter, FasterWhisperOptions, _has_speech
 from aidub.adapters.diarization_pyannote import PyannoteDiarizationAdapter
-from aidub.adapters.voice.edge_tts_adapter import EdgeTTSAdapter, default_voice_for_language
+from aidub.adapters.voice.edge_tts_adapter import (
+    EdgeTTSAdapter,
+    default_voice_for_language,
+    get_voice_for_language,
+)
 from aidub.application.timing_fitter import TimingFitter
 from aidub.application.translation_pipeline import (
     DialogueLine,
@@ -72,27 +76,64 @@ class PipelineCancelled(RuntimeError):
 
 
 def _estimate_pitch(audio: Any, sr: int) -> float:
-    """Estimate fundamental frequency (pitch) to identify male vs female voice."""
+    """
+    Estimate fundamental frequency (pitch) dynamically across voiced frames
+    using autocorrelation to distinguish male vs female speech characteristics.
+    """
     import numpy as np
 
-    if len(audio) < sr * 0.05:
+    if audio is None:
         return 0.0
-    center = len(audio) // 2
-    half_win = min(1024, max(256, len(audio) // 4))
-    frame = audio[max(0, center - half_win) : min(len(audio), center + half_win)]
-    if len(frame) < 512:
+
+    arr = np.asarray(audio, dtype=np.float32)
+    if arr.ndim > 1:
+        arr = arr.mean(axis=1)
+
+    min_samples = int(sr * 0.05)
+    if len(arr) < min_samples:
         return 0.0
-    frame = frame - np.mean(frame)
+
+    # Search for highest energy voiced window to avoid silent regions
+    win_size = min(2048, max(512, len(arr) // 4))
+    hop_size = win_size // 2
+
+    best_frame: np.ndarray | None = None
+    best_energy = 0.0
+
+    for i in range(0, max(1, len(arr) - win_size), hop_size):
+        sub = arr[i : i + win_size]
+        energy = float(np.sum(sub**2))
+        if energy > best_energy:
+            best_energy = energy
+            best_frame = sub
+
+    if best_frame is None or best_energy < 1e-4:
+        # Fallback to middle frame
+        center = len(arr) // 2
+        half_win = min(1024, max(256, len(arr) // 4))
+        best_frame = arr[max(0, center - half_win) : min(len(arr), center + half_win)]
+
+    if len(best_frame) < 512:
+        return 0.0
+
+    frame = best_frame - np.mean(best_frame)
     corr = np.correlate(frame, frame, mode="full")
     corr = corr[len(corr) // 2 :]
-    min_lag = int(sr / 350)
-    max_lag = int(sr / 80)
+
+    # Vocal pitch range: 65 Hz (deep male) to 400 Hz (high female/child)
+    min_lag = int(sr / 400)
+    max_lag = int(sr / 65)
     if max_lag >= len(corr) or min_lag >= max_lag:
         return 0.0
+
     peak_lag = min_lag + int(np.argmax(corr[min_lag:max_lag]))
     if peak_lag == 0:
         return 0.0
-    return float(sr / peak_lag)
+
+    f0 = float(sr / peak_lag)
+    if 60.0 <= f0 <= 400.0:
+        return f0
+    return 0.0
 
 
 def _translate_to_target(text: str, target_lang: str = "bn") -> str:
@@ -100,13 +141,17 @@ def _translate_to_target(text: str, target_lang: str = "bn") -> str:
     cleaned = text.strip()
     if not cleaned or cleaned == "…":
         return cleaned
+
+    target_lang_clean = str(target_lang or "bn").strip()
+    norm_lang = target_lang_clean.split("-")[0].split("_")[0].lower()
+
     try:
         import json
         import urllib.parse
         import urllib.request
 
         q = urllib.parse.quote(cleaned)
-        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target_lang}&dt=t&q={q}"
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={norm_lang}&dt=t&q={q}"
         req = urllib.request.Request(
             url,
             headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
@@ -121,7 +166,14 @@ def _translate_to_target(text: str, target_lang: str = "bn") -> str:
     try:
         from deep_translator import MyMemoryTranslator
 
-        m_tgt = "bn-BD" if target_lang.startswith("bn") else target_lang
+        dialect_map = {
+            "bn": "bn-BD",
+            "en": "en-US",
+            "es": "es-ES",
+            "pt": "pt-BR",
+            "zh": "zh-CN",
+        }
+        m_tgt = dialect_map.get(norm_lang, target_lang_clean)
         tr = MyMemoryTranslator(source="auto", target=m_tgt).translate(cleaned)
         if tr and tr.strip():
             return tr.strip()
@@ -129,7 +181,3 @@ def _translate_to_target(text: str, target_lang: str = "bn") -> str:
         pass
 
     return cleaned
-
-
-
-

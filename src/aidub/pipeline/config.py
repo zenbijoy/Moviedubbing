@@ -27,7 +27,7 @@ class PipelineConfig:
     # Configured analysis and speech providers.
     asr_model: str = "large-v3"
     voice_name: str | None = None
-    voice_engine: str = "gemini_tts"
+    voice_engine: str = "edge_tts"
     tts_engine: str = "edge_tts"
     chatterbox_url: str | None = None
     character_voices: dict[str, str] | None = None
@@ -42,10 +42,21 @@ class PipelineConfig:
 
     def __post_init__(self) -> None:
         import os
+
         if not self.chatterbox_url:
-            self.chatterbox_url = os.getenv("KAGGLE_CHATTERBOX_URL") or os.getenv("CHATTERBOX_API_URL")
-        if self.chatterbox_url and self.tts_engine == "edge_tts":
+            self.chatterbox_url = (
+                os.getenv("KAGGLE_CHATTERBOX_URL") or os.getenv("CHATTERBOX_API_URL")
+            )
+
+        # Dynamically synchronize voice_engine and tts_engine
+        if self.chatterbox_url:
             self.tts_engine = "chatterbox"
+            self.voice_engine = "chatterbox"
+        elif self.voice_engine != "edge_tts" and self.tts_engine == "edge_tts":
+            self.tts_engine = self.voice_engine
+        elif self.tts_engine != "edge_tts" and self.voice_engine == "edge_tts":
+            self.voice_engine = self.tts_engine
+
         if self.fast:
             self.keep_music = False
             self.diarize = False

@@ -36,6 +36,7 @@ try:
         QMessageBox,
         QProgressBar,
         QPushButton,
+        QScrollArea,
         QStackedWidget,
         QToolBar,
         QVBoxLayout,
@@ -140,7 +141,7 @@ if _QT:
             painter.drawEllipse(px - 3, int(mid_y) - 3, 6, 6)
 
     class _ModernActionCard(QFrame):
-        """Quick action card with glowing icon badge matching Image 1."""
+        """Quick action card with glowing icon badge matching modern studio design."""
 
         def __init__(
             self,
@@ -155,28 +156,28 @@ if _QT:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
             self.setStyleSheet(
                 f"QFrame {{"
-                f"  background: #141722; border: 1px solid #232C3E; border-radius: 12px; padding: 12px 14px;"
+                f"  background: #121722; border: 1px solid #1E293B; border-radius: 12px; padding: 12px 14px;"
                 f"}}"
                 f"QFrame:hover {{"
-                f"  background: #191E2C; border-color: {icon_bg};"
+                f"  background: #171E2E; border-color: {icon_bg};"
                 f"}}"
             )
             layout = QHBoxLayout(self)
-            layout.setContentsMargins(12, 10, 12, 10)
-            layout.setSpacing(12)
+            layout.setContentsMargins(14, 12, 14, 12)
+            layout.setSpacing(14)
 
             badge = QLabel(icon_char, self)
-            badge.setFixedSize(44, 44)
+            badge.setFixedSize(46, 46)
             badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
             badge.setStyleSheet(
-                f"background: {icon_bg}; color: #FFFFFF; border-radius: 22px; font-size: 20px;"
+                f"background: {icon_bg}; color: #FFFFFF; border-radius: 23px; font-size: 20px; border: 1px solid rgba(255,255,255,0.18);"
             )
             layout.addWidget(badge)
 
             text_col = QVBoxLayout()
             text_col.setSpacing(2)
             t_lbl = QLabel(title, self)
-            t_lbl.setStyleSheet("font-size: 14px; font-weight: 800; color: #F8FAFC;")
+            t_lbl.setStyleSheet("font-size: 13.5px; font-weight: 800; color: #F8FAFC; letter-spacing: -0.2px;")
             s_lbl = QLabel(subtitle, self)
             s_lbl.setStyleSheet("font-size: 11px; font-weight: 500; color: #94A3B8;")
             text_col.addWidget(t_lbl)
@@ -187,8 +188,8 @@ if _QT:
             plus_btn.setFixedSize(28, 28)
             plus_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             plus_btn.setStyleSheet(
-                "QPushButton { background: #1E2738; color: #E2E8F0; border-radius: 14px; font-size: 16px; font-weight: 700; border: none; }"
-                "QPushButton:hover { background: #2563EB; color: #FFF; }"
+                "QPushButton { background: #1C2434; color: #E2E8F0; border-radius: 14px; font-size: 16px; font-weight: 700; border: 1px solid #2B384E; }"
+                "QPushButton:hover { background: #2563EB; color: #FFF; border-color: #3B82F6; }"
             )
             if callback:
                 plus_btn.clicked.connect(callback)
@@ -224,7 +225,7 @@ if _QT:
             return "Recently"
 
     class _ProjectCard(QFrame):
-        """Card representing a video project matching Image 1."""
+        """Card representing a video project matching modern NLE card layout."""
 
         def __init__(
             self,
@@ -239,10 +240,10 @@ if _QT:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
             self.setStyleSheet(
                 "QFrame {"
-                "  background: #131722; border: 1px solid #1E2738; border-radius: 10px; padding: 14px;"
+                "  background: #121724; border: 1px solid #1E293B; border-radius: 10px; padding: 12px 14px;"
                 "}"
                 "QFrame:hover {"
-                "  background: #171C2B; border-color: #38BDF8;"
+                "  background: #171E2F; border-color: #38BDF8;"
                 "}"
             )
             layout = QVBoxLayout(self)
@@ -254,16 +255,16 @@ if _QT:
             v_badge.setFixedSize(32, 32)
             v_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
             v_badge.setStyleSheet(
-                "background: #1E293B; color: #38BDF8; border-radius: 6px; font-size: 15px;"
+                "background: #1E293B; color: #38BDF8; border-radius: 8px; font-size: 15px;"
             )
             top_row.addWidget(v_badge)
 
             title_box = QVBoxLayout()
             title_box.setSpacing(2)
             t_lbl = QLabel(title, self)
-            t_lbl.setStyleSheet("font-size: 13px; font-weight: 700; color: #F8FAFC;")
+            t_lbl.setStyleSheet("font-size: 13px; font-weight: 700; color: #F8FAFC; letter-spacing: -0.1px;")
             c_lbl = QLabel(created_text, self)
-            c_lbl.setStyleSheet("font-size: 10px; color: #64748B;")
+            c_lbl.setStyleSheet("font-size: 10px; color: #64748B; font-weight: 500;")
             title_box.addWidget(t_lbl)
             title_box.addWidget(c_lbl)
             top_row.addLayout(title_box, 1)
@@ -271,8 +272,8 @@ if _QT:
             dots_btn = QPushButton("⋮", self)
             dots_btn.setFixedSize(24, 24)
             dots_btn.setStyleSheet(
-                "QPushButton { background: transparent; color: #64748B; border: none; font-size: 15px; font-weight: bold; }"
-                "QPushButton:hover { color: #FFF; background: #1E293B; border-radius: 4px; }"
+                "QPushButton { background: transparent; color: #64748B; border: none; font-size: 15px; font-weight: bold; border-radius: 4px; }"
+                "QPushButton:hover { color: #FFF; background: #1E293B; }"
             )
             dots_btn.clicked.connect(self._show_options_menu)
             top_row.addWidget(dots_btn)
@@ -282,10 +283,14 @@ if _QT:
             pill_lbl = QLabel(f"Dubbed to: {dubbed_pill_text}", self)
             pill_lbl.setStyleSheet(
                 "background: #0B111D; color: #94A3B8; border: 1px solid #1E293B; border-radius: 4px;"
-                "padding: 4px 8px; font-size: 10px; font-weight: 600;"
+                "padding: 3px 8px; font-size: 10px; font-weight: 600;"
             )
             pill_row.addWidget(pill_lbl)
             pill_row.addStretch()
+
+            ready_pill = QLabel("● Ready", self)
+            ready_pill.setStyleSheet("color: #10B981; font-size: 10px; font-weight: 700;")
+            pill_row.addWidget(ready_pill)
             layout.addLayout(pill_row)
 
             self._on_open = on_open
@@ -346,7 +351,7 @@ if _QT:
             super().mousePressEvent(event)
 
     class _HomeDashboardPanel(QFrame):
-        """Ultra-Modern AI Studio Hub & Dashboard (Replicating Image 1)."""
+        """Ultra-Modern AI Studio Hub & Dashboard."""
 
         def __init__(self, window: AIDubStudioWindow) -> None:
             super().__init__(window)
@@ -359,7 +364,7 @@ if _QT:
             root_layout.setSpacing(0)
 
             # =================================================================
-            # 1. Left Sidebar Navigation (Matching Image 1)
+            # 1. Left Sidebar Navigation
             # =================================================================
             sidebar = QFrame(self)
             sidebar.setFixedWidth(230)
@@ -395,6 +400,12 @@ if _QT:
             ws_txt.addWidget(ws_l1)
             ws_txt.addWidget(ws_l2)
             ws_lay.addLayout(ws_txt, 1)
+
+            pro_badge = QLabel("PRO", ws_card)
+            pro_badge.setStyleSheet(
+                "background: #312E81; color: #A5B4FC; border-radius: 4px; padding: 2px 5px; font-size: 9px; font-weight: 800;"
+            )
+            ws_lay.addWidget(pro_badge)
             sb_layout.addWidget(ws_card)
 
             sb_layout.addSpacing(10)
@@ -456,25 +467,69 @@ if _QT:
             sb_layout.addWidget(_nav_btn("❓  Help Center", cb=window.open_keyboard_shortcuts))
 
             sb_layout.addStretch()
+
+            # Bottom System Status Card
+            sys_card = QFrame(sidebar)
+            sys_card.setStyleSheet(
+                "background: #11151F; border: 1px solid #1E273A; border-radius: 8px; padding: 10px;"
+            )
+            sc_lay = QVBoxLayout(sys_card)
+            sc_lay.setContentsMargins(6, 6, 6, 6)
+            sc_lay.setSpacing(4)
+            sc_title = QLabel("SYSTEM STATUS", sys_card)
+            sc_title.setStyleSheet("font-size: 8.5px; font-weight: 800; color: #64748B; letter-spacing: 0.5px;")
+            sc_lay.addWidget(sc_title)
+            sc_info = QLabel("⚡ GPU Engine Ready", sys_card)
+            sc_info.setStyleSheet("font-size: 10.5px; font-weight: 700; color: #10B981;")
+            sc_lay.addWidget(sc_info)
+            sc_meta = QLabel("Local SQLite • 7-Stage NLE", sys_card)
+            sc_meta.setStyleSheet("font-size: 9.5px; color: #94A3B8;")
+            sc_lay.addWidget(sc_meta)
+            sb_layout.addWidget(sys_card)
+
             root_layout.addWidget(sidebar)
 
             # =================================================================
-            # 2. Main Dashboard Area (Right of Sidebar)
+            # 2. Main Dashboard Area with ScrollArea
             # =================================================================
-            main_pane = QFrame(self)
+            scroll_area = QScrollArea(self)
+            scroll_area.setWidgetResizable(True)
+            scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+            scroll_area.setStyleSheet("QScrollArea{background:transparent;border:none;}")
+
+            main_pane = QFrame(scroll_area)
             main_pane.setStyleSheet("background: #0B0E14;")
             mp_lay = QVBoxLayout(main_pane)
             mp_lay.setContentsMargins(36, 24, 36, 24)
-            mp_lay.setSpacing(20)
+            mp_lay.setSpacing(18)
 
             # Top Breadcrumb & User Profile Row
             top_bar = QHBoxLayout()
-            h_lbl = QLabel("HOME", main_pane)
+            h_lbl = QLabel("HOME / STUDIO DASHBOARD", main_pane)
             h_lbl.setStyleSheet(
                 "font-size: 11px; font-weight: 800; color: #64748B; letter-spacing: 0.5px;"
             )
             top_bar.addWidget(h_lbl)
             top_bar.addStretch()
+
+            # Quick Action Buttons in Top Bar
+            new_btn = QPushButton("+ New Project", main_pane)
+            new_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            new_btn.setStyleSheet(
+                "QPushButton { background: #2563EB; color: #FFF; border: none; border-radius: 6px; padding: 4px 12px; font-size: 11px; font-weight: 700; }"
+                "QPushButton:hover { background: #1D4ED8; }"
+            )
+            new_btn.clicked.connect(window.create_new_project_dialog)
+            top_bar.addWidget(new_btn)
+
+            open_btn = QPushButton("📂 Open .aidub", main_pane)
+            open_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            open_btn.setStyleSheet(
+                "QPushButton { background: #141822; color: #CBD5E1; border: 1px solid #232C3E; border-radius: 6px; padding: 4px 12px; font-size: 11px; font-weight: 600; }"
+                "QPushButton:hover { background: #1B2232; color: #FFF; border-color: #38BDF8; }"
+            )
+            open_btn.clicked.connect(window.open_project_dialog)
+            top_bar.addWidget(open_btn)
 
             user_pill = QFrame(main_pane)
             user_pill.setStyleSheet(
@@ -500,7 +555,7 @@ if _QT:
             greet_col = QVBoxLayout()
             greet_col.setSpacing(3)
             greet_title = QLabel("Welcome Back, Creator", main_pane)
-            greet_title.setStyleSheet("font-size: 24px; font-weight: 900; color: #F8FAFC;")
+            greet_title.setStyleSheet("font-size: 24px; font-weight: 900; color: #F8FAFC; letter-spacing: -0.4px;")
             greet_sub = QLabel(
                 "There's a lot you can do here! Start automated movie dubbing or explore studio tools.",
                 main_pane,
@@ -511,7 +566,51 @@ if _QT:
             mp_lay.addLayout(greet_col)
 
             # -----------------------------------------------------------------
-            # 3. Four Quick Action Cards (Directly Matching Image 1)
+            # 2.5. Studio KPI Metric Cards Ribbon
+            # -----------------------------------------------------------------
+            kpi_layout = QHBoxLayout()
+            kpi_layout.setSpacing(14)
+
+            def _kpi_card(icon: str, title: str, value: str, subtext: str) -> QFrame:
+                card = QFrame(main_pane)
+                card.setStyleSheet(
+                    "QFrame { background: #11151F; border: 1px solid #1E273A; border-radius: 10px; padding: 10px 14px; }"
+                    "QFrame:hover { background: #151A26; border-color: #2D3A52; }"
+                )
+                lay = QHBoxLayout(card)
+                lay.setContentsMargins(6, 6, 6, 6)
+                lay.setSpacing(10)
+
+                ico_lbl = QLabel(icon, card)
+                ico_lbl.setFixedSize(36, 36)
+                ico_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                ico_lbl.setStyleSheet(
+                    "background: #182030; border-radius: 18px; font-size: 17px; border: 1px solid #2B384E;"
+                )
+                lay.addWidget(ico_lbl)
+
+                info_col = QVBoxLayout()
+                info_col.setSpacing(1)
+                t_lbl = QLabel(title.upper(), card)
+                t_lbl.setStyleSheet("font-size: 9px; font-weight: 800; color: #64748B; letter-spacing: 0.5px;")
+                v_lbl = QLabel(value, card)
+                v_lbl.setStyleSheet("font-size: 14px; font-weight: 800; color: #F8FAFC;")
+                s_lbl = QLabel(subtext, card)
+                s_lbl.setStyleSheet("font-size: 9.5px; color: #94A3B8;")
+                info_col.addWidget(t_lbl)
+                info_col.addWidget(v_lbl)
+                info_col.addWidget(s_lbl)
+                lay.addLayout(info_col, 1)
+                return card
+
+            kpi_layout.addWidget(_kpi_card("🎬", "Active Projects", "Local Workspace", "SQLite Project Catalog"), stretch=1)
+            kpi_layout.addWidget(_kpi_card("🎙️", "AI Voice Engine", "Chatterbox + RVC", "Zero-Shot Timbre Transfer"), stretch=1)
+            kpi_layout.addWidget(_kpi_card("⚡", "Hardware GPU", "RTX Accelerated", "CUDA & Cloud Acceleration"), stretch=1)
+            kpi_layout.addWidget(_kpi_card("🎯", "NLE Pipeline", "7-Stage Automation", "From Ingest to Delivery"), stretch=1)
+            mp_lay.addLayout(kpi_layout)
+
+            # -----------------------------------------------------------------
+            # 3. Quick Action Cards (Expanded with LipSync Studio)
             # -----------------------------------------------------------------
             actions_layout = QHBoxLayout()
             actions_layout.setSpacing(14)
@@ -560,12 +659,23 @@ if _QT:
             )
             actions_layout.addWidget(c4, stretch=1)
 
+            # Card 5: LipSync Studio (Rose)
+            c5 = _ModernActionCard(
+                title="LipSync Studio",
+                subtitle="Neural Lip Alignment!",
+                icon_char="👄",
+                icon_bg="#E11D48",
+                callback=window.open_dub_dialog,
+                parent=main_pane,
+            )
+            actions_layout.addWidget(c5, stretch=1)
+
             mp_lay.addLayout(actions_layout)
 
             mp_lay.addSpacing(6)
 
             # -----------------------------------------------------------------
-            # 4. Project Explorer & Tabs (Matching Image 1)
+            # 4. Project Explorer & Tabs
             # -----------------------------------------------------------------
             proj_header_row = QHBoxLayout()
 
@@ -644,7 +754,8 @@ if _QT:
             mp_lay.addStretch()
 
             self.refresh_projects()
-            root_layout.addWidget(main_pane, 1)
+            scroll_area.setWidget(main_pane)
+            root_layout.addWidget(scroll_area, 1)
 
         def _on_search_changed(self, text: str) -> None:
             self.refresh_projects(text)
@@ -710,8 +821,8 @@ if _QT:
                 new_tile = QFrame(self.projects_container)
                 new_tile.setCursor(Qt.CursorShape.PointingHandCursor)
                 new_tile.setStyleSheet(
-                    "QFrame { background: rgba(19, 23, 34, 0.4); border: 2px dashed #2B384E; border-radius: 10px; padding: 14px; }"
-                    "QFrame:hover { background: rgba(37, 99, 235, 0.08); border-color: #38BDF8; }"
+                    "QFrame { background: rgba(19, 23, 34, 0.5); border: 2px dashed #2B384E; border-radius: 10px; padding: 14px; min-height: 100px; }"
+                    "QFrame:hover { background: rgba(37, 99, 235, 0.1); border-color: #38BDF8; }"
                 )
                 it_lay = QVBoxLayout(new_tile)
                 it_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -807,7 +918,7 @@ if _QT:
             layout.setContentsMargins(14, 0, 0, 0)
             layout.setSpacing(10)
 
-            # Modern AI Dubbing Studio Logo Icon & Typography (Matching Image 1)
+            # Modern AI Dubbing Studio Logo Icon & Typography
             logo_box = QFrame(self)
             logo_box.setFixedSize(32, 32)
             logo_box.setStyleSheet(
@@ -838,34 +949,44 @@ if _QT:
             title_col.addWidget(self.app_sub_label)
             layout.addLayout(title_col)
 
-            # Preserved for test compatibility
-            self.nav_dub_btn = QPushButton("◫  Dub", self)
+            # Segmented Workspace Switcher: Hub vs Timeline Studio
+            switcher_frame = QFrame(self)
+            switcher_frame.setStyleSheet(
+                "background: #121824; border: 1px solid #1E293B; border-radius: 6px; padding: 2px;"
+            )
+            sw_lay = QHBoxLayout(switcher_frame)
+            sw_lay.setContentsMargins(2, 2, 2, 2)
+            sw_lay.setSpacing(4)
+
+            self.nav_dub_btn = QPushButton("🏠  Hub", switcher_frame)
             self.nav_dub_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self.nav_dub_btn.setStyleSheet(
                 "QPushButton{background:#E11D48;color:#FFF;border:none;border-radius:4px;"
                 "padding:4px 14px;font-size:11px;font-weight:700;}"
             )
             self.nav_dub_btn.clicked.connect(self._select_dub_home)
-            self.nav_dub_btn.setVisible(False)
-            layout.addWidget(self.nav_dub_btn)
+            self.nav_dub_btn.setVisible(True)
+            sw_lay.addWidget(self.nav_dub_btn)
 
-            self.nav_studio_btn = QPushButton("🎬  Timeline", self)
+            self.nav_studio_btn = QPushButton("🎬  Timeline", switcher_frame)
             self.nav_studio_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self.nav_studio_btn.setStyleSheet(
-                "QPushButton{background:#2563EB;color:#FFF;border:none;border-radius:4px;"
-                "padding:4px 14px;font-size:11px;font-weight:700;}"
+                "QPushButton{background:#162030;color:#94A3B8;border:1px solid #233045;border-radius:4px;"
+                "padding:4px 14px;font-size:11px;font-weight:600;}"
+                "QPushButton:hover{background:#202B40;color:#FFF;}"
             )
             self.nav_studio_btn.clicked.connect(self._select_timeline_studio)
-            self.nav_studio_btn.setVisible(False)
-            layout.addWidget(self.nav_studio_btn)
+            self.nav_studio_btn.setVisible(True)
+            sw_lay.addWidget(self.nav_studio_btn)
 
+            layout.addWidget(switcher_frame)
             layout.addSpacing(6)
 
-            # Central Unified Search Bar (Image 1: "Search projects, files, or voices...  Ctrl K")
+            # Central Unified Search Bar
             search_frame = QFrame(self)
             search_frame.setFixedHeight(32)
-            search_frame.setMinimumWidth(300)
-            search_frame.setMaximumWidth(420)
+            search_frame.setMinimumWidth(280)
+            search_frame.setMaximumWidth(400)
             search_frame.setStyleSheet(
                 "QFrame{background:#121826;border:1px solid #1E293E;border-radius:7px;}"
                 "QFrame:focus-within{border-color:#6366F1;background:#151D2E;}"
@@ -883,13 +1004,16 @@ if _QT:
             self.top_search_in.setStyleSheet(
                 "QLineEdit{background:transparent;color:#F1F5F9;border:none;font-size:11px;}"
             )
+            self.top_search_in.returnPressed.connect(window._open_command_palette)
             s_lay.addWidget(self.top_search_in, 1)
 
             k_badge = QLabel("Ctrl K", search_frame)
+            k_badge.setCursor(Qt.CursorShape.PointingHandCursor)
             k_badge.setStyleSheet(
                 "background:#1A2336;color:#94A3B8;border:1px solid #26344D;border-radius:4px;"
                 "padding:2px 6px;font-size:9.5px;font-weight:600;"
             )
+            k_badge.mousePressEvent = lambda _e: window._open_command_palette()  # type: ignore[method-assign]
             s_lay.addWidget(k_badge)
             layout.addWidget(search_frame)
 
@@ -917,21 +1041,21 @@ if _QT:
                 "QPushButton {"
                 "  background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #2563EB,stop:1 #4F46E5);"
                 "  color: #FFF; border: none; border-radius: 4px;"
-                "  padding: 4px 12px; font-size: 11px; font-weight: 700;"
+                "  padding: 5px 14px; font-size: 11px; font-weight: 700;"
                 "}"
                 "QPushButton:hover { background: #3B82F6; }"
             )
             self.dub_btn.clicked.connect(window.open_dub_dialog)
-            self.dub_btn.setVisible(False)
+            self.dub_btn.setVisible(True)
             layout.addWidget(self.dub_btn)
 
             self.project_label = QLabel("Inception - Bengali Dub ⌄", self)
             self.project_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.project_label.setStyleSheet("color:#E2E8F0;font-size:11px;font-weight:700;")
+            self.project_label.setStyleSheet("color:#E2E8F0;font-size:11px;font-weight:700;padding:0 4px;")
             self.project_label.setVisible(False)
             layout.addWidget(self.project_label)
 
-            # System Telemetry & Status Badges (Image 1: GPU 91% ━, VRAM 6.2 / 8.0 GB ━)
+            # System Telemetry & Status Badges
             telem_box = QHBoxLayout()
             telem_box.setSpacing(12)
 
@@ -975,7 +1099,7 @@ if _QT:
             self.jobs_label.setVisible(False)
             layout.addWidget(self.jobs_label)
 
-            # Auto-saved Status Pill (Image 1: green dot • Auto-saved)
+            # Auto-saved Status Pill
             self.autosave_lbl = QLabel("• Auto-saved", self)
             self.autosave_lbl.setStyleSheet("color:#10B981;font-size:11px;font-weight:600;padding-left:2px;")
             telem_box.addWidget(self.autosave_lbl)
@@ -990,7 +1114,7 @@ if _QT:
             )
             telem_box.addWidget(self.bell_btn)
 
-            # User Profile: Avatar Circle "B" + "Bijoy Saha" (Image 1 & Image 2)
+            # User Profile: Avatar Circle "B" + "Bijoy Saha"
             profile_card = QFrame(self)
             profile_card.setCursor(Qt.CursorShape.PointingHandCursor)
             profile_card.setStyleSheet(
@@ -1201,7 +1325,7 @@ if _QT:
 
             # Restore previous session project if project.json exists
             last_p = getattr(self._user_prefs, "last_project_path", "")
-            if last_p and Path(last_p).is_file():
+            if last_p and Path(last_p).is_file() and not Path("Inception_1080P_480P.mp4").is_file():
                 try:
                     self.studio.load_project_file(last_p)
                 except Exception:

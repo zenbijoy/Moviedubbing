@@ -707,9 +707,9 @@ if _QT:
             self._nav_buttons: dict[str, QPushButton] = {}
 
             for icon, name in self._NAV_ITEMS:
-                btn = QPushButton(f"{icon}\n{name}", self)
+                btn = QPushButton(f"{icon}  {name}", self)
                 btn.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn.setFixedHeight(50)
+                btn.setFixedHeight(28)
                 btn.setCheckable(True)
                 is_studio = name == "Studio"
                 btn.setChecked(is_studio)
@@ -735,9 +735,9 @@ if _QT:
             layout.addStretch()
 
             # Settings at bottom (Image 1)
-            settings_btn = QPushButton("⚙\nSettings", self)
+            settings_btn = QPushButton("⚙  Settings", self)
             settings_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            settings_btn.setFixedHeight(48)
+            settings_btn.setFixedHeight(28)
             settings_btn.setStyleSheet(
                 "QPushButton{background:transparent;color:#64748B;border:none;"
                 "border-radius:8px;font-size:10px;font-weight:600;padding:4px 0;}"
@@ -880,20 +880,33 @@ if _QT:
                 "QFrame#AiActionsPanel {  background: #111315;  border-left: 1px solid #08090B;}"
             )
 
-            layout = QVBoxLayout(self)
-            layout.setContentsMargins(8, 0, 8, 8)
-            layout.setSpacing(2)
+            main_lay = QVBoxLayout(self)
+            main_lay.setContentsMargins(0, 0, 0, 0)
+            main_lay.setSpacing(0)
 
-            header = QHBoxLayout()
-            hdr = QLabel("AI Actions", self)
-            hdr.setFixedHeight(34)
-            hdr.setStyleSheet("font-size:11px;font-weight:600;color:#E8EAEE;")
+            header_w = QWidget(self)
+            header = QHBoxLayout(header_w)
+            header.setContentsMargins(6, 2, 6, 2)
+            hdr = QLabel("AI Actions", header_w)
+            hdr.setFixedHeight(22)
+            hdr.setStyleSheet("font-size:10.5px;font-weight:700;color:#E8EAEE;")
             header.addWidget(hdr)
             header.addStretch()
-            self.status_badge = QLabel("", self)
+            self.status_badge = QLabel("", header_w)
             self.status_badge.setStyleSheet("font-size:8px;font-weight:800;color:#64748B;")
             header.addWidget(self.status_badge)
-            layout.addLayout(header)
+            main_lay.addWidget(header_w)
+
+            ai_scroll = QScrollArea(self)
+            ai_scroll.setWidgetResizable(True)
+            ai_scroll.setFrameShape(QFrame.Shape.NoFrame)
+            ai_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            ai_scroll.setStyleSheet("QScrollArea{background:transparent;border:none;} QScrollBar:vertical{width:3px;background:#111315;} QScrollBar::handle:vertical{background:#232D42;border-radius:1px;}")
+
+            content_w = QWidget(ai_scroll)
+            layout = QVBoxLayout(content_w)
+            layout.setContentsMargins(4, 0, 4, 2)
+            layout.setSpacing(1)
 
             actions = [
                 ("1", "Extract Dialogue Audio"),
@@ -912,12 +925,12 @@ if _QT:
             ]
 
             for icon, name in actions:
-                btn = QPushButton(f"{icon}  {name}", self)
+                btn = QPushButton(f"{icon}  {name}", content_w)
                 btn.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn.setStyleSheet(
                     "QPushButton {"
-                    "  background:transparent;color:#C2C6CD;font-size:11px;text-align:left;"
-                    "  border:none;padding:4px 6px;border-radius:2px;min-height:20px;"
+                    "  background:transparent;color:#C2C6CD;font-size:9.5px;text-align:left;"
+                    "  border:none;padding:2px 4px;border-radius:2px;min-height:16px;"
                     "}"
                     "QPushButton:hover{background:#272B31;color:#FFF;}"
                 )
@@ -926,35 +939,39 @@ if _QT:
 
             layout.addStretch()
 
-            self.stage_lbl = QLabel("Ready · dubbing pipeline", self)
+            self.stage_lbl = QLabel("Ready · dubbing pipeline", content_w)
             self.stage_lbl.setWordWrap(True)
             self.stage_lbl.setStyleSheet("font-size:9px;color:#A9B2C3;")
             self.stage_lbl.setVisible(False)
             layout.addWidget(self.stage_lbl)
-            self.progress_bar = QProgressBar(self)
+            self.progress_bar = QProgressBar(content_w)
             self.progress_bar.setRange(0, 100)
             self.progress_bar.setValue(0)
             self.progress_bar.setTextVisible(False)
             self.progress_bar.setFixedHeight(4)
             self.progress_bar.setVisible(False)
             layout.addWidget(self.progress_bar)
-            self.quality_lbl = QLabel("QUALITY GATE · NOT RUN", self)
+            self.quality_lbl = QLabel("QUALITY GATE · NOT RUN", content_w)
             self.quality_lbl.setStyleSheet("font-size:8px;font-weight:800;color:#64748B;")
             self.quality_lbl.setVisible(False)
             layout.addWidget(self.quality_lbl)
+            ai_scroll.setWidget(content_w)
+            main_lay.addWidget(ai_scroll, 1)
+
             self.run_btn = QPushButton("✦  AUTO DUB MASTER", self)
             self.run_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self.run_btn.setVisible(True)
+            self.run_btn.setFixedHeight(28)
             self.run_btn.setToolTip(
                 "Run the complete dubbing pipeline using the selected target language"
             )
             self.run_btn.setStyleSheet(
                 "QPushButton{background:#2563EB;color:#FFF;border:1px solid #3B82F6;"
-                "border-radius:5px;padding:5px;font-size:10px;font-weight:800;}"
+                "border-radius:4px;padding:3px;font-size:10px;font-weight:800;}"
                 "QPushButton:hover{background:#3B82F6;}"
             )
             self.run_btn.clicked.connect(self._on_run_clicked)
-            layout.addWidget(self.run_btn)
+            main_lay.addWidget(self.run_btn)
 
         def _on_run_clicked(self) -> None:
             if self._busy:

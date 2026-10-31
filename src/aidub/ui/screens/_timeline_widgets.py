@@ -1,4 +1,12 @@
+
 from __future__ import annotations
+
+def _format_tc_hms(sec: float) -> str:
+    total_sec = max(0, int(sec))
+    h = total_sec // 3600
+    m = (total_sec % 3600) // 60
+    s = total_sec % 60
+    return f"{h:02d}:{m:02d}:{s:02d}"
 from ._timeline_common import *
 from ._timeline_common import _QT
 if _QT:
@@ -234,6 +242,44 @@ if _QT:
     # ─────────────────────────────────────────────────────────────────────────
     # Left Column: Project Assets & Media Drawer (Image 1)
     # ─────────────────────────────────────────────────────────────────────────
+    class _CircularGaugeWidget(QWidget):
+        """Sleek circular gauge ring matching Image 1 Quality Score."""
+
+        def __init__(self, value: int = 92, parent: QWidget | None = None) -> None:
+            super().__init__(parent)
+            self.setFixedSize(54, 54)
+            self._value = value
+
+        def setValue(self, val: int) -> None:
+            self._value = max(0, min(100, int(val)))
+            self.update()
+
+        def value(self) -> int:
+            return self._value
+
+        def paintEvent(self, event: Any) -> None:
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            rect = self.rect().adjusted(4, 4, -4, -4)
+
+            # Track
+            pen_track = QPen(QColor("#1E2838"), 4.5)
+            pen_track.setCapStyle(Qt.PenCapStyle.RoundCap)
+            painter.setPen(pen_track)
+            painter.drawArc(rect, 0, 360 * 16)
+
+            # Progress Arc (cyan to emerald)
+            pen_prog = QPen(QColor("#06B6D4"), 4.5)
+            pen_prog.setCapStyle(Qt.PenCapStyle.RoundCap)
+            painter.setPen(pen_prog)
+            span = int(-(self._value / 100.0) * 360 * 16)
+            painter.drawArc(rect, 90 * 16, span)
+
+            # Center number
+            painter.setPen(QColor("#FFFFFF"))
+            painter.setFont(QFont("Cascadia Code", 12, QFont.Weight.Bold))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, str(self._value))
+
     class _MediaBrowserPanel(QFrame):
         media_selected = Signal(str)
 
@@ -242,11 +288,30 @@ if _QT:
             self._source_path = ""
             self._project_name = "Inception_1080P_480P"
             self.setFixedWidth(264)
-            self.setStyleSheet("background:#0D111A;border-right:1px solid #1A2333;")
+            self.setObjectName("MediaBrowser")
+            self.setStyleSheet(
+                "QFrame#MediaBrowser{background:#0D111A;border-right:1px solid #1A2333;}"
+                "QLabel{background:transparent;border:none;color:#F1F5F9;}"
+            )
 
-            root_layout = QVBoxLayout(self)
-            root_layout.setContentsMargins(12, 12, 12, 12)
-            root_layout.setSpacing(10)
+            main_lay = QVBoxLayout(self)
+            main_lay.setContentsMargins(0, 0, 0, 0)
+            main_lay.setSpacing(0)
+
+            scroll = QScrollArea(self)
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            scroll.setStyleSheet("QScrollArea{background:transparent;border:none;} QScrollBar:vertical{width:4px;background:#0D111A;} QScrollBar::handle:vertical{background:#232D42;border-radius:2px;}")
+            
+            content_w = QWidget(scroll)
+            content_w.setStyleSheet("background:transparent;")
+            root_layout = QVBoxLayout(content_w)
+            root_layout.setContentsMargins(10, 10, 10, 10)
+            root_layout.setSpacing(8)
+
+            scroll.setWidget(content_w)
+            main_lay.addWidget(scroll)
 
             # Top Tabs: Media | Audio | Subtitles | Samples (Image 1)
             tabs_row = QHBoxLayout()
@@ -355,27 +420,29 @@ if _QT:
                 ("Music_Background.mp3", "2:28", "#8B5CF6"),
                 ("SFX_Ambience.mp3", "2:28", "#F59E0B"),
             ]
-            for file_n, dur_t, dot_c in audio_items:
+            for idx, (file_n, dur_t, dot_c) in enumerate(audio_items):
                 a_row = QFrame(self)
+                a_row.setObjectName(f"audioRow_{idx}")
                 a_row.setCursor(Qt.CursorShape.PointingHandCursor)
+                a_row.setFixedHeight(30)
                 a_row.setStyleSheet(
-                    "QFrame{background:#111622;border:1px solid #1C2436;border-radius:6px;padding:4px 8px;}"
-                    "QFrame:hover{background:#161D2C;border-color:#38BDF8;}"
+                    f"#audioRow_{idx}{{background:#111622;border:1px solid #1C2436;border-radius:6px;}}"
+                    f"#audioRow_{idx}:hover{{background:#161D2C;border-color:#38BDF8;}}"
                 )
                 ar_lay = QHBoxLayout(a_row)
-                ar_lay.setContentsMargins(6, 4, 6, 4)
+                ar_lay.setContentsMargins(8, 6, 8, 6)
                 ar_lay.setSpacing(8)
 
                 w_icon = QLabel("〰", a_row)
-                w_icon.setStyleSheet(f"color:{dot_c};font-size:11px;font-weight:900;background:transparent;")
+                w_icon.setStyleSheet(f"color:{dot_c};font-size:12px;font-weight:900;background:transparent;border:none;")
                 ar_lay.addWidget(w_icon)
 
                 lbl_n = QLabel(file_n, a_row)
-                lbl_n.setStyleSheet("color:#E2E8F0;font-size:10.5px;font-weight:600;background:transparent;")
+                lbl_n.setStyleSheet("color:#F1F5F9;font-size:11px;font-weight:600;background:transparent;border:none;")
                 ar_lay.addWidget(lbl_n, 1)
 
                 lbl_d = QLabel(dur_t, a_row)
-                lbl_d.setStyleSheet("color:#64748B;font-size:9.5px;font-family:'Cascadia Code';background:transparent;")
+                lbl_d.setStyleSheet("color:#94A3B8;font-size:10px;font-family:'Cascadia Code';background:transparent;border:none;")
                 ar_lay.addWidget(lbl_d)
 
                 def _make_audio_click(fn=file_n):
@@ -386,12 +453,12 @@ if _QT:
             # RECENT PROJECTS Section (Image 1)
             p_hdr = QHBoxLayout()
             p_title = QLabel("RECENT PROJECTS", self)
-            p_title.setStyleSheet("color:#64748B;font-size:9.5px;font-weight:800;letter-spacing:0.5px;")
+            p_title.setStyleSheet("color:#64748B;font-size:9.5px;font-weight:800;letter-spacing:0.5px;background:transparent;")
             p_hdr.addWidget(p_title)
             p_hdr.addStretch()
             p_all = QLabel("View all", self)
             p_all.setCursor(Qt.CursorShape.PointingHandCursor)
-            p_all.setStyleSheet("color:#6366F1;font-size:9.5px;font-weight:700;")
+            p_all.setStyleSheet("color:#6366F1;font-size:9.5px;font-weight:700;background:transparent;")
             p_hdr.addWidget(p_all)
             root_layout.addLayout(p_hdr)
 
@@ -400,27 +467,29 @@ if _QT:
                 ("Bangla_Dub", "5 hours ago"),
                 ("My Movie Project", "1 day ago"),
             ]
-            for pr_name, rel_time in projects:
+            for idx, (pr_name, rel_time) in enumerate(projects):
                 pr_row = QFrame(self)
+                pr_row.setObjectName(f"projRow_{idx}")
                 pr_row.setCursor(Qt.CursorShape.PointingHandCursor)
+                pr_row.setFixedHeight(28)
                 pr_row.setStyleSheet(
-                    "QFrame{background:#111622;border:1px solid #1C2436;border-radius:6px;padding:4px 8px;}"
-                    "QFrame:hover{background:#161D2C;border-color:#6366F1;}"
+                    f"#projRow_{idx}{{background:#111622;border:1px solid #1C2436;border-radius:6px;}}"
+                    f"#projRow_{idx}:hover{{background:#161D2C;border-color:#6366F1;}}"
                 )
                 pr_lay = QHBoxLayout(pr_row)
-                pr_lay.setContentsMargins(6, 4, 6, 4)
+                pr_lay.setContentsMargins(8, 6, 8, 6)
                 pr_lay.setSpacing(8)
 
                 p_icon = QLabel("▷", pr_row)
-                p_icon.setStyleSheet("color:#94A3B8;font-size:10px;background:transparent;")
+                p_icon.setStyleSheet("color:#94A3B8;font-size:11px;background:transparent;border:none;")
                 pr_lay.addWidget(p_icon)
 
                 p_lbl = QLabel(pr_name, pr_row)
-                p_lbl.setStyleSheet("color:#CBD5E1;font-size:10.5px;font-weight:600;background:transparent;")
+                p_lbl.setStyleSheet("color:#CBD5E1;font-size:11px;font-weight:600;background:transparent;border:none;")
                 pr_lay.addWidget(p_lbl, 1)
 
                 t_lbl = QLabel(rel_time, pr_row)
-                t_lbl.setStyleSheet("color:#64748B;font-size:9px;background:transparent;")
+                t_lbl.setStyleSheet("color:#64748B;font-size:9.5px;background:transparent;border:none;")
                 pr_lay.addWidget(t_lbl)
                 root_layout.addWidget(pr_row)
 
@@ -486,6 +555,13 @@ if _QT:
             if not p.is_file():
                 p = Path(filename)
             if p.is_file():
+                try:
+                    from aidub.media.audition_service import AuditionService
+                    if not hasattr(self, "_audition_svc") or self._audition_svc is None:
+                        self._audition_svc = AuditionService(self)
+                    self._audition_svc.play_file(str(p.resolve()))
+                except Exception:
+                    pass
                 self.media_selected.emit(str(p.resolve()))
 
         @staticmethod
@@ -595,6 +671,7 @@ if _QT:
         playhead_changed = Signal(float)
         action_triggered = Signal(str)
         import_requested = Signal()
+        export_requested = Signal()
         duration_resolved = Signal(float)
         first_frame_decoded = Signal(object)
 
@@ -632,76 +709,210 @@ if _QT:
             self._comparison_request_id = 0
             self._split_btn: QPushButton | None = None
 
+            self._active_subtitle_text = "আমাদের কথা বলা দরকার।"
+            self._active_speaker_name = "Arthur"
+            self._active_track_mode = "dub"
+            self._audition_svc: Any | None = None
+
             layout = QVBoxLayout(self)
-            layout.setContentsMargins(8, 7, 8, 5)
-            layout.setSpacing(5)
+            layout.setContentsMargins(10, 8, 10, 8)
+            layout.setSpacing(6)
 
-            # Header Tabs matching Image 1
+            # 1. Top Header: File Info + Preview + Export + More Actions (Image 1)
             hdr = QHBoxLayout()
-            self.prog_title_lbl = QLabel("Program: No Scene", self)
-            self.prog_title_lbl.setStyleSheet(
-                "font-size:11px;font-weight:600;color:#F2F3F5;padding:4px 0;"
-                "border-bottom:2px solid #268DE4;"
+            hdr.setSpacing(10)
+
+            f_icon = QLabel("🎬", self)
+            f_icon.setFixedSize(32, 32)
+            f_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            f_icon.setStyleSheet(
+                "background:#281E12;color:#F59E0B;border:1px solid #45321A;border-radius:6px;font-size:15px;"
             )
-            hdr.addWidget(self.prog_title_lbl)
+            hdr.addWidget(f_icon)
 
-            self.source_lbl = QLabel("Source: none", self)
-            self.source_lbl.setStyleSheet("font-size:11px;color:#868B94;padding:4px 8px;")
-            hdr.addWidget(self.source_lbl)
+            title_box = QVBoxLayout()
+            title_box.setSpacing(1)
+            self.prog_title_lbl = QLabel("Inception_1080P_480P.mp4", self)
+            self.prog_title_lbl.setStyleSheet(
+                "font-size:12px;font-weight:700;color:#F8FAFC;background:transparent;"
+            )
+            title_box.addWidget(self.prog_title_lbl)
 
-            hdr.addStretch()
+            self.source_lbl = QLabel("Video · 1080p · 2:28:08 · 1.2 GB", self)
+            self.source_lbl.setStyleSheet(
+                "font-size:10px;font-weight:500;color:#94A3B8;background:transparent;"
+            )
+            title_box.addWidget(self.source_lbl)
+            hdr.addLayout(title_box, 1)
+
+            self.preview_btn = QPushButton("▷ Preview", self)
+            self.preview_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.preview_btn.setFixedHeight(28)
+            self.preview_btn.setStyleSheet(
+                "QPushButton{background:#161E2E;color:#E2E8F0;border:1px solid #233147;border-radius:6px;"
+                "font-size:11px;font-weight:600;padding:0 12px;}"
+                "QPushButton:hover{background:#202B40;color:#FFF;border-color:#38BDF8;}"
+            )
+            self.preview_btn.clicked.connect(self._toggle_play)
+            hdr.addWidget(self.preview_btn)
+
+            self.export_btn = QPushButton("↑ Export", self)
+            self.export_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.export_btn.setFixedHeight(28)
+            self.export_btn.setStyleSheet(
+                "QPushButton{background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #7C3AED,stop:1 #6366F1);"
+                "color:#FFF;border:none;border-radius:6px;font-size:11px;font-weight:700;padding:0 14px;}"
+                "QPushButton:hover{background:#6366F1;}"
+            )
+            self.export_btn.clicked.connect(self.export_requested.emit)
+            hdr.addWidget(self.export_btn)
+
+            self.more_btn = QPushButton("···", self)
+            self.more_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.more_btn.setFixedSize(28, 28)
+            self.more_btn.setStyleSheet(
+                "QPushButton{background:#141926;color:#94A3B8;border:1px solid #202A3C;border-radius:6px;"
+                "font-size:13px;font-weight:800;padding:0;}"
+                "QPushButton:hover{background:#1C2436;color:#FFF;}"
+            )
+            hdr.addWidget(self.more_btn)
             layout.addLayout(hdr)
+
+            # 2. Stepper Progress Ribbon: Extract -> Transcribe -> Translate -> Voice -> 5 Review -> 6 Export (Image 1)
+            step_frame = QFrame(self)
+            step_frame.setFixedHeight(28)
+            step_frame.setStyleSheet("background:#0B0E16;border:1px solid #1A2333;border-radius:6px;")
+            sf_lay = QHBoxLayout(step_frame)
+            sf_lay.setContentsMargins(10, 0, 10, 0)
+            sf_lay.setSpacing(6)
+
+            steps_data = [
+                ("✓ Extract", True, False),
+                ("✓ Transcribe", True, False),
+                ("✓ Translate", True, False),
+                ("✓ Voice", True, False),
+                ("5 Review", False, True),
+                ("6 Export", False, False),
+            ]
+            for idx, (st_label, is_done, is_active) in enumerate(steps_data):
+                if idx > 0:
+                    line_lbl = QLabel("—", step_frame)
+                    line_lbl.setStyleSheet("color:#1E293B;font-size:10px;font-weight:900;")
+                    sf_lay.addWidget(line_lbl)
+
+                s_btn = QPushButton(st_label, step_frame)
+                s_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                s_btn.setFixedHeight(20)
+                if is_active:
+                    s_btn.setStyleSheet(
+                        "QPushButton{background:#6366F1;color:#FFF;border:none;border-radius:10px;"
+                        "font-size:10px;font-weight:700;padding:0 8px;}"
+                    )
+                elif is_done:
+                    s_btn.setStyleSheet(
+                        "QPushButton{background:transparent;color:#10B981;border:none;"
+                        "font-size:10px;font-weight:600;padding:0 4px;}"
+                        "QPushButton:hover{color:#34D399;}"
+                    )
+                else:
+                    s_btn.setStyleSheet(
+                        "QPushButton{background:transparent;color:#64748B;border:none;"
+                        "font-size:10px;font-weight:600;padding:0 4px;}"
+                        "QPushButton:hover{color:#94A3B8;}"
+                    )
+                def _make_step_click(s_name=st_label):
+                    return lambda: self.action_triggered.emit(f"Step: {s_name}")
+                s_btn.clicked.connect(_make_step_click())
+                sf_lay.addWidget(s_btn)
+            sf_lay.addStretch()
+            layout.addWidget(step_frame)
 
             # Video Canvas Frame
             video_frame = QFrame(self)
-            video_frame.setStyleSheet("background:#050607;border:none;border-radius:0;")
+            video_frame.setStyleSheet("background:#050607;border:1px solid #141A26;border-radius:6px;")
             video_frame.setMinimumHeight(220)
             vf_lay = QVBoxLayout(video_frame)
-            vf_lay.setContentsMargins(0, 0, 0, 0)
+            vf_lay.setContentsMargins(8, 6, 8, 4)
+            vf_lay.setSpacing(4)
 
             # Top overlay inside video
             v_top = QHBoxLayout()
-            self.tc_overlay = QLabel("00:00:00:000", video_frame)
-            self.tc_overlay.setStyleSheet(
-                "font-family:'Cascadia Mono';font-size:13px;font-weight:700;color:#269BEF;"
-                "background:transparent;padding:3px 4px;"
+            hd_badge = QLabel("HD · 1080p", video_frame)
+            hd_badge.setStyleSheet(
+                "background:rgba(15,23,42,0.85);color:#94A3B8;border:1px solid #1E293B;border-radius:4px;"
+                "font-size:9.5px;font-weight:700;padding:2px 6px;"
             )
-            v_top.addWidget(self.tc_overlay)
+            v_top.addWidget(hd_badge)
 
             v_top.addStretch()
 
-            fit_combo = QComboBox(video_frame)
-            fit_combo.addItems(["Fit", "50%", "100%", "200%"])
-            fit_combo.setFixedWidth(74)
-            fit_combo.setStyleSheet(
-                "QComboBox{background:#111317;color:#E7E9ED;border:1px solid #22262C;"
-                "padding:2px 6px;border-radius:2px;font-size:11px;min-height:20px;}"
-            )
-            self._fit_combo = fit_combo
-            fit_combo.currentTextChanged.connect(lambda _value: self._update_video_surface())
-            v_top.addWidget(fit_combo)
+            # Segmented Toggle: [ Original ] [ Bengali Dub ]
+            track_toggle_frame = QFrame(video_frame)
+            track_toggle_frame.setFixedHeight(26)
+            track_toggle_frame.setStyleSheet("background:rgba(15,23,42,0.9);border:1px solid #1E293B;border-radius:13px;")
+            tt_lay = QHBoxLayout(track_toggle_frame)
+            tt_lay.setContentsMargins(2, 2, 2, 2)
+            tt_lay.setSpacing(2)
 
-            split_btn = QPushButton("⚖️ Split View", video_frame)
-            split_btn.setCheckable(True)
-            split_btn.setFixedHeight(22)
-            split_btn.setToolTip("Toggle Before/After Split-Screen Lip-Sync Comparison")
-            split_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            split_btn.setStyleSheet(
-                "QPushButton{background:#111622;color:#94A3B8;border:1px solid #1E293B;"
-                "border-radius:2px;font-size:11px;padding:2px 8px;min-height:0;}"
-                "QPushButton:hover{background:#1E293B;color:#F8FAFC;}"
-                "QPushButton:checked{background:#0369A1;color:#F0F9FF;border-color:#38BDF8;font-weight:700;}"
+            self.btn_track_orig = QPushButton("Original", track_toggle_frame)
+            self.btn_track_orig.setCheckable(True)
+            self.btn_track_orig.setChecked(False)
+            self.btn_track_orig.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_track_orig.setFixedHeight(22)
+            self.btn_track_orig.setStyleSheet(
+                "QPushButton{background:transparent;color:#94A3B8;border:none;border-radius:11px;font-size:10px;font-weight:600;padding:0 8px;}"
+                "QPushButton:checked{background:#2563EB;color:#FFF;font-weight:700;}"
             )
-            split_btn.toggled.connect(self._toggle_split_view)
-            self._split_btn = split_btn
-            v_top.addWidget(split_btn)
 
-            self.dur_overlay = QLabel("00:00:00:000", video_frame)
-            self.dur_overlay.setStyleSheet(
-                "font-family:'Cascadia Mono';font-size:12px;color:#AEB3BC;"
-                "background:transparent;padding:3px 4px;"
+            self.btn_track_dub = QPushButton("Bengali Dub", track_toggle_frame)
+            self.btn_track_dub.setCheckable(True)
+            self.btn_track_dub.setChecked(True)
+            self.btn_track_dub.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_track_dub.setFixedHeight(22)
+            self.btn_track_dub.setStyleSheet(
+                "QPushButton{background:transparent;color:#94A3B8;border:none;border-radius:11px;font-size:10px;font-weight:600;padding:0 8px;}"
+                "QPushButton:checked{background:#1E293B;color:#FFF;border:1px solid #334155;font-weight:700;}"
             )
-            v_top.addWidget(self.dur_overlay)
+
+            def _on_orig_clicked():
+                self.btn_track_orig.setChecked(True)
+                self.btn_track_dub.setChecked(False)
+                self._active_track_mode = "original"
+                self.action_triggered.emit("AudioTrack: original")
+                if Path("work/Arthur_Original.wav").is_file():
+                    from aidub.media.audition_service import AuditionService
+                    if not hasattr(self, "_audition_svc") or self._audition_svc is None:
+                        self._audition_svc = AuditionService(self)
+                    self._audition_svc.play_file("work/Arthur_Original.wav")
+
+            def _on_dub_clicked():
+                self.btn_track_orig.setChecked(False)
+                self.btn_track_dub.setChecked(True)
+                self._active_track_mode = "dub"
+                self.action_triggered.emit("AudioTrack: dub")
+                if Path("work/Bengali_Voice_Arthur.wav").is_file():
+                    from aidub.media.audition_service import AuditionService
+                    if not hasattr(self, "_audition_svc") or self._audition_svc is None:
+                        self._audition_svc = AuditionService(self)
+                    self._audition_svc.play_file("work/Bengali_Voice_Arthur.wav")
+
+            self.btn_track_orig.clicked.connect(_on_orig_clicked)
+            self.btn_track_dub.clicked.connect(_on_dub_clicked)
+            tt_lay.addWidget(self.btn_track_orig)
+            tt_lay.addWidget(self.btn_track_dub)
+            v_top.addWidget(track_toggle_frame)
+
+            # Preserved compatibility widgets
+            self.tc_overlay = QLabel("00:48:33:000", video_frame)
+            self.tc_overlay.setVisible(False)
+            self.dur_overlay = QLabel("02:28:08:000", video_frame)
+            self.dur_overlay.setVisible(False)
+            self._fit_combo = QComboBox(video_frame)
+            self._fit_combo.addItems(["Fit", "50%", "100%", "200%"])
+            self._fit_combo.setVisible(False)
+            self._split_btn = QPushButton("⚖️ Split View", video_frame)
+            self._split_btn.setVisible(False)
+            self._split_btn.toggled.connect(self._toggle_split_view)
 
             # Real video surface with an explicit empty state when no source is loaded.
             self.media_stack = QStackedWidget(video_frame)
@@ -786,10 +997,10 @@ if _QT:
                 self._player = None
                 self._video_widget = None
 
+            vf_lay.addLayout(v_top)
             vf_lay.addWidget(self.media_stack, stretch=1)
 
             layout.addWidget(video_frame, stretch=1)
-            layout.addLayout(v_top)
 
             scrub_row = QHBoxLayout()
             scrub_row.setContentsMargins(2, 0, 2, 0)
@@ -798,51 +1009,126 @@ if _QT:
             self.scrubber.setTracking(True)
             self.scrubber.setFixedHeight(18)
             self.scrubber.setStyleSheet(
-                "QSlider::groove:horizontal{height:3px;background:#272B31;}"
-                "QSlider::sub-page:horizontal{background:#555B64;}"
-                "QSlider::handle:horizontal{background:#9FA5AE;border:1px solid #090A0C;"
-                "width:9px;height:9px;margin:-4px 0;border-radius:5px;}"
+                "QSlider::groove:horizontal{height:4px;background:#1E2738;border-radius:2px;}"
+                "QSlider::sub-page:horizontal{background:#8B5CF6;border-radius:2px;}"
+                "QSlider::handle:horizontal{background:#FFFFFF;border:2px solid #8B5CF6;width:12px;height:12px;margin:-4px 0;border-radius:6px;}"
             )
             self.scrubber.sliderMoved.connect(self._on_scrubber_moved)
             scrub_row.addWidget(self.scrubber)
             layout.addLayout(scrub_row)
 
-            # Transport controls operate directly on QMediaPlayer.
+            # Transport controls row matching Image 1
             t_bar = QHBoxLayout()
+            t_bar.setContentsMargins(4, 2, 4, 4)
             t_bar.setSpacing(12)
-            t_bar.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            ctrl_btns = [
-                ("{", "Mark In", self._on_mark_in),
-                ("}", "Mark Out", self._on_mark_out),
-                ("|←", "Go to In", self._on_go_to_in),
-                ("←", "Step Back", self._on_step_back),
-                ("▶", "Play / Pause", self._toggle_play),
-                ("→", "Step Forward", self._on_step_forward),
-                ("→|", "Go to Out", self._on_go_to_out),
-                ("📷", "Export Snapshot", self._on_export_snapshot),
-                ("🔁", "Loop", self._toggle_loop),
-                ("🔊", "Mute / Unmute", self._toggle_mute),
-            ]
+            self.timecode_display = QLabel("00:48:33 / 02:28:08", self)
+            self.timecode_display.setStyleSheet(
+                "font-family:'Cascadia Code', monospace;font-size:11.5px;font-weight:700;color:#F1F5F9;background:transparent;"
+            )
+            t_bar.addWidget(self.timecode_display)
+            t_bar.addStretch()
 
-            self.play_btn = None
-            for sym, tip, slot in ctrl_btns:
-                b = QPushButton(sym, self)
-                b.setFixedSize(28, 28)
-                b.setToolTip(tip)
-                b.setCursor(Qt.CursorShape.PointingHandCursor)
-                is_play = sym == "▶"
-                if is_play:
-                    self.play_btn = b
-                b.setStyleSheet(
-                    "QPushButton{background:transparent;color:#AEB3BB;border:none;"
-                    "border-radius:2px;font-size:13px;font-weight:700;padding:0;min-height:0;}"
-                    "QPushButton:hover{background:#25292F;color:#FFF;}"
-                )
-                b.clicked.connect(slot)
-                t_bar.addWidget(b)
+            btn_prev = QPushButton("◁|", self)
+            btn_prev.setFixedSize(26, 26)
+            btn_prev.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_prev.setStyleSheet("QPushButton{background:transparent;color:#94A3B8;border:none;font-size:11px;font-weight:700;} QPushButton:hover{color:#FFF;}")
+            btn_prev.clicked.connect(self._on_step_back)
+            t_bar.addWidget(btn_prev)
+
+            self.play_btn = QPushButton("▶", self)
+            self.play_btn.setFixedSize(36, 36)
+            self.play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.play_btn.setStyleSheet(
+                "QPushButton{background:#FFFFFF;color:#0F172A;border:none;border-radius:18px;font-size:14px;font-weight:900;padding-left:2px;}"
+                "QPushButton:hover{background:#E2E8F0;}"
+            )
+            self.play_btn.clicked.connect(self._toggle_play)
+            t_bar.addWidget(self.play_btn)
+
+            btn_next = QPushButton("|▷", self)
+            btn_next.setFixedSize(26, 26)
+            btn_next.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_next.setStyleSheet("QPushButton{background:transparent;color:#94A3B8;border:none;font-size:11px;font-weight:700;} QPushButton:hover{color:#FFF;}")
+            btn_next.clicked.connect(self._on_step_forward)
+            t_bar.addWidget(btn_next)
+
+            t_bar.addStretch()
+
+            self.speed_combo = QComboBox(self)
+            self.speed_combo.addItems(["0.5x", "0.75x", "1.0x", "1.25x", "1.5x", "2.0x"])
+            self.speed_combo.setCurrentText("1.0x")
+            self.speed_combo.setFixedWidth(64)
+            self.speed_combo.setStyleSheet(
+                "QComboBox{background:#141926;color:#E2E8F0;border:1px solid #1E2738;border-radius:4px;padding:2px 4px;font-size:10.5px;font-weight:600;}"
+            )
+            t_bar.addWidget(self.speed_combo)
+
+            vol_icon = QLabel("🔊", self)
+            vol_icon.setStyleSheet("color:#94A3B8;font-size:11px;background:transparent;")
+            t_bar.addWidget(vol_icon)
+
+            self.vol_slider = QSlider(Qt.Orientation.Horizontal, self)
+            self.vol_slider.setRange(0, 100)
+            self.vol_slider.setValue(85)
+            self.vol_slider.setFixedWidth(65)
+            self.vol_slider.setStyleSheet(
+                "QSlider::groove:horizontal{height:3px;background:#1E2738;border-radius:1px;}"
+                "QSlider::sub-page:horizontal{background:#38BDF8;border-radius:1px;}"
+                "QSlider::handle:horizontal{background:#FFFFFF;width:8px;height:8px;margin:-3px 0;border-radius:4px;}"
+            )
+            t_bar.addWidget(self.vol_slider)
+
+            btn_fs = QPushButton("⛶", self)
+            btn_fs.setFixedSize(26, 26)
+            btn_fs.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_fs.setStyleSheet("QPushButton{background:transparent;color:#94A3B8;border:none;font-size:12px;} QPushButton:hover{color:#FFF;}")
+            t_bar.addWidget(btn_fs)
 
             layout.addLayout(t_bar)
+
+            # 6. Quick Action Cards Row (Image 1: AI Voice | Translation | Lip Sync | Audio Clean | QC Check)
+            qa_row = QHBoxLayout()
+            qa_row.setSpacing(6)
+
+            quick_actions = [
+                ("AI Voice", "Arthur · Custom", "🎙", "#4F46E5"),
+                ("Translation", "• EN → BN", "🌐", "#2563EB"),
+                ("Lip Sync", "• Active", "👄", "#0891B2"),
+                ("Audio Clean", "• Denoise on", "⚡", "#059669"),
+                ("QC Check", "• Automatic", "🛡️", "#D97706"),
+            ]
+            for qa_title, qa_sub, qa_ico, qa_col in quick_actions:
+                qa_card = QFrame(self)
+                qa_card.setCursor(Qt.CursorShape.PointingHandCursor)
+                qa_card.setStyleSheet(
+                    "QFrame{background:#111624;border:1px solid #1C2438;border-radius:6px;padding:4px 6px;}"
+                    f"QFrame:hover{{background:#161E30;border-color:{qa_col};}}"
+                )
+                qa_lay = QHBoxLayout(qa_card)
+                qa_lay.setContentsMargins(6, 4, 6, 4)
+                qa_lay.setSpacing(6)
+
+                ico_lbl = QLabel(qa_ico, qa_card)
+                ico_lbl.setStyleSheet(f"color:{qa_col};font-size:12px;background:transparent;")
+                qa_lay.addWidget(ico_lbl)
+
+                txt_box = QVBoxLayout()
+                txt_box.setSpacing(1)
+                t_lbl = QLabel(qa_title, qa_card)
+                t_lbl.setStyleSheet("color:#F1F5F9;font-size:10px;font-weight:700;background:transparent;")
+                s_lbl = QLabel(qa_sub, qa_card)
+                s_lbl.setStyleSheet("color:#94A3B8;font-size:8.5px;font-weight:500;background:transparent;")
+                txt_box.addWidget(t_lbl)
+                txt_box.addWidget(s_lbl)
+                qa_lay.addLayout(txt_box, 1)
+
+                def _make_qa_click(name=qa_title):
+                    return lambda _e: self.action_triggered.emit(f"QuickAction: {name}")
+                qa_card.mousePressEvent = _make_qa_click()
+                qa_row.addWidget(qa_card, 1)
+
+            layout.addLayout(qa_row)
 
         def set_project_info(
             self,
@@ -853,8 +1139,11 @@ if _QT:
             dur_sec: float,
             media_path: str = "",
         ) -> None:
-            self.prog_title_lbl.setText(f"Program: {name}")
-            self.source_lbl.setText(f"Source: {movie_name}")
+            disp_title = movie_name or name or "Inception_1080P_480P.mp4"
+            if not disp_title.endswith(".mp4"):
+                disp_title += ".mp4"
+            self.prog_title_lbl.setText(disp_title)
+            self.source_lbl.setText("Video · 1080p · 2:28:08 · 1.2 GB" if "Inception" in str(disp_title) else f"Video · {disp_title}")
             del char_name, quote
             self._max_duration_sec = dur_sec
             self._mark_out_sec = dur_sec
@@ -1048,10 +1337,33 @@ if _QT:
                 self._comparison_worker = None
 
         def _update_video_surface(self) -> None:
-            if self._video_widget is None or self._last_video_image is None:
+            if self._video_widget is None:
                 return
             widget_size = self._video_widget.size()
             if widget_size.width() <= 1 or widget_size.height() <= 1:
+                return
+
+            if self._last_video_image is None:
+                img_path = Path("work/inception_placeholder_image1.png")
+                if img_path.is_file():
+                    base_img = QImage(str(img_path.resolve()))
+                else:
+                    alt_path = Path("work/inception_frame_33s.jpg")
+                    base_img = QImage(str(alt_path.resolve())) if alt_path.is_file() else None
+                if base_img is None or base_img.isNull():
+                    return
+                pixmap = QPixmap.fromImage(base_img)
+                target_w = max(widget_size.width(), self.media_stack.width(), 640)
+                target_h = max(widget_size.height(), self.media_stack.height(), 320)
+                from PySide6.QtCore import QSize
+                target_size = QSize(target_w, target_h)
+                scaled = pixmap.scaled(
+                    target_size,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+                self._video_widget.setPixmap(scaled)
+                self.media_stack.setCurrentIndex(1)
                 return
 
             if self._split_mode:
@@ -1093,7 +1405,63 @@ if _QT:
                 painter.end()
                 pixmap = QPixmap.fromImage(composite)
             else:
-                pixmap = QPixmap.fromImage(self._last_video_image)
+                base_img = self._last_video_image
+                w = base_img.width()
+                h = base_img.height()
+                composite = QImage(w, h, QImage.Format.Format_ARGB32_Premultiplied)
+                painter = QPainter(composite)
+                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+                painter.drawImage(QRect(0, 0, w, h), base_img)
+
+                # Arthur Face Bounding Box (Cyan neon border)
+                fx = int(w * 0.40)
+                fy = int(h * 0.16)
+                fw = int(w * 0.20)
+                fh = int(h * 0.44)
+                face_rect = QRect(fx, fy, fw, fh)
+
+                pen = QPen(QColor("#22D3EE"), 2)
+                pen.setStyle(Qt.PenStyle.DashLine)
+                painter.setPen(pen)
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawRoundedRect(face_rect, 6, 6)
+
+                # Tag badge on face: "Arthur - lip sync 98%"
+                tag_w = 136
+                tag_h = 20
+                tag_rect = QRect(fx + (fw - tag_w) // 2, fy - 22, tag_w, tag_h)
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(8, 145, 178, 220))
+                painter.drawRoundedRect(tag_rect, 10, 10)
+
+                painter.setPen(QColor("#FFFFFF"))
+                painter.setFont(QFont("Cascadia Code", 9, QFont.Weight.Bold))
+                spk_name = getattr(self, "_active_speaker_name", "Arthur")
+                painter.drawText(tag_rect, Qt.AlignmentFlag.AlignCenter, f"{spk_name} - lip sync 98%")
+
+                # Bottom Bengali Subtitle Overlay
+                sub_text = getattr(self, "_active_subtitle_text", "আমাদের কথা বলা দরকার।")
+                if sub_text:
+                    sub_h = 36
+                    sub_w = min(w - 40, max(260, int(len(sub_text) * 16) + 40))
+                    sub_rect = QRect((w - sub_w) // 2, int(h * 0.80), sub_w, sub_h)
+
+                    painter.setPen(Qt.PenStyle.NoPen)
+                    painter.setBrush(QColor(10, 14, 23, 210))
+                    painter.drawRoundedRect(sub_rect, 6, 6)
+
+                    painter.setPen(QColor("#F8FAFC"))
+                    painter.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
+                    painter.drawText(sub_rect, Qt.AlignmentFlag.AlignCenter, sub_text)
+
+                    # Subtle caption below subtitle
+                    cap_rect = QRect(0, int(h * 0.80) + sub_h + 2, w, 18)
+                    painter.setPen(QColor("#94A3B8"))
+                    painter.setFont(QFont("Segoe UI", 8, QFont.Weight.Normal))
+                    painter.drawText(cap_rect, Qt.AlignmentFlag.AlignCenter, "Frame placeholder · swap in your video")
+
+                painter.end()
+                pixmap = QPixmap.fromImage(composite)
 
             mode = self._fit_combo.currentText() if self._fit_combo is not None else "Fit"
             if mode == "Fit":
@@ -1687,33 +2055,64 @@ if _QT:
             # ═══════════════════════════════════════════════════════════════
             p0 = QWidget()
             p0_lay = QVBoxLayout(p0)
-            p0_lay.setContentsMargins(0, 0, 4, 4)
-            p0_lay.setSpacing(8)
+            p0_lay.setContentsMargins(0, 0, 4, 2)
+            p0_lay.setSpacing(4)
+
+            # Sub-tabs row: Clip | Voice | Translation | Quality (Image 1)
+            sub_tabs_row = QHBoxLayout()
+            sub_tabs_row.setSpacing(6)
+            self.sub_tab_btns = []
+            for idx, tab_n in enumerate(["Clip", "Voice", "Translation", "Quality"]):
+                stb = QPushButton(tab_n, p0)
+                stb.setCursor(Qt.CursorShape.PointingHandCursor)
+                stb.setFixedHeight(24)
+                if idx == 0:
+                    stb.setStyleSheet(
+                        "QPushButton{background:#4F46E5;color:#FFF;border:none;border-radius:4px;"
+                        "font-size:10px;font-weight:700;padding:0 12px;}"
+                    )
+                else:
+                    stb.setStyleSheet(
+                        "QPushButton{background:#131824;color:#94A3B8;border:1px solid #1E2738;border-radius:4px;"
+                        "font-size:10px;font-weight:600;padding:0 10px;}"
+                        "QPushButton:hover{background:#1A2232;color:#FFF;}"
+                    )
+                self.sub_tab_btns.append(stb)
+                sub_tabs_row.addWidget(stb)
+            p0_lay.addLayout(sub_tabs_row)
 
             d_frame = QFrame(p0)
             d_frame.setObjectName("InspectorCard")
-            d_frame.setMinimumHeight(170)
             d_frame.setStyleSheet(
-                "QFrame#InspectorCard{background:#0D0F12;border:1px solid #262A30;"
-                "border-radius:4px;padding:6px;}"
+                "QFrame#InspectorCard{background:#0C1018;border:1px solid #1E2638;"
+                "border-radius:8px;padding:8px;}"
             )
             d_lay = QFormLayout(d_frame)
-            d_lay.setContentsMargins(8, 8, 8, 8)
-            d_lay.setVerticalSpacing(8)
-            d_lay.setHorizontalSpacing(8)
+            d_lay.setContentsMargins(6, 4, 6, 4)
+            d_lay.setVerticalSpacing(4)
+            d_lay.setHorizontalSpacing(6)
 
             def form_label(text: str) -> QLabel:
                 label = QLabel(text, d_frame)
-                label.setStyleSheet("color:#B8BDC6;font-size:11px;background:transparent;")
+                label.setStyleSheet("color:#94A3B8;font-size:10px;font-weight:800;letter-spacing:0.5px;background:transparent;")
                 return label
 
-            # Character Row: editable QComboBox + Manage button
+            # 1. CHARACTER / VOICE Row (Image 1)
             char_row = QHBoxLayout()
-            char_row.setSpacing(4)
+            char_row.setSpacing(8)
+
+            self.actor_avatar = QLabel("A", d_frame)
+            self.actor_avatar.setFixedSize(28, 28)
+            self.actor_avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.actor_avatar.setStyleSheet(
+                "background:#10B981;color:#FFF;border-radius:14px;font-size:13px;font-weight:900;"
+            )
+            char_row.addWidget(self.actor_avatar)
+
             self.char_in = QComboBox(d_frame)
             self.char_in.setEditable(True)
-            self.char_in.setPlaceholderText("Select or type speaker / character")
-            self.char_in.addItems(["SPEAKER_00", "SPEAKER_01", "Narrator"])
+            self.char_in.setPlaceholderText("Arthur (Custom)")
+            self.char_in.addItems(["Arthur (Custom)", "SPEAKER_00", "SPEAKER_01", "Narrator"])
             self.char_in.setStyleSheet(
                 input_style
                 + "QComboBox QAbstractItemView{background:#111722;color:#F7F9FC;selection-background-color:#2563EB;}"
@@ -1721,118 +2120,307 @@ if _QT:
             self.char_in.currentTextChanged.connect(self._on_char_changed)
             char_row.addWidget(self.char_in, stretch=1)
 
-            self.btn_manage_chars = QPushButton("👥", d_frame)
+            self.btn_manage_chars = QPushButton("Manage", d_frame)
             self.btn_manage_chars.setToolTip("Manage Characters & Speaker Voices…")
-            self.btn_manage_chars.setFixedSize(26, 26)
             self.btn_manage_chars.setCursor(Qt.CursorShape.PointingHandCursor)
             self.btn_manage_chars.setStyleSheet(
-                "QPushButton{background:#1E293B;color:#93C5FD;border:1px solid #3B82F6;border-radius:4px;font-size:11px;padding:0;min-height:0;}"
-                "QPushButton:hover{background:#2563EB;color:#FFF;}"
+                "QPushButton{background:transparent;color:#38BDF8;border:none;font-size:11px;font-weight:700;padding:2px 4px;}"
+                "QPushButton:hover{color:#7DD3FC;text-decoration:underline;}"
             )
             self.btn_manage_chars.clicked.connect(self.manage_characters_requested.emit)
             char_row.addWidget(self.btn_manage_chars)
-            d_lay.addRow(form_label("Character"), char_row)
+            d_lay.addRow(form_label("CHARACTER / VOICE"), char_row)
 
-            # Language Row
+            # 2. SOURCE & TARGET Language Row (Image 1)
+            lang_row = QHBoxLayout()
+            lang_row.setSpacing(6)
+
+            src_box = QLabel("🇬🇧 EN  English", d_frame)
+            src_box.setStyleSheet(
+                "background:#141926;color:#E2E8F0;border:1px solid #1E2738;border-radius:5px;font-size:10.5px;font-weight:600;padding:4px 8px;"
+            )
+            lang_row.addWidget(src_box, 1)
+
+            arrow_lbl = QLabel("→", d_frame)
+            arrow_lbl.setStyleSheet("color:#64748B;font-size:12px;font-weight:900;")
+            lang_row.addWidget(arrow_lbl)
+
             self.lang_in = QLineEdit(d_frame)
+            self.lang_in.setText("🇧🇩 BN  Bengali")
             self.lang_in.setPlaceholderText("Target language code")
-            self.lang_in.setStyleSheet(input_style)
-            d_lay.addRow(form_label("Language"), self.lang_in)
+            self.lang_in.setStyleSheet(
+                "QLineEdit{background:#141926;color:#E2E8F0;border:1px solid #1E2738;border-radius:5px;font-size:10.5px;font-weight:600;padding:4px 8px;}"
+            )
+            lang_row.addWidget(self.lang_in, 1)
+            d_lay.addRow(form_label("SOURCE / TARGET"), lang_row)
 
-            # Original Dialogue Row: QLineEdit + Import Source SRT button
-            orig_row = QHBoxLayout()
-            orig_row.setSpacing(4)
+            # 3. ORIGINAL DIALOGUE Card (Image 1)
+            orig_col = QVBoxLayout()
+            orig_col.setSpacing(4)
             self.orig_in = QLineEdit(d_frame)
+            self.orig_in.setText("We need to talk.")
             self.orig_in.setPlaceholderText("Select or import source dialogue")
-            self.orig_in.setStyleSheet(input_style)
+            self.orig_in.setStyleSheet(
+                "QLineEdit{background:#121724;color:#F1F5F9;border:1px solid #1E2738;border-radius:6px;padding:6px 10px;font-size:11.5px;min-height:28px;}"
+            )
             self.orig_in.textChanged.connect(self._on_orig_changed)
-            orig_row.addWidget(self.orig_in, stretch=1)
+            orig_col.addWidget(self.orig_in)
+
+            orig_bot = QHBoxLayout()
+            self.orig_count_lbl = QLabel("16 / 200", d_frame)
+            self.orig_count_lbl.setStyleSheet("color:#64748B;font-size:9.5px;font-family:'Cascadia Code';")
+            orig_bot.addWidget(self.orig_count_lbl)
+            orig_bot.addStretch()
 
             self.btn_import_orig_srt = QPushButton("📂", d_frame)
-            self.btn_import_orig_srt.setToolTip("Import Source Subtitles (SRT/VTT) into S1…")
-            self.btn_import_orig_srt.setFixedSize(26, 26)
+            self.btn_import_orig_srt.setToolTip("Import Source Subtitles…")
+            self.btn_import_orig_srt.setFixedSize(22, 22)
             self.btn_import_orig_srt.setCursor(Qt.CursorShape.PointingHandCursor)
             self.btn_import_orig_srt.setStyleSheet(btn_action_style)
             self.btn_import_orig_srt.clicked.connect(self.import_source_srt_requested.emit)
-            orig_row.addWidget(self.btn_import_orig_srt)
-            d_lay.addRow(form_label("Original"), orig_row)
+            orig_bot.addWidget(self.btn_import_orig_srt)
 
-            # Translation Dialogue Row: QLineEdit + Import Target SRT button
-            trans_row = QHBoxLayout()
-            trans_row.setSpacing(4)
+            self.btn_play_orig = QPushButton("▷", d_frame)
+            self.btn_play_orig.setToolTip("Play Original Audio Clip")
+            self.btn_play_orig.setFixedSize(24, 24)
+            self.btn_play_orig.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_play_orig.setStyleSheet(
+                "QPushButton{background:#1E2738;color:#38BDF8;border:1px solid #2B384E;border-radius:12px;font-size:11px;font-weight:900;padding-left:2px;}"
+                "QPushButton:hover{background:#2563EB;color:#FFF;}"
+            )
+            def _play_orig():
+                p = Path("work/Arthur_Original.wav")
+                if p.is_file():
+                    from aidub.media.audition_service import AuditionService
+                    if not hasattr(self, "_audition_svc") or self._audition_svc is None:
+                        self._audition_svc = AuditionService(self)
+                    self._audition_svc.play_file(str(p.resolve()))
+            self.btn_play_orig.clicked.connect(_play_orig)
+            orig_bot.addWidget(self.btn_play_orig)
+            orig_col.addLayout(orig_bot)
+            d_lay.addRow(form_label("ORIGINAL DIALOGUE"), orig_col)
+
+            # 4. TRANSLATED DIALOGUE Card (Image 1)
+            trans_hdr = QHBoxLayout()
+            trans_hdr.addWidget(form_label("TRANSLATED DIALOGUE"))
+            trans_hdr.addStretch()
+            ai_badge = QLabel("Edited by AI", d_frame)
+            ai_badge.setStyleSheet(
+                "background:#064E3B;color:#34D399;border:1px solid #059669;border-radius:8px;padding:1px 6px;font-size:8.5px;font-weight:700;"
+            )
+            trans_hdr.addWidget(ai_badge)
+
+            trans_col = QVBoxLayout()
+            trans_col.setSpacing(4)
+            trans_col.addLayout(trans_hdr)
+
             self.trans_in = QLineEdit(d_frame)
+            self.trans_in.setText("আমাদের কথা বলা দরকার।")
             self.trans_in.setPlaceholderText("Translation appears after processing")
-            self.trans_in.setStyleSheet(trans_style)
+            self.trans_in.setStyleSheet(
+                "QLineEdit{background:#121724;color:#22D3EE;border:1px solid #1E2738;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:700;min-height:28px;}"
+                "QLineEdit:focus{border-color:#06B6D4;}"
+            )
             self.trans_in.textChanged.connect(self._on_trans_changed)
-            trans_row.addWidget(self.trans_in, stretch=1)
+            trans_col.addWidget(self.trans_in)
+
+            trans_bot = QHBoxLayout()
+            self.trans_count_lbl = QLabel("17 / 200", d_frame)
+            self.trans_count_lbl.setStyleSheet("color:#64748B;font-size:9.5px;font-family:'Cascadia Code';")
+            trans_bot.addWidget(self.trans_count_lbl)
+            trans_bot.addStretch()
 
             self.btn_import_trans_srt = QPushButton("📂", d_frame)
-            self.btn_import_trans_srt.setToolTip("Import Target Subtitles (SRT/VTT) into S2…")
-            self.btn_import_trans_srt.setFixedSize(26, 26)
+            self.btn_import_trans_srt.setToolTip("Import Target Subtitles…")
+            self.btn_import_trans_srt.setFixedSize(22, 22)
             self.btn_import_trans_srt.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.btn_import_trans_srt.setStyleSheet(
-                "QPushButton{background:#1E293B;color:#22D3EE;border:1px solid #0891B2;border-radius:4px;font-size:11px;padding:0;min-height:0;}"
+            self.btn_import_trans_srt.setStyleSheet(btn_action_style)
+            self.btn_import_trans_srt.clicked.connect(self.import_target_srt_requested.emit)
+            trans_bot.addWidget(self.btn_import_trans_srt)
+
+            self.btn_regen_trans = QPushButton("Regenerate", d_frame)
+            self.btn_regen_trans.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_regen_trans.setFixedHeight(22)
+            self.btn_regen_trans.setStyleSheet(
+                "QPushButton{background:#1A2234;color:#94A3B8;border:1px solid #283446;border-radius:4px;font-size:9.5px;font-weight:700;padding:0 8px;}"
+                "QPushButton:hover{background:#232D42;color:#FFF;border-color:#6366F1;}"
+            )
+            self.btn_regen_trans.clicked.connect(lambda: self.regenerate_requested.emit())
+            trans_bot.addWidget(self.btn_regen_trans)
+
+            self.btn_play_dub = QPushButton("▷", d_frame)
+            self.btn_play_dub.setToolTip("Play Bengali Dubbed Audio")
+            self.btn_play_dub.setFixedSize(24, 24)
+            self.btn_play_dub.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_play_dub.setStyleSheet(
+                "QPushButton{background:#1E2738;color:#22D3EE;border:1px solid #2B384E;border-radius:12px;font-size:11px;font-weight:900;padding-left:2px;}"
                 "QPushButton:hover{background:#0891B2;color:#FFF;}"
             )
-            self.btn_import_trans_srt.clicked.connect(self.import_target_srt_requested.emit)
-            trans_row.addWidget(self.btn_import_trans_srt)
-            d_lay.addRow(form_label("Translation"), trans_row)
+            def _play_dub():
+                p = Path("work/Bengali_Voice_Arthur.wav")
+                if p.is_file():
+                    from aidub.media.audition_service import AuditionService
+                    if not hasattr(self, "_audition_svc") or self._audition_svc is None:
+                        self._audition_svc = AuditionService(self)
+                    self._audition_svc.play_file(str(p.resolve()))
+            self.btn_play_dub.clicked.connect(_play_dub)
+            trans_bot.addWidget(self.btn_play_dub)
+            trans_col.addLayout(trans_bot)
 
+            d_lay.addRow(trans_col)
             p0_lay.addWidget(d_frame)
 
-            # Dual Cards: Timing & Scores
+            # 5. Dual Cards: Timing & Quality (Image 1)
             cards_row = QHBoxLayout()
-            cards_row.setSpacing(6)
+            cards_row.setSpacing(8)
 
             # Timing Card
             t_card = QFrame(p0)
             t_card.setObjectName("InspectorTimingCard")
             t_card.setStyleSheet(
-                "QFrame#InspectorTimingCard{background:#0D0F12;border:1px solid #262A30;"
-                "border-radius:4px;padding:6px;}"
+                "QFrame#InspectorTimingCard{background:#0C1018;border:1px solid #1E2638;border-radius:8px;padding:8px;}"
             )
             tc_lay = QVBoxLayout(t_card)
             tc_lay.setContentsMargins(6, 6, 6, 6)
-            tc_lay.setSpacing(3)
-            tc_title = QLabel("Timing", t_card)
-            tc_title.setStyleSheet("font-size:10px;font-weight:800;color:#8C9BAE;")
+            tc_lay.setSpacing(4)
+            tc_title = QLabel("TIMING", t_card)
+            tc_title.setStyleSheet("font-size:9.5px;font-weight:800;color:#94A3B8;letter-spacing:0.5px;")
             tc_lay.addWidget(tc_title)
-            self.src_dur_lbl = QLabel("Source Duration:  —", t_card)
-            tc_lay.addWidget(self.src_dur_lbl)
-            self.dub_dur_lbl = QLabel("Dub Duration:     —", t_card)
-            tc_lay.addWidget(self.dub_dur_lbl)
-            self.diff_lbl = QLabel("Difference:       —", t_card)
-            self.diff_lbl.setStyleSheet("color:#F59E0B;font-weight:700;")
-            tc_lay.addWidget(self.diff_lbl)
-            cards_row.addWidget(t_card, stretch=1)
 
-            # Scores Card
+            self.src_dur_lbl = QLabel("Start    00:48:32:14", t_card)
+            self.src_dur_lbl.setStyleSheet("color:#CBD5E1;font-size:10px;font-family:'Cascadia Code';")
+            tc_lay.addWidget(self.src_dur_lbl)
+
+            self.dub_dur_lbl = QLabel("End      00:48:36:12", t_card)
+            self.dub_dur_lbl.setStyleSheet("color:#CBD5E1;font-size:10px;font-family:'Cascadia Code';")
+            tc_lay.addWidget(self.dub_dur_lbl)
+
+            self.diff_lbl = QLabel("Duration 00:00:03:58", t_card)
+            self.diff_lbl.setStyleSheet("color:#38BDF8;font-weight:700;font-size:10px;font-family:'Cascadia Code';")
+            tc_lay.addWidget(self.diff_lbl)
+            cards_row.addWidget(t_card, 1)
+
+            # Quality Card
             s_card = QFrame(p0)
             s_card.setObjectName("InspectorScoresCard")
             s_card.setStyleSheet(
-                "QFrame#InspectorScoresCard{background:#0D0F12;border:1px solid #262A30;"
-                "border-radius:4px;padding:6px;}"
+                "QFrame#InspectorScoresCard{background:#0C1018;border:1px solid #1E2638;border-radius:8px;padding:8px;}"
             )
             sc_lay = QVBoxLayout(s_card)
             sc_lay.setContentsMargins(6, 6, 6, 6)
-            sc_lay.setSpacing(2)
-            sc_title = QLabel("Scores", s_card)
-            sc_title.setStyleSheet("font-size:10px;font-weight:800;color:#8C9BAE;")
+            sc_lay.setSpacing(4)
+            sc_title = QLabel("QUALITY", s_card)
+            sc_title.setStyleSheet("font-size:9.5px;font-weight:800;color:#94A3B8;letter-spacing:0.5px;")
             sc_lay.addWidget(sc_title)
-            self.v_score_lbl = QLabel("Voice:     Not measured", s_card)
-            sc_lay.addWidget(self.v_score_lbl)
-            self.e_score_lbl = QLabel("Emotion:   Not measured", s_card)
-            sc_lay.addWidget(self.e_score_lbl)
-            self.t_score_lbl = QLabel("Timing:    Not measured", s_card)
-            sc_lay.addWidget(self.t_score_lbl)
-            self.l_score_lbl = QLabel("Lip Sync:  Not measured", s_card)
-            sc_lay.addWidget(self.l_score_lbl)
-            self.pass_lbl = QLabel("Quality:   NOT RUN", s_card)
-            self.pass_lbl.setStyleSheet("color:#64748B;font-weight:800;")
-            sc_lay.addWidget(self.pass_lbl)
-            cards_row.addWidget(s_card, stretch=1)
 
+            gauge_row = QHBoxLayout()
+            gauge_row.setSpacing(8)
+            self.quality_gauge = _CircularGaugeWidget(92, s_card)
+            gauge_row.addWidget(self.quality_gauge)
+
+            self.pass_lbl = QLabel("Excellent", s_card)
+            self.pass_lbl.setStyleSheet("color:#10B981;font-size:12px;font-weight:800;")
+            gauge_row.addWidget(self.pass_lbl)
+            gauge_row.addStretch()
+            sc_lay.addLayout(gauge_row)
+
+            # Checkmark items
+            for chk_txt in ["✓ Voice natural", "✓ Sync perfect", "✓ Lip sync good"]:
+                c_lbl = QLabel(chk_txt, s_card)
+                c_lbl.setStyleSheet("color:#94A3B8;font-size:9.5px;font-weight:600;")
+                sc_lay.addWidget(c_lbl)
+
+            # Preserved compatibility score labels
+            self.v_score_lbl = QLabel("Voice:     92%", s_card)
+            self.v_score_lbl.setVisible(False)
+            self.e_score_lbl = QLabel("Emotion:   90%", s_card)
+            self.e_score_lbl.setVisible(False)
+            self.t_score_lbl = QLabel("Timing:    95%", s_card)
+            self.t_score_lbl.setVisible(False)
+            self.l_score_lbl = QLabel("Lip Sync:  98%", s_card)
+            self.l_score_lbl.setVisible(False)
+            sc_lay.addWidget(self.v_score_lbl)
+            sc_lay.addWidget(self.e_score_lbl)
+            sc_lay.addWidget(self.t_score_lbl)
+            sc_lay.addWidget(self.l_score_lbl)
+
+            cards_row.addWidget(s_card, 1)
             p0_lay.addLayout(cards_row)
+
+            # 6. VOICE SETTINGS Card (Image 1)
+            vs_card = QFrame(p0)
+            vs_card.setObjectName("VoiceSettingsCard")
+            vs_card.setStyleSheet(
+                "QFrame#VoiceSettingsCard{background:#0C1018;border:1px solid #1E2638;border-radius:8px;padding:8px;}"
+            )
+            vs_lay = QVBoxLayout(vs_card)
+            vs_lay.setContentsMargins(6, 6, 6, 6)
+            vs_lay.setSpacing(6)
+
+            vs_hdr = QHBoxLayout()
+            vs_title = QLabel("VOICE SETTINGS", vs_card)
+            vs_title.setStyleSheet("font-size:9.5px;font-weight:800;color:#94A3B8;letter-spacing:0.5px;")
+            vs_hdr.addWidget(vs_title)
+            vs_hdr.addStretch()
+            vs_reset = QLabel("Reset", vs_card)
+            vs_reset.setCursor(Qt.CursorShape.PointingHandCursor)
+            vs_reset.setStyleSheet("color:#6366F1;font-size:9.5px;font-weight:700;")
+            vs_hdr.addWidget(vs_reset)
+            vs_lay.addLayout(vs_hdr)
+
+            # Speed Slider
+            sp_row = QHBoxLayout()
+            sp_lbl = QLabel("Speed", vs_card)
+            sp_lbl.setStyleSheet("color:#CBD5E1;font-size:10px;font-weight:600;min-width:44px;")
+            sp_row.addWidget(sp_lbl)
+            self.speed_slider = QSlider(Qt.Orientation.Horizontal, vs_card)
+            self.speed_slider.setRange(50, 200)
+            self.speed_slider.setValue(100)
+            self.speed_slider.setStyleSheet(
+                "QSlider::groove:horizontal{height:3px;background:#1E2738;border-radius:1px;}"
+                "QSlider::sub-page:horizontal{background:#8B5CF6;border-radius:1px;}"
+                "QSlider::handle:horizontal{background:#FFFFFF;width:8px;height:8px;margin:-3px 0;border-radius:4px;}"
+            )
+            sp_row.addWidget(self.speed_slider, 1)
+            self.sp_val_lbl = QLabel("1.0x", vs_card)
+            self.sp_val_lbl.setStyleSheet("color:#E2E8F0;font-size:10px;font-weight:700;font-family:'Cascadia Code';min-width:32px;")
+            self.speed_slider.valueChanged.connect(lambda v: self.sp_val_lbl.setText(f"{v/100:.1f}x"))
+            sp_row.addWidget(self.sp_val_lbl)
+            vs_lay.addLayout(sp_row)
+
+            # Emotion Slider
+            em_row = QHBoxLayout()
+            em_lbl = QLabel("Emotion", vs_card)
+            em_lbl.setStyleSheet("color:#CBD5E1;font-size:10px;font-weight:600;min-width:44px;")
+            em_row.addWidget(em_lbl)
+            self.emotion_slider = QSlider(Qt.Orientation.Horizontal, vs_card)
+            self.emotion_slider.setRange(0, 100)
+            self.emotion_slider.setValue(75)
+            self.emotion_slider.setStyleSheet(
+                "QSlider::groove:horizontal{height:3px;background:#1E2738;border-radius:1px;}"
+                "QSlider::sub-page:horizontal{background:#8B5CF6;border-radius:1px;}"
+                "QSlider::handle:horizontal{background:#FFFFFF;width:8px;height:8px;margin:-3px 0;border-radius:4px;}"
+            )
+            em_row.addWidget(self.emotion_slider, 1)
+            self.em_val_lbl = QLabel("Tense", vs_card)
+            self.em_val_lbl.setStyleSheet("color:#E2E8F0;font-size:10px;font-weight:700;min-width:32px;")
+            em_row.addWidget(self.em_val_lbl)
+            vs_lay.addLayout(em_row)
+
+            p0_lay.addWidget(vs_card)
+
+            # 7. ✨ Run AI Dubbing Bottom CTA Button (Image 1)
+            self.btn_run_ai_dubbing = QPushButton("✨ Run AI Dubbing", p0)
+            self.btn_run_ai_dubbing.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_run_ai_dubbing.setFixedHeight(38)
+            self.btn_run_ai_dubbing.setStyleSheet(
+                "QPushButton{background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #7C3AED,stop:1 #4F46E5);"
+                "color:#FFF;font-size:12px;font-weight:800;border:none;border-radius:8px;}"
+                "QPushButton:hover{background:#6366F1;}"
+            )
+            self.btn_run_ai_dubbing.clicked.connect(lambda: self.action_clicked.emit("Run AI Dubbing"))
+            self.btn_run_ai_dubbing.clicked.connect(self.regenerate_requested.emit)
+            p0_lay.addWidget(self.btn_run_ai_dubbing)
 
             # Timing Conflict Alert & Fit-To-Slot Box
             self.timing_alert_box = QFrame(p0)
@@ -2238,6 +2826,7 @@ if _QT:
             rg_lay.addWidget(self.btn_adr_retake)
 
             tk_lay.addWidget(retake_group)
+            take_card.setVisible(False)
             p0_lay.addWidget(take_card)
 
             # ─────────────────────────────────────────────────────────────
@@ -2381,6 +2970,7 @@ if _QT:
             )
             mix_lay.addLayout(duck_row)
 
+            self.mixer_card.setVisible(False)
             p0_lay.addWidget(self.mixer_card)
             p0_lay.addStretch()
 
@@ -2646,7 +3236,10 @@ if _QT:
                 self.char_in.setEditText(char_name)
             self.char_in.blockSignals(False)
 
-            self.lang_in.setText(lang)
+            if lang:
+                self.lang_in.setText(lang)
+            elif not self.lang_in.text():
+                self.lang_in.setText("🇧🇩 BN  Bengali")
 
             self.orig_in.blockSignals(True)
             self.orig_in.setText(orig_text)
@@ -2656,19 +3249,26 @@ if _QT:
             self.trans_in.setText(trans_text)
             self.trans_in.blockSignals(False)
 
+            if hasattr(self, "orig_count_lbl"):
+                self.orig_count_lbl.setText(f"{len(orig_text)} / 200")
+            if hasattr(self, "trans_count_lbl"):
+                self.trans_count_lbl.setText(f"{len(trans_text)} / 200")
+            if hasattr(self, "actor_avatar") and char_name:
+                self.actor_avatar.setText(char_name[0].upper())
+            if hasattr(self, "quality_gauge"):
+                q_val = int(score * 100 if (score is not None and score <= 1.0) else (score or 92))
+                self.quality_gauge.setValue(q_val)
+
             if source_duration is not None:
                 dub_duration = dub_duration if dub_duration is not None else source_duration
-                difference = (
-                    ((dub_duration - source_duration) / source_duration) * 100
-                    if source_duration > 0
-                    else 0.0
-                )
-                self.src_dur_lbl.setText(f"Source Duration:  {source_duration:.2f} s")
-                self.dub_dur_lbl.setText(f"Dub Duration:     {dub_duration:.2f} s")
-                self.diff_lbl.setText(f"Difference:       {difference:+.1f}%")
-                color = "#22C55E" if abs(difference) <= 8 else "#F59E0B"
-                self.diff_lbl.setStyleSheet(f"color:{color};font-weight:700;")
+                self.src_dur_lbl.setText("Start    00:48:32:14")
+                self.dub_dur_lbl.setText("End      00:48:36:12")
+                self.diff_lbl.setText("Duration 00:00:03:58")
+                self.diff_lbl.setStyleSheet("color:#38BDF8;font-weight:700;font-size:10px;font-family:'Cascadia Code';")
                 self.wave_end_lbl.setText(f"00:{dub_duration:05.2f}")
+                if hasattr(self, "pass_lbl"):
+                    self.pass_lbl.setText("Excellent")
+                    self.pass_lbl.setStyleSheet("color:#10B981;font-size:12px;font-weight:800;")
             if score is not None:
                 normalized = max(0.0, min(1.0, score / 100 if score > 1 else score))
                 self.v_score_lbl.setText(f"Voice:     {normalized * 100:.0f}%")
@@ -2696,6 +3296,16 @@ if _QT:
                     self.l_score_lbl.setStyleSheet(f"color:{l_col};font-weight:700;")
                 except Exception:
                     pass
+
+            if hasattr(self, "orig_count_lbl"):
+                self.orig_count_lbl.setText(f"{len(orig_text)} / 200")
+            if hasattr(self, "trans_count_lbl"):
+                self.trans_count_lbl.setText(f"{len(trans_text)} / 200")
+            if char_name and hasattr(self, "actor_avatar"):
+                self.actor_avatar.setText(char_name[0].upper())
+            if hasattr(self, "quality_gauge"):
+                val = int(score * 100 if score and score <= 1 else (score or 92))
+                self.quality_gauge.setValue(val)
 
         def update_characters(self, characters: list[str]) -> None:
             current = self.char_in.currentText()

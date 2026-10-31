@@ -22,7 +22,7 @@ from aidub.adapters.voice_base import (
     VoiceEngineError,
     VoiceEngineKind,
 )
-from aidub.media.ffmpeg_ops import _run, duration
+from aidub.media.ffmpeg_ops import _ffmpeg_exe, _run, duration
 
 logger = logging.getLogger(__name__)
 
@@ -136,16 +136,23 @@ class ChatterboxAdapter:
         reference_audio_path: Path | str | None = None,
         speaker_id: int | str = 0,
         language: str = "bn",
+        voice: str | None = None,
+        emotion: str | None = None,
+        reference_audio: Path | str | None = None,
+        **kwargs: Any,
     ) -> Path:
         """
         Synthesize text into speech with voice cloning.
 
         Args:
-            text: Bengali or localized dialogue text to synthesize.
+            text: Dialogue text to localize.
             output_wav_path: Destination path for output WAV file.
             reference_audio_path: Optional reference audio for speaker voice cloning.
             speaker_id: Speaker identifier for reference lookup.
-            language: Target language ('bn' for Bangla).
+            language: Target language ('bn' for Bangla, etc.).
+            voice: Optional voice identifier.
+            emotion: Optional emotion style.
+            reference_audio: Alias for reference_audio_path.
 
         Returns:
             Path to the output WAV file.
@@ -155,20 +162,24 @@ class ChatterboxAdapter:
 
         out_p = Path(output_wav_path)
         out_p.parent.mkdir(parents=True, exist_ok=True)
+        effective_ref = reference_audio_path if reference_audio_path is not None else reference_audio
 
         if self.is_remote:
             return self._synthesize_remote(
                 text=text,
                 out_p=out_p,
-                reference_audio_path=reference_audio_path,
+                reference_audio_path=effective_ref,
                 speaker_id=speaker_id,
                 language=language,
+                voice=voice,
+                emotion=emotion,
+                **kwargs,
             )
         else:
             return self._synthesize_local(
                 text=text,
                 out_p=out_p,
-                reference_audio_path=reference_audio_path,
+                reference_audio_path=effective_ref,
             )
 
     def _synthesize_remote(
@@ -178,6 +189,9 @@ class ChatterboxAdapter:
         reference_audio_path: Path | str | None,
         speaker_id: int | str,
         language: str,
+        voice: str | None = None,
+        emotion: str | None = None,
+        **kwargs: Any,
     ) -> Path:
         """Synthesize via remote Kaggle / Cloudflare REST API."""
         spk_str = str(speaker_id)
@@ -193,11 +207,16 @@ class ChatterboxAdapter:
 
         try:
             with httpx.Client(timeout=self.timeout) as client:
-                data = {
+                data: dict[str, Any] = {
                     "text": text,
                     "speaker_id": spk_str,
                     "language": language,
                 }
+                if voice:
+                    data["voice"] = str(voice)
+                if emotion:
+                    data["emotion"] = str(emotion)
+
                 if ref_file_to_send:
                     with open(ref_file_to_send, "rb") as rf:
                         files = {"reference_audio": (ref_file_to_send.name, rf, "audio/wav")}
@@ -304,7 +323,7 @@ class ChatterboxVoiceEngine:
             # Resample / reformat to requested sample rate using ffmpeg
             _run(
                 [
-                    "ffmpeg",
+                    _ffmpeg_exe(),
                     "-y",
                     "-i",
                     str(raw_wav_path),
@@ -333,4 +352,3 @@ __all__ = [
     "ChatterboxAdapter",
     "ChatterboxVoiceEngine",
 ]
-
